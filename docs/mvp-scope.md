@@ -29,6 +29,29 @@ product thesis is validated.
 9. **Minimal serving telemetry** — at least impression + quartiles wired into
    `creative_events` (proves the analytics foundation; rich dashboard is post-MVP).
 
+## Implementation status (2026-06-30)
+
+Code-complete and building green:
+
+- [x] Auth (Supabase email/password, middleware, profiles via trigger)
+- [x] Template showcase (public landing)
+- [x] Creative configuration (format picker + config form)
+- [x] VAST tag generation + dynamic `GET /api/vast` (gated, fail-closed, cached)
+- [x] Billing: Checkout + webhook (source of truth) + idempotency
+- [x] Dashboard (subscriptions, templates, creatives with copyable tags)
+- [x] Telemetry beacon `GET /api/track` -> `creative_events`
+
+Remaining before a true end-to-end demo (needs external setup / assets):
+
+- [ ] **Interactive runtime assets** — the actual SIMID document + VPAID unit for
+      the Shoppable Video template, uploaded to Supabase Storage.
+- [ ] **Seed data** — one published template row pointing at those assets.
+- [ ] **Live credentials** — Supabase project (apply `schema.sql`), Stripe products/
+      prices + webhook secret, env vars.
+- [ ] **Verification** — render the tag in Google IMA (VPAID) + a SIMID player;
+      confirm the kill-switch flips on cancel.
+- [ ] **`/security-review`** on payments, auth, and the public endpoints before push.
+
 ## Out of scope (post-MVP)
 
 - Additional templates (Branching Story, Lead-Gen) and additional formats.
