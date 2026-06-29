@@ -1,0 +1,99 @@
+# Data Model
+
+> Status: design phase. Conceptual schema + RLS intent. The actual `schema.sql`
+> migration is written when MVP scope is locked; keep this doc in sync with it.
+
+## Entities
+
+### `users`
+Backed by Supabase Auth (`auth.users`). App-level profile data lives in a `profiles`
+table keyed by the auth user id, holding `stripe_customer_id` and preferences.
+
+### `templates`
+Catalog of available interactive ad templates (admin-curated, read-only to users).
+
+| Field | Notes |
+| --- | --- |
+| `id` | uuid PK |
+| `name`, `description` | display |
+| `type` | e.g. `shoppable_video`, `branching_story`, `lead_gen` |
+| `category` | grouping for the showcase |
+| `supported_standards` | array, e.g. `{simid, vpaid}` — drives the format picker |
+| `runtime_keys` | per-standard pointer to the runtime build (e.g. simid/vpaid asset ids) |
+| `preview_url` | showcase preview |
+| `config_schema` | JSON schema describing the fields a user must fill |
+| `pricing_tier` | links to a Stripe price / plan |
+| `created_at`, `updated_at` | |
+
+### `creatives`
+A user's configured instance of a template.
+
+| Field | Notes |
+| --- | --- |
+| `id` | uuid PK (this is the `creative_id` in the VAST URL) |
+| `user_id` | FK → auth user |
+| `template_id` | FK → templates |
+| `selected_format` | `simid` \| `vpaid` \| … — user's choice; must be in template's `supported_standards` |
+| `config_json` | jsonb — validated against the template's `config_schema` |
+| `status` | `draft` \| `active` \| `paused` \| `archived` |
+| `created_at`, `updated_at` | |
+
+### `subscriptions`
+Source-of-truth mirror of Stripe state. See [billing.md](billing.md).
+
+| Field | Notes |
+| --- | --- |
+| `id` | uuid PK |
+| `user_id` | FK → auth user |
+| `plan_type` | `single` \| `all_access` |
+| `template_id` | FK → templates, **null for all-access** |
+| `status` | `active` \| `trialing` \| `past_due` \| `canceled` \| `incomplete` |
+| `stripe_subscription_id`, `stripe_customer_id` | |
+| `current_period_end` | ts; the effective expiry used by the gate |
+| `cancel_at_period_end` | bool |
+| `created_at`, `updated_at` | |
+
+### `creative_events` (analytics)
+Ingested ad events — the core value for media buyers. Append-only.
+
+| Field | Notes |
+| --- | --- |
+| `id` | bigint PK |
+| `creative_id` | FK |
+| `event_type` | `impression` \| `start` \| `q25` \| `q50` \| `q75` \| `complete` \| `interaction` \| `click` |
+| `meta` | jsonb (device, geo bucket, interaction detail) |
+| `occurred_at` | ts |
+
+> Volume note: this table can grow fast. MVP may use plain Postgres; revisit
+> partitioning / a dedicated analytics store post-MVP.
+
+## Relationships
+
+```
+auth.users 1──* creatives *──1 templates
+auth.users 1──* subscriptions *──0..1 templates   (null template_id = all-access)
+creatives  1──* creative_events
+```
+
+## The serving read (hot path)
+
+The VAST endpoint must answer "is this creative currently entitled to serve?" with a
+single fast lookup. Intent: a **denormalized view or materialized record** keyed by
+`creative_id` exposing exactly: `template_id`, `selected_format`, `config_json`, and
+the **effective subscription status** (active + `current_period_end`), resolved from
+either a matching single-template sub or any all-access sub for the owner. Refreshed
+on creative change and on Stripe webhook. Read via service-role, **bypassing RLS by
+design** (no user session exists on this path). See [security.md](security.md).
+
+## RLS intent
+
+| Table | Policy intent |
+| --- | --- |
+| `profiles` | owner can read/update own row |
+| `templates` | authenticated read for all; writes admin-only |
+| `creatives` | owner can CRUD own rows only |
+| `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
+| `creative_events` | **no direct client access**; writes via serving/ingest layer, reads via aggregated/owner-scoped views |
+
+RLS protects the **dashboard** path. It is intentionally not relied upon for the
+public VAST path, which uses a narrowly scoped service-role read.
