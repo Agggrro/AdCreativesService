@@ -38,6 +38,13 @@ Standard authenticated Next.js app. All data access goes through Supabase with R
 so a user can only ever see/modify their own creatives and subscriptions. This layer
 is **not** performance-critical and may use the Node runtime freely.
 
+Implemented: public showcase ([`app/page.tsx`](../app/page.tsx)); email/password auth
+([`app/login`](../app/login), [`app/signup`](../app/signup),
+[`app/auth/`](../app/auth) + [`middleware.ts`](../middleware.ts) for session refresh);
+protected dashboard ([`app/dashboard/`](../app/dashboard)) for subscriptions, the
+template catalog, the creative configurator, and copyable VAST tag URLs. Browser/SSR
+Supabase clients live in [`lib/supabase/`](../lib/supabase).
+
 ## B. Database
 
 See [data-model.md](data-model.md) for entities. Two access patterns coexist:
