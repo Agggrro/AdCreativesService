@@ -1,7 +1,8 @@
 # Data Model
 
-> Status: design phase. Conceptual schema + RLS intent. The actual `schema.sql`
-> migration is written when MVP scope is locked; keep this doc in sync with it.
+> Status: **implemented** in [`supabase/schema.sql`](../supabase/schema.sql). This doc
+> is the conceptual companion (entities, intent, RLS rationale); keep it in sync with
+> the SQL on every change.
 
 ## Entities
 
@@ -78,19 +79,29 @@ creatives  1──* creative_events
 ## The serving read (hot path)
 
 The VAST endpoint must answer "is this creative currently entitled to serve?" with a
-single fast lookup. Intent: a **denormalized view or materialized record** keyed by
-`creative_id` exposing exactly: `template_id`, `selected_format`, `config_json`, and
-the **effective subscription status** (active + `current_period_end`), resolved from
-either a matching single-template sub or any all-access sub for the owner. Refreshed
-on creative change and on Stripe webhook. Read via service-role, **bypassing RLS by
-design** (no user session exists on this path). See [security.md](security.md).
+single fast lookup. Implemented as the view **`private.creative_serving`** (in a
+dedicated `private` schema that is **not exposed to the API**), keyed by `creative_id`,
+exposing `template_id`, `selected_format`, `config_json`, `creative_status`,
+`template_type`, `runtime_keys`, `supported_standards`, plus resolved `is_entitled`
+and `should_serve` flags.
+
+Entitlement is resolved **live** via an indexed `EXISTS` against `subscriptions`
+(active/trialing, non-expired, covering the template via all-access or matching
+single) — backed by the partial index `subscriptions_active_lookup_idx`. A live view
+(rather than a trigger-maintained table) keeps it always-correct with no refresh
+plumbing; the ~60s edge cache (ADR-0004 / mvp-scope) absorbs the read cost. Promote to
+a materialized record only if profiling demands it.
+
+Read via the **service role**, which **bypasses RLS by design** (no user session
+exists on this path); access to the `private` schema is granted to `service_role`
+only. See [security.md](security.md).
 
 ## RLS intent
 
 | Table | Policy intent |
 | --- | --- |
 | `profiles` | owner can read/update own row |
-| `templates` | authenticated read for all; writes admin-only |
+| `templates` | **published** templates readable by anon + authenticated (public showcase); drafts hidden; writes admin-only (service role) |
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
 | `creative_events` | **no direct client access**; writes via serving/ingest layer, reads via aggregated/owner-scoped views |
