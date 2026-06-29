@@ -58,9 +58,17 @@ queries Stripe and never does a live join. See [architecture.md](architecture.md
     `cancel_at_period_end`, `template_id` (from metadata).
   - `customer.subscription.deleted` → mark `canceled`.
   - `invoice.payment_failed` → mark `past_due`.
-- After any change, **recompute and refresh the denormalized serving status** for all
-  affected creatives so the kill-switch reacts promptly.
-- Idempotent: dedupe by Stripe event id; webhooks can be redelivered.
+- **No separate "refresh" step.** The serving record is a *live* view
+  (`private.creative_serving`) that recomputes entitlement on read, so writing the
+  `subscriptions` row is sufficient — the VAST kill-switch reacts within the ~60s
+  cache window automatically.
+- **Idempotent:** each event id is claimed in `public.stripe_events` before
+  processing; a duplicate returns 200 without reprocessing, and a handler failure
+  rolls back the claim so Stripe's retry can reprocess.
+
+Implemented in [`app/api/stripe/webhook/route.ts`](../app/api/stripe/webhook/route.ts);
+plans/price config + status mapping in [`lib/stripe.ts`](../lib/stripe.ts); checkout
+session in [`app/api/checkout/route.ts`](../app/api/checkout/route.ts).
 
 ## Lifecycle → serving behavior
 

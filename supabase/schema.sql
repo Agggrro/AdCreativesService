@@ -215,6 +215,16 @@ comment on table public.creative_events is 'Append-only ad telemetry. Written by
 create index if not exists creative_events_creative_time_idx
   on public.creative_events (creative_id, occurred_at desc);
 
+-- ---------------------------------------------------------------------------
+-- stripe_events  (webhook idempotency ledger)
+-- ---------------------------------------------------------------------------
+create table if not exists public.stripe_events (
+  id          text primary key,        -- Stripe event id
+  type        text not null,
+  received_at timestamptz not null default now()
+);
+comment on table public.stripe_events is 'Processed Stripe event ids for webhook idempotency. Service-role only.';
+
 -- ============================================================================
 -- Row Level Security
 -- ----------------------------------------------------------------------------
@@ -228,6 +238,8 @@ alter table public.templates       enable row level security;
 alter table public.creatives       enable row level security;
 alter table public.subscriptions   enable row level security;
 alter table public.creative_events enable row level security;
+alter table public.stripe_events   enable row level security;
+-- stripe_events: no policy => no client access; only the service role (webhook) touches it.
 
 -- profiles: owner reads/updates own row (insert handled by trigger).
 drop policy if exists profiles_select_own on public.profiles;

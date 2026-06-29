@@ -68,6 +68,15 @@ Ingested ad events — the core value for media buyers. Append-only.
 > Volume note: this table can grow fast. MVP may use plain Postgres; revisit
 > partitioning / a dedicated analytics store post-MVP.
 
+### `stripe_events` (webhook idempotency)
+Ledger of processed Stripe event ids. Service-role only; no client access.
+
+| Field | Notes |
+| --- | --- |
+| `id` | text PK — the Stripe event id |
+| `type` | event type |
+| `received_at` | ts |
+
 ## Relationships
 
 ```
@@ -108,6 +117,7 @@ EXECUTE is granted to `service_role` only and which returns an explicit TABLE
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
 | `creative_events` | **no direct client access**; writes via serving/ingest layer, reads via aggregated/owner-scoped views |
+| `stripe_events` | **no direct client access**; written only by the webhook (service role) |
 
 RLS protects the **dashboard** path. It is intentionally not relied upon for the
 public VAST path, which uses a narrowly scoped service-role read.
