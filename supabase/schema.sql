@@ -326,6 +326,44 @@ grant usage on schema private to service_role;
 revoke all on private.creative_serving from anon, authenticated;
 grant select on private.creative_serving to service_role;
 
+-- ---------------------------------------------------------------------------
+-- RPC access to the serving record (the VAST endpoint's read path)
+-- ---------------------------------------------------------------------------
+-- PostgREST only exposes the `public`/`graphql_public` schemas, so the private
+-- view cannot be read via .from(). This SECURITY DEFINER function in `public`
+-- is the single read path: it runs as its owner (reads private), returns an
+-- explicit TABLE (self-contained for PostgREST introspection — no dependency on
+-- a private composite type), and EXECUTE is restricted to the service role.
+create or replace function public.get_creative_serving(p_creative_id uuid)
+returns table (
+  creative_id         uuid,
+  user_id             uuid,
+  template_id         uuid,
+  selected_format     text,
+  config_json         jsonb,
+  creative_status     creative_status,
+  template_type       text,
+  runtime_keys        jsonb,
+  supported_standards text[],
+  is_entitled         boolean,
+  should_serve        boolean
+)
+language sql
+security definer
+set search_path = public, private
+stable
+as $$
+  select creative_id, user_id, template_id, selected_format, config_json,
+         creative_status, template_type, runtime_keys, supported_standards,
+         is_entitled, should_serve
+  from private.creative_serving
+  where creative_id = p_creative_id;
+$$;
+
+-- Only the service role may call it (revoking from PUBLIC also covers anon/authenticated).
+revoke all on function public.get_creative_serving(uuid) from public;
+grant execute on function public.get_creative_serving(uuid) to service_role;
+
 -- ============================================================================
 -- End of schema
 -- ============================================================================

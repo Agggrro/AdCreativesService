@@ -94,7 +94,10 @@ a materialized record only if profiling demands it.
 
 Read via the **service role**, which **bypasses RLS by design** (no user session
 exists on this path); access to the `private` schema is granted to `service_role`
-only. See [security.md](security.md).
+only. Because PostgREST does not expose `private`, the endpoint reads through the
+**`public.get_creative_serving(uuid)` RPC** — a SECURITY DEFINER function whose
+EXECUTE is granted to `service_role` only and which returns an explicit TABLE
+(self-contained for introspection). See [security.md](security.md).
 
 ## RLS intent
 

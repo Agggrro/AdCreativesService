@@ -211,7 +211,12 @@ export type Database = {
       };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      get_creative_serving: {
+        Args: { p_creative_id: string };
+        Returns: Database["private"]["Views"]["creative_serving"]["Row"][];
+      };
+    };
     Enums: {
       plan_type: "single" | "all_access";
       subscription_status:

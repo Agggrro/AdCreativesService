@@ -58,7 +58,10 @@ in the wild — **public, unauthenticated, high QPS, latency-sensitive**.
 Request flow:
 
 1. Parse + validate `creative_id` (and optional `format` override, macros).
-2. Read the denormalized serving record (service-role, single indexed lookup).
+2. Read the denormalized serving record via the `get_creative_serving` RPC
+   (service-role; PostgREST doesn't expose the `private` schema, so a SECURITY
+   DEFINER function in `public` — EXECUTE restricted to `service_role` — is the
+   read path). See [data-model.md](data-model.md).
 3. **Subscription gate:** is there an active subscription covering this creative's
    template (single-template sub for that `template_id`, OR an all-access sub)?
    - **Active** → build a valid VAST 4.2 document containing the interactive payload
@@ -116,6 +119,6 @@ without touching the serving logic. See [ADR-0004](decisions/0004-mvp-on-free-ti
 | Concern | Runtime | Why |
 | --- | --- | --- |
 | Dashboard / auth pages | Node (Vercel) | Rich, low QPS |
-| `GET /api/vast` | Edge + cache | Latency, QPS, global reach |
+| `GET /api/vast` | Node + CDN cache (`s-maxage=60`) | Full supabase-js/storage support; CDN cache absorbs QPS/latency. Edge is a documented future optimization. |
 | `POST /api/stripe/webhook` | Node | Needs raw body for signature verification |
 | Creative runtime assets | Supabase Storage (free tier, CDN) | Static-ish, signed URLs, geo-distributed |
