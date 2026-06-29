@@ -39,6 +39,11 @@ The adapter layer hides these differences from the endpoint. Each adapter is
 responsible for spec-conformant output — validate with the **`vast-spec-reviewer`**
 subagent.
 
+**Implemented in** [`lib/vast/`](../lib/vast): `builder.ts` (VAST 4.2 envelope,
+tracking, fail-closed `generateVast`), `adapters/{simid,vpaid}.ts` (per-format
+`<MediaFiles>` nodes), `adapters/index.ts` (registry + `getAdapter`), `xml.ts`
+(escaping/CDATA), `config.ts` (defensive `config_json` parsing).
+
 ## The protection reality (do not oversell)
 
 A SIMID/VPAID creative **executes JavaScript on the client**. That JS is, by
