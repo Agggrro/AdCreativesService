@@ -68,6 +68,10 @@ Ingested ad events — the core value for media buyers. Append-only.
 > Volume note: this table can grow fast. MVP may use plain Postgres; revisit
 > partitioning / a dedicated analytics store post-MVP.
 
+Ingested by [`app/api/track/route.ts`](../app/api/track/route.ts) — a public,
+fire-and-forget beacon that maps VAST event names (start/firstQuartile/… plus
+impression/click) to the enum and inserts via the service role.
+
 ### `stripe_events` (webhook idempotency)
 Ledger of processed Stripe event ids. Service-role only; no client access.
 
