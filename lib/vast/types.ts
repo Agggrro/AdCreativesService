@@ -14,6 +14,10 @@ export interface CreativeConfig {
   durationSeconds?: number;
   /** Click-through landing URL, if any. */
   clickThroughUrl?: string;
+  /** Shoppable overlay: product label shown on the "Shop Now" badge. */
+  productName?: string;
+  /** Shoppable overlay: product thumbnail URL. */
+  productImageUrl?: string;
   /** Player dimensions; default 640x360. */
   width?: number;
   height?: number;

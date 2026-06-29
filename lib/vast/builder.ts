@@ -64,6 +64,19 @@ export function buildInlineVast(ctx: VastBuildContext): string {
       `            </VideoClicks>\n`
     : "";
 
+  // AdParameters carries the creative config to the SIMID/VPAID runtime
+  // (server-injected; never baked into the static asset — ADR-0003).
+  const adParams: Record<string, string | number> = {
+    durationSeconds: ctx.config.durationSeconds ?? DEFAULT_DURATION_SECONDS,
+  };
+  if (ctx.config.videoUrl) adParams.videoUrl = ctx.config.videoUrl;
+  if (ctx.config.clickThroughUrl) adParams.clickThroughUrl = ctx.config.clickThroughUrl;
+  if (ctx.config.productName) adParams.productName = ctx.config.productName;
+  if (ctx.config.productImageUrl) adParams.productImageUrl = ctx.config.productImageUrl;
+  const adParameters = `            <AdParameters>${cdata(
+    JSON.stringify(adParams),
+  )}</AdParameters>\n`;
+
   const mediaFiles = indent(adapter.mediaFilesInner(ctx), 14);
 
   // [ERRORCODE] is a VAST macro the player substitutes; it must stay literal.
@@ -82,7 +95,7 @@ export function buildInlineVast(ctx: VastBuildContext): string {
           <UniversalAdId idRegistry="adinteract">${escapeXml(cid)}</UniversalAdId>
           <Linear>
             <Duration>${duration}</Duration>
-            <TrackingEvents>
+${adParameters}            <TrackingEvents>
 ${trackingEvents}
             </TrackingEvents>
 ${videoClicks}            <MediaFiles>

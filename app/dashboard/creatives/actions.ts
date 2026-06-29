@@ -15,6 +15,8 @@ export async function createCreative(formData: FormData): Promise<void> {
   const selectedFormat = String(formData.get("selected_format") ?? "");
   const videoUrl = String(formData.get("video_url") ?? "").trim();
   const clickThroughUrl = String(formData.get("click_through_url") ?? "").trim();
+  const productName = String(formData.get("product_name") ?? "").trim();
+  const productImageUrl = String(formData.get("product_image_url") ?? "").trim();
   const durationRaw = String(formData.get("duration_seconds") ?? "").trim();
 
   if (!templateId || !selectedFormat || !videoUrl) {
@@ -27,6 +29,8 @@ export async function createCreative(formData: FormData): Promise<void> {
 
   const config_json: Record<string, Json> = { videoUrl };
   if (clickThroughUrl) config_json.clickThroughUrl = clickThroughUrl;
+  if (productName) config_json.productName = productName;
+  if (productImageUrl) config_json.productImageUrl = productImageUrl;
   const duration = Number(durationRaw);
   if (Number.isFinite(duration) && duration > 0) {
     config_json.durationSeconds = duration;

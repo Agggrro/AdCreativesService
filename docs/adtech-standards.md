@@ -40,9 +40,12 @@ responsible for spec-conformant output — validate with the **`vast-spec-review
 subagent.
 
 **Implemented in** [`lib/vast/`](../lib/vast): `builder.ts` (VAST 4.2 envelope,
-tracking, fail-closed `generateVast`), `adapters/{simid,vpaid}.ts` (per-format
-`<MediaFiles>` nodes), `adapters/index.ts` (registry + `getAdapter`), `xml.ts`
-(escaping/CDATA), `config.ts` (defensive `config_json` parsing).
+`<AdParameters>` config injection, tracking, fail-closed `generateVast`),
+`adapters/{simid,vpaid}.ts` (per-format `<MediaFiles>` nodes), `adapters/index.ts`
+(registry + `getAdapter`), `xml.ts` (escaping/CDATA), `config.ts` (defensive
+`config_json` parsing). Runtime units (Shop Now overlay) live in
+[`runtime/shoppable/`](../runtime); per-creative config reaches them via
+`<AdParameters>` at serve time (never baked in — ADR-0003).
 
 ## The protection reality (do not oversell)
 

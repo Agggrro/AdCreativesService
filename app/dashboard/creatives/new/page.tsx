@@ -119,6 +119,26 @@ export default async function NewCreativePage({
         </label>
 
         <label className="block space-y-1">
+          <span className="text-sm font-medium">Product name (Shop Now badge)</span>
+          <input
+            name="product_name"
+            type="text"
+            placeholder="Summer Jacket — $79"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
+          />
+        </label>
+
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Product image URL (optional)</span>
+          <input
+            name="product_image_url"
+            type="url"
+            placeholder="https://cdn.example.com/product.jpg"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
+          />
+        </label>
+
+        <label className="block space-y-1">
           <span className="text-sm font-medium">Duration in seconds (optional)</span>
           <input
             name="duration_seconds"

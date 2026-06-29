@@ -43,11 +43,15 @@ Code-complete and building green:
 
 Remaining before a true end-to-end demo (needs external setup / assets):
 
-- [ ] **Interactive runtime assets** — the actual SIMID document + VPAID unit for
-      the Shoppable Video template, uploaded to Supabase Storage.
-- [ ] **Seed data** — one published template row pointing at those assets.
-- [ ] **Live credentials** — Supabase project (apply `schema.sql`), Stripe products/
-      prices + webhook secret, env vars.
+- [x] **Interactive runtime assets** — Shop Now overlay authored for both standards
+      ([`runtime/shoppable/simid/index.html`](../runtime/shoppable/simid/index.html),
+      [`runtime/shoppable/vpaid/unit.js`](../runtime/shoppable/vpaid/unit.js));
+      reference impl, still needs upload to Storage + player validation.
+- [x] **Seed data** — published Shoppable Video template
+      ([`supabase/seed.sql`](../supabase/seed.sql)).
+- [ ] **Upload assets** to the private `creatives` bucket (see runtime/README.md).
+- [ ] **Live credentials** — Supabase project (apply `schema.sql` + `seed.sql`),
+      Stripe products/prices + webhook secret, env vars.
 - [ ] **Verification** — render the tag in Google IMA (VPAID) + a SIMID player;
       confirm the kill-switch flips on cancel.
 - [ ] **`/security-review`** on payments, auth, and the public endpoints before push.

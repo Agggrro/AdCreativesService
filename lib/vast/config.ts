@@ -18,6 +18,8 @@ export function parseCreativeConfig(json: Json): CreativeConfig {
     videoMimeType: str(obj.videoMimeType),
     durationSeconds: num(obj.durationSeconds),
     clickThroughUrl: str(obj.clickThroughUrl),
+    productName: str(obj.productName),
+    productImageUrl: str(obj.productImageUrl),
     width: num(obj.width),
     height: num(obj.height),
   };

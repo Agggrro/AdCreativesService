@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AdInteract — Shoppable (SIMID)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: transparent;
+        font-family: sans-serif;
+        overflow: hidden;
+      }
+      /* SIMID renders over the player's video; keep it click-through except UI. */
+      #stage {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      #shop {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: #000;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        pointer-events: auto;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+      }
+      #shop img {
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        object-fit: cover;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <button id="shop" hidden>Shop Now</button>
+    </div>
+
+    <script>
+      /**
+       * AdInteract — Shoppable Video, SIMID 1.1 creative.
+       * Establishes the SIMID session with the player, reads config from the
+       * VAST <AdParameters> (init.creativeData.adParameters), and shows a
+       * "Shop Now" overlay that fires SIMID:Creative:clickThru. Config is
+       * server-injected, never baked in (ADR-0003). Reference implementation —
+       * validate against your target SIMID player.
+       */
+      (function () {
+        var sessionId = "";
+        var messageId = 1;
+        var params = {};
+
+        function post(type, args) {
+          window.parent.postMessage(
+            JSON.stringify({
+              sessionId: sessionId,
+              messageId: messageId++,
+              timestamp: Date.now(),
+              type: type,
+              args: args || {},
+            }),
+            "*",
+          );
+        }
+
+        function resolve(incoming, value) {
+          post("resolve", { messageId: incoming.messageId, value: value || {} });
+        }
+
+        function render() {
+          var btn = document.getElementById("shop");
+          if (params.productImageUrl) {
+            var img = document.createElement("img");
+            img.src = params.productImageUrl;
+            btn.prepend(img);
+          }
+          btn.lastChild.textContent = params.productName
+            ? "Shop Now — " + params.productName
+            : "Shop Now";
+          btn.hidden = false;
+          btn.addEventListener("click", function () {
+            post("SIMID:Creative:clickThru", {
+              url: params.clickThroughUrl || "",
+              playerHandles: true,
+              clickData: {},
+            });
+          });
+        }
+
+        function handleInit(msg) {
+          try {
+            var cd = (msg.args && msg.args.creativeData) || {};
+            params = JSON.parse(cd.adParameters || "{}");
+          } catch (e) {
+            params = {};
+          }
+          resolve(msg, {});
+        }
+
+        window.addEventListener("message", function (event) {
+          var data;
+          try {
+            data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+          } catch (e) {
+            return;
+          }
+          if (!data || !data.type) return;
+
+          switch (data.type) {
+            case "createSession":
+              sessionId = data.sessionId || sessionId;
+              resolve(data, {});
+              break;
+            case "SIMID:Player:init":
+              handleInit(data);
+              break;
+            case "SIMID:Player:startCreative":
+              resolve(data, {});
+              render();
+              break;
+            default:
+              // Acknowledge any other player message so the session stays alive.
+              if (data.type.indexOf("SIMID:Player:") === 0) resolve(data, {});
+              break;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
