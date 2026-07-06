@@ -125,3 +125,9 @@ EXECUTE is granted to `service_role` only and which returns an explicit TABLE
 
 RLS protects the **dashboard** path. It is intentionally not relied upon for the
 public VAST path, which uses a narrowly scoped service-role read.
+
+`schema.sql` also issues explicit table **grants** to the API roles (`anon`,
+`authenticated`, `service_role`). Supabase usually auto-grants these, but not
+reliably across projects/key formats — without them every role hits
+`permission denied`. The grant is the table-level privilege; **RLS is still the
+row-level gate** (a grant without a matching policy yields zero rows).

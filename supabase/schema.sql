@@ -286,6 +286,21 @@ create policy subscriptions_select_own on public.subscriptions
 -- anon/authenticated roles are denied. Writes/reads go through the service role
 -- (ingest) or future owner-scoped aggregate views.
 
+-- ---------------------------------------------------------------------------
+-- Table grants for the API roles
+-- ---------------------------------------------------------------------------
+-- Supabase normally auto-grants these; we set them explicitly so the schema is
+-- portable and the service role always has table access. RLS (above) remains
+-- the row-level gate for anon/authenticated — a GRANT without a matching policy
+-- still yields zero rows for those roles.
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public
+  grant all on sequences to anon, authenticated, service_role;
+
 -- ============================================================================
 -- Serving view (hot path) — private schema, service role only
 -- ----------------------------------------------------------------------------
