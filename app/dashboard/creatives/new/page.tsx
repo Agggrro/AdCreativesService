@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createCreative } from "@/app/dashboard/creatives/actions";
+import { parseConfigSchema, type ConfigField } from "@/lib/config-schema";
 
 export default async function NewCreativePage({
   searchParams,
@@ -42,7 +43,7 @@ export default async function NewCreativePage({
 
   const { data: template } = await supabase
     .from("templates")
-    .select("id, name, supported_standards")
+    .select("id, name, supported_standards, config_schema")
     .eq("id", sp.template)
     .eq("is_published", true)
     .maybeSingle();
@@ -57,6 +58,8 @@ export default async function NewCreativePage({
       </div>
     );
   }
+
+  const { fields } = parseConfigSchema(template.config_schema);
 
   return (
     <div className="max-w-lg space-y-6">
@@ -97,57 +100,15 @@ export default async function NewCreativePage({
           </div>
         </fieldset>
 
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Video URL</span>
-          <input
-            name="video_url"
-            type="url"
-            required
-            placeholder="https://cdn.example.com/video.mp4"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-          />
-        </label>
+        {fields.map((field) => (
+          <Field key={field.name} field={field} />
+        ))}
 
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Click-through URL (optional)</span>
-          <input
-            name="click_through_url"
-            type="url"
-            placeholder="https://shop.example.com/product"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-          />
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Product name (Shop Now badge)</span>
-          <input
-            name="product_name"
-            type="text"
-            placeholder="Summer Jacket — $79"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-          />
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Product image URL (optional)</span>
-          <input
-            name="product_image_url"
-            type="url"
-            placeholder="https://cdn.example.com/product.jpg"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-          />
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Duration in seconds (optional)</span>
-          <input
-            name="duration_seconds"
-            type="number"
-            min={1}
-            placeholder="30"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-          />
-        </label>
+        {fields.length === 0 && (
+          <p className="text-sm text-gray-500">
+            This template has no configurable fields.
+          </p>
+        )}
 
         <div className="flex items-center gap-3">
           <button
@@ -162,5 +123,73 @@ export default async function NewCreativePage({
         </div>
       </form>
     </div>
+  );
+}
+
+function Field({ field }: { field: ConfigField }) {
+  const base =
+    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black";
+  const def = field.default;
+
+  return (
+    <label className="block space-y-1">
+      <span className="text-sm font-medium">
+        {field.label}
+        {field.required ? " *" : ""}
+      </span>
+
+      {field.type === "textarea" ? (
+        <textarea
+          name={field.name}
+          required={field.required}
+          placeholder={field.placeholder}
+          defaultValue={typeof def === "string" ? def : undefined}
+          rows={3}
+          className={base}
+        />
+      ) : field.type === "select" ? (
+        <select
+          name={field.name}
+          required={field.required}
+          defaultValue={def !== undefined ? String(def) : undefined}
+          className={base}
+        >
+          {!field.required && <option value="">—</option>}
+          {(field.options ?? []).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      ) : field.type === "range" ? (
+        <input
+          name={field.name}
+          type="range"
+          min={field.min ?? 0}
+          max={field.max ?? 100}
+          defaultValue={def !== undefined ? String(def) : undefined}
+          className="w-full"
+        />
+      ) : (
+        <input
+          name={field.name}
+          type={
+            field.type === "number"
+              ? "number"
+              : field.type === "url" || field.type === "image"
+                ? "url"
+                : "text"
+          }
+          required={field.required}
+          min={field.type === "number" ? field.min : undefined}
+          max={field.type === "number" ? field.max : undefined}
+          placeholder={field.placeholder}
+          defaultValue={def !== undefined ? String(def) : undefined}
+          className={base}
+        />
+      )}
+
+      {field.help && <span className="text-xs text-gray-400">{field.help}</span>}
+    </label>
   );
 }
