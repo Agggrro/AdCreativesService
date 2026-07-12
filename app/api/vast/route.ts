@@ -60,7 +60,13 @@ export async function GET(request: Request): Promise<Response> {
     const config = parseCreativeConfig(serving.config_json);
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? url.origin;
 
-    const vast = generateVast({ serving, config, interactiveUrl, siteUrl });
+    const vast = generateVast({
+      serving,
+      config,
+      rawConfig: serving.config_json,
+      interactiveUrl,
+      siteUrl,
+    });
     return vastResponse(vast);
   } catch {
     // Any unexpected error: never leak a partial payload.

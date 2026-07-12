@@ -104,6 +104,38 @@ The VAST builder selects the adapter from the user's chosen format on the creati
 Adding a new standard = adding an adapter, not touching the endpoint. See
 [ADR-0002](decisions/0002-multi-format-creative-delivery.md).
 
+### Live preview: `POST /api/vast/preview` + `GET /api/vast/preview/[token]`
+
+The dashboard configurator ([`app/dashboard/creatives/new`](../app/dashboard/creatives/new))
+has a "Launch Ad" panel ([`components/PreviewPanel.tsx`](../components/PreviewPanel.tsx))
+that runs a template with whatever is **currently typed into the form** — before the
+creative is saved — in three player backends: an in-house sandbox harness, Google IMA
+SDK, and Video.js + `videojs-ima`. This is a **separate, authenticated surface**, not a
+variant of the public serving path above:
+
+1. `POST /api/vast/preview` — requires a signed-in dashboard user (no subscription
+   check: preview is a try-before-you-configure surface, open to any account). Takes
+   `{ templateId, format, fields }`, validates them the same way
+   `createCreative` does, and mints a **stateless, HMAC-signed, 120s-TTL token**
+   (`lib/vast/preview-token.ts`) encoding the template/format/config — no DB row is
+   read or written. A stateless token was chosen over a server-side cache because the
+   stack has no Redis/KV and Vercel functions don't share memory across invocations
+   (ADR-0004); see [ADR-0006](decisions/0006-live-preview-token.md).
+2. `GET /api/vast/preview/[token]` — public by necessity (the third-party player SDKs
+   fetch it directly, with no session), but **self-authorizing** via the token's HMAC
+   signature + expiry rather than the subscription entitlement gate. It reuses
+   `resolveInteractiveUrl()` + `buildInlineVast()` directly (not `generateVast()`,
+   which gates on `should_serve`) against a synthetic `CreativeServing`-shaped context
+   built from the token (`lib/vast/preview-context.ts`). Response is
+   `Cache-Control: no-store` — never cached, unlike the real endpoint.
+
+Both routes are additive: the real `/api/vast?creative_id=` path, its entitlement gate,
+and its 60s cache are untouched. The only shared code is `buildInlineVast()` itself,
+which both now feed via a `rawConfig` field so a creative's full `config_json` — not
+just the fixed subset `CreativeConfig` knows about — reaches `<AdParameters>` (this
+also fixed a real bug: custom per-template fields like a Scratch & Reveal's `coverText`
+were previously silently dropped from production `<AdParameters>`).
+
 ### Stripe webhook `/api/stripe/webhook`
 
 Source of truth for subscription state. Verifies the Stripe signature, then updates

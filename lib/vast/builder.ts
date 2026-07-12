@@ -1,6 +1,14 @@
+import type { Json } from "../../types/database.types";
 import type { VastBuildContext } from "./types";
 import { getAdapter } from "./adapters";
 import { cdata, escapeXml, indent } from "./xml";
+
+/** Narrow an arbitrary Json value down to a plain object, or {} otherwise. */
+function asRecord(json: Json): Record<string, Json> {
+  return json && typeof json === "object" && !Array.isArray(json)
+    ? (json as Record<string, Json>)
+    : {};
+}
 
 const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>';
 const DEFAULT_DURATION_SECONDS = 30;
@@ -65,14 +73,22 @@ export function buildInlineVast(ctx: VastBuildContext): string {
     : "";
 
   // AdParameters carries the creative config to the SIMID/VPAID runtime
-  // (server-injected; never baked into the static asset — ADR-0003).
-  const adParams: Record<string, string | number> = {
+  // (server-injected; never baked into the static asset — ADR-0003). Start from
+  // the full raw config_json so per-template custom fields (imageUrl, coverText,
+  // revealThreshold, ...) reach the unit, then re-apply the explicit/defaulted
+  // fields the builder already computes so a malformed raw value can never
+  // shadow the already-coerced typed one.
+  const adParams: Record<string, Json> = {
+    ...asRecord(ctx.rawConfig),
     durationSeconds: ctx.config.durationSeconds ?? DEFAULT_DURATION_SECONDS,
   };
   if (ctx.config.videoUrl) adParams.videoUrl = ctx.config.videoUrl;
+  if (ctx.config.videoMimeType) adParams.videoMimeType = ctx.config.videoMimeType;
   if (ctx.config.clickThroughUrl) adParams.clickThroughUrl = ctx.config.clickThroughUrl;
   if (ctx.config.productName) adParams.productName = ctx.config.productName;
   if (ctx.config.productImageUrl) adParams.productImageUrl = ctx.config.productImageUrl;
+  if (ctx.config.width) adParams.width = ctx.config.width;
+  if (ctx.config.height) adParams.height = ctx.config.height;
   const adParameters = `            <AdParameters>${cdata(
     JSON.stringify(adParams),
   )}</AdParameters>\n`;

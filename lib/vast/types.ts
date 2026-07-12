@@ -1,4 +1,4 @@
-import type { CreativeServing, DeliveryFormat } from "../../types/database.types";
+import type { CreativeServing, DeliveryFormat, Json } from "../../types/database.types";
 
 /**
  * Normalized, builder-ready view of a creative's `config_json`. The endpoint
@@ -27,6 +27,13 @@ export interface CreativeConfig {
 export interface VastBuildContext {
   serving: CreativeServing;
   config: CreativeConfig;
+  /**
+   * The untouched config_json this creative was built from. AdParameters is
+   * built from this (not just the narrow, typed `config` above) so per-template
+   * custom fields (e.g. a Scratch & Reveal's coverText/revealThreshold) reach
+   * the runtime unit, not just the handful of fields CreativeConfig knows about.
+   */
+  rawConfig: Json;
   /** Signed, short-TTL URL to the SIMID document / VPAID JS unit. */
   interactiveUrl: string;
   /** Public base URL (trailing slash optional) for tracking/error beacons. */

@@ -20,6 +20,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0003](0003-access-control-over-code-hiding.md) | Access control over creative-code secrecy | Accepted |
 | [0004](0004-mvp-on-free-tiers.md) | Run the MVP entirely on free tiers | Accepted |
 | [0005](0005-interactive-image-creatives.md) | Interactive-image creatives via VPAID/SIMID (not display) | Accepted |
+| [0006](0006-live-preview-token.md) | Stateless signed tokens for the live "Launch Ad" preview | Accepted |
 
 ## Template
 

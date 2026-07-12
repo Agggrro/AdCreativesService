@@ -53,7 +53,12 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 - [ ] **Live credentials** — Supabase project (apply `schema.sql` + `seed.sql`),
       Stripe products/prices + webhook secret, env vars.
 - [ ] **Verification** — render the tag in Google IMA (VPAID) + a SIMID player;
-      confirm the kill-switch flips on cancel.
+      confirm the kill-switch flips on cancel. The dashboard configurator's
+      "Launch Ad" panel (any signed-in user, any template, current unsaved
+      config) now gives a fast in-product way to do this ad hoc — Sandbox,
+      Google IMA SDK, and Video.js + `videojs-ima` tabs — but the checked-off
+      state here still refers to validating the real, published Shoppable
+      Video assets end-to-end at least once.
 - [ ] **`/security-review`** on payments, auth, and the public endpoints before push.
 
 ## Out of scope (post-MVP)

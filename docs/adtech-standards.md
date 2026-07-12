@@ -48,6 +48,17 @@ subagent.
 [`runtime/shoppable/`](../runtime); per-creative config reaches them via
 `<AdParameters>` at serve time (never baked in — ADR-0003).
 
+`<AdParameters>` carries the creative's **full `config_json`**, not just the fixed
+subset (`videoUrl`, `clickThroughUrl`, `durationSeconds`, `productName`,
+`productImageUrl`) that `CreativeConfig` types explicitly — those explicit fields
+are re-applied on top so their defaults/coercion still win, but every other
+per-template field (e.g. Scratch & Reveal's `coverText`/`revealThreshold`) now
+reaches the runtime unit too. `VastBuildContext.rawConfig` carries this through.
+
+**Try before saving:** the dashboard configurator can run a template's *current,
+unsaved* form values through a real (ephemeral) VAST tag in three player
+backends — see the "Live preview" section of [architecture.md](architecture.md).
+
 ## The protection reality (do not oversell)
 
 A SIMID/VPAID creative **executes JavaScript on the client**. That JS is, by
