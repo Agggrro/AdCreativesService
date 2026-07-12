@@ -74,9 +74,27 @@ The showcase (landing + dashboard) already renders template cards from the
 
 ## Definition of done
 
-- [ ] 4 templates seeded and visible as tiles (landing + dashboard).
-- [ ] Configurator renders each template's fields from `config_schema`.
-- [ ] For each: VPAID unit builds, is syntactically valid, and `/api/vast` returns a
-      full VAST with a signed unit URL when entitled (fail-closed otherwise).
-- [ ] SIMID offered where a base loop is provided.
-- [ ] Docs updated (ADR-0005, adtech-standards, data-model if schema changes).
+- [x] 4 templates implemented + seeded in `seed.sql` (appear as tiles once applied).
+- [x] Configurator renders each template's fields from `config_schema`.
+- [x] Each VPAID unit builds (`npm run build:runtime`) and passes `node --check`;
+      `/api/vast` serves image-only VPAID (verified) and fails closed otherwise.
+- [~] SIMID: serving-layer gating done (requires a base loop); the SIMID runtime
+      base for image templates is deferred — VPAID-first per ADR-0005.
+- [x] Docs updated (ADR-0005, adtech-standards, this plan).
+
+## Publish step (do when ready to go live with these templates)
+
+These are built but NOT yet on the live site (publishing adult templates to the
+public showcase is a deliberate call). To publish:
+1. `npm run build:runtime` → upload everything in `runtime/dist/**` to the private
+   `creatives` Storage bucket at the matching `runtime_keys` paths.
+2. Apply `supabase/seed.sql` (SQL Editor) — this publishes all 5 template rows.
+3. The tiles appear automatically (landing + dashboard); configure a creative and
+   the VAST tag serves the unit.
+
+## Follow-ups (post-batch)
+
+- Validate each unit in a real player (Google IMA / out-stream) — reference impls.
+- SIMID variants for image templates (needs a base-loop provisioning approach).
+- Escape/sanitize URL values injected into unit CSS (advertiser-scoped, low risk).
+- Preview thumbnails per template for richer tiles.
