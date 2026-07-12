@@ -116,7 +116,11 @@ ${mediaFiles}
  */
 export function generateVast(ctx: VastBuildContext): string {
   if (!ctx.serving.should_serve) return emptyVast();
-  if (!getAdapter(ctx.serving.selected_format)) return emptyVast();
-  if (!ctx.config.videoUrl || !ctx.interactiveUrl) return emptyVast();
+  const adapter = getAdapter(ctx.serving.selected_format);
+  if (!adapter) return emptyVast();
+  // The interactive unit is always required; video is required only for formats
+  // that need it (SIMID). VPAID image-only creatives have no videoUrl.
+  if (!ctx.interactiveUrl) return emptyVast();
+  if (!adapter.isServable(ctx)) return emptyVast();
   return buildInlineVast(ctx);
 }

@@ -9,6 +9,10 @@ import { baseVideoMediaFile } from "../shared";
  */
 export const simidAdapter: FormatAdapter = {
   format: "simid",
+  // SIMID layers over a playing linear video → requires a base video/loop.
+  isServable(ctx: VastBuildContext): boolean {
+    return !!ctx.config.videoUrl;
+  },
   mediaFilesInner(ctx: VastBuildContext): string {
     return [
       baseVideoMediaFile(ctx),

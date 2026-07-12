@@ -9,14 +9,21 @@ import { baseVideoMediaFile, DEFAULT_WIDTH, DEFAULT_HEIGHT } from "../shared";
  */
 export const vpaidAdapter: FormatAdapter = {
   format: "vpaid",
+  // The VPAID unit draws itself in the slot; no base video required.
+  isServable(): boolean {
+    return true;
+  },
   mediaFilesInner(ctx: VastBuildContext): string {
     const width = ctx.config.width ?? DEFAULT_WIDTH;
     const height = ctx.config.height ?? DEFAULT_HEIGHT;
-    return [
-      baseVideoMediaFile(ctx),
+    const vpaidFile =
       `<MediaFile delivery="progressive" type="application/javascript" ` +
-        `apiFramework="VPAID" width="${width}" height="${height}">` +
-        `${cdata(ctx.interactiveUrl)}</MediaFile>`,
-    ].join("\n");
+      `apiFramework="VPAID" width="${width}" height="${height}">` +
+      `${cdata(ctx.interactiveUrl)}</MediaFile>`;
+    // Include a static base video only when one is provided (fallback for
+    // non-VPAID players). Image-only creatives omit it.
+    return ctx.config.videoUrl
+      ? [baseVideoMediaFile(ctx), vpaidFile].join("\n")
+      : vpaidFile;
   },
 };

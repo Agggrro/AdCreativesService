@@ -40,6 +40,12 @@ export interface VastBuildContext {
  */
 export interface FormatAdapter {
   readonly format: DeliveryFormat;
+  /**
+   * Whether this format can serve for the given context. VPAID renders the unit
+   * itself (always servable); SIMID layers over a playing video and needs a base
+   * loop, so it is servable only when a videoUrl is present (ADR-0005).
+   */
+  isServable(ctx: VastBuildContext): boolean;
   /** XML fragment to place inside <MediaFiles>. */
   mediaFilesInner(ctx: VastBuildContext): string;
 }
