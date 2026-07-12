@@ -10,32 +10,52 @@ import { loadImaSdk } from "./load-ima-sdk";
 
 // video.js has official types; videojs-ima/videojs-contrib-ads (imported for
 // their side effect of registering a plugin) do not, so the plugin surface we
-// actually call is described here rather than left as `any`.
-interface ImaPlugin {
-  requestAds: () => void;
-}
+// actually call is described here rather than left as `any` (confirmed by
+// reading node_modules/videojs-ima/dist/videojs.ima.js directly, since the
+// package ships no types/docs for this). `player.ima(options)` returns
+// nothing — it creates the ad objects asynchronously, internally deferred to
+// the player's own 'ready' lifecycle — and the plugin's default
+// `requestMode: 'onLoad'` already calls requestAds() itself once that's done,
+// so no manual requestAds() call is needed (and calling one immediately after
+// player.ima(options) races ahead of that setup and throws).
 interface PlayerWithIma extends Player {
-  ima: (options: { adTagUrl: string }) => ImaPlugin;
+  ima: (options: { adTagUrl: string }) => void;
 }
 
 /**
  * Video.js + the official googleads/videojs-ima plugin — the most widely used
  * open-source HTML5 player, wrapping the same IMA engine as the ImaPlayer tab
  * but with Video.js's own control chrome. Requests the same previewTagUrl.
+ * Click-through isn't wired up here: unlike the raw IMA SDK (ImaPlayer.tsx),
+ * this plugin doesn't expose a click event through the public video.js event
+ * API to listen for.
  */
-export function VideoJsPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps) {
+// Safety net: if no ad-state event fires within this window (ad request stuck
+// or silently dropped — e.g. the well-documented CORS/mixed-content class of
+// issue with IMA ad-tag requests), stop showing an indefinite spinner.
+const AD_EVENT_TIMEOUT_MS = 10_000;
+
+export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<PlayerWithIma | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
-    const clickThroughUrl =
-      typeof mint.sandbox.adParameters.clickThroughUrl === "string"
-        ? mint.sandbox.adParameters.clickThroughUrl
-        : "(click-through)";
+    let sawAdEvent = false;
 
     onStatus("Loading Video.js…");
+
+    const watchdog = setTimeout(() => {
+      if (!cancelled && !sawAdEvent) {
+        onStatus("Ad request timed out.");
+      }
+    }, AD_EVENT_TIMEOUT_MS);
+
+    const reportAdEvent = (status: string) => {
+      sawAdEvent = true;
+      clearTimeout(watchdog);
+      onStatus(status);
+    };
 
     Promise.all([
       import("video.js"),
@@ -54,20 +74,22 @@ export function VideoJsPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerP
         }) as unknown as PlayerWithIma;
         playerRef.current = player;
 
-        player.on("ads-ad-started", () => onStatus("Playing"));
-        player.on("ads-click", () => onClickThrough(clickThroughUrl));
-        player.on("ads-allpods-completed", () => onStatus("Complete"));
-        player.on("adserror", () => onStatus("Ad error."));
+        // videojs-contrib-ads' ad-state-machine events (plugin-agnostic).
+        player.on("adstart", () => reportAdEvent("Playing"));
+        player.on("adend", () => reportAdEvent("Complete"));
+        player.on("adtimeout", () => reportAdEvent("Ad request timed out."));
+        player.on("vjsadserror", () => reportAdEvent("Ad error."));
 
-        const ima = player.ima({ adTagUrl: mint.previewTagUrl });
-        ima.requestAds();
+        player.ima({ adTagUrl: mint.previewTagUrl });
       })
       .catch(() => {
+        clearTimeout(watchdog);
         if (!cancelled) onStatus("Could not load Video.js.");
       });
 
     return () => {
       cancelled = true;
+      clearTimeout(watchdog);
       try {
         playerRef.current?.dispose();
       } catch {
