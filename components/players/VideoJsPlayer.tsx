@@ -71,6 +71,7 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
         const player = videojs(videoRef.current, {
           controls: true,
           fluid: true,
+          muted: true,
         }) as unknown as PlayerWithIma;
         playerRef.current = player;
 
@@ -81,6 +82,19 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
         player.on("vjsadserror", () => reportAdEvent("Ad error."));
 
         player.ima({ adTagUrl: mint.previewTagUrl });
+
+        // contrib-ads only starts the ad break once BOTH 'adsready' (which
+        // videojs-ima triggers itself once the ad response is loaded) AND
+        // 'play' have fired — with no real content video, nothing ever calls
+        // play() on its own, so the ad would otherwise sit fully loaded but
+        // never actually start. Muted so this isn't blocked by autoplay policy.
+        const playResult = player.play();
+        if (playResult && typeof playResult.catch === "function") {
+          playResult.catch(() => {
+            /* autoplay blocked; readyforpreroll will still fire once the
+               user interacts with the player's own play control */
+          });
+        }
       })
       .catch(() => {
         clearTimeout(watchdog);
