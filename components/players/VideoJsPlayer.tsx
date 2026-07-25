@@ -19,18 +19,14 @@ import { loadImaSdk } from "./load-ima-sdk";
 // so no manual requestAds() call is needed (and calling one immediately after
 // player.ima(options) races ahead of that setup and throws).
 interface PlayerWithIma extends Player {
-  ima: (options: { adTagUrl: string; prerollTimeout?: number }) => void;
+  ima: (options: {
+    adTagUrl: string;
+    // Escape hatch videojs-ima forwards verbatim to the underlying
+    // player.ads(...) call (contrib-ads) — needed for settings contrib-ads
+    // itself defines but videojs-ima doesn't surface as a top-level option.
+    contribAdsSettings?: { playerMode?: "outstream" };
+  }) => void;
 }
-
-// videojs-ima's own default prerollTimeout is 1000ms — the window contrib-ads
-// waits, after 'play', for the ad response to arrive before giving up and
-// resuming "content" (per its own source: "Prerolls took too long! Play
-// content instead."). That's tuned for real ad networks on a page that's
-// already fully loaded; our ad-request round trip alone routinely exceeds it
-// (confirmed in production: adsready ~450-700ms after play, but adtimeout
-// still fired at the full 1000ms mark and killed the ad break regardless of
-// the response having already arrived). Give it much more headroom.
-const PREROLL_TIMEOUT_MS = 8_000;
 
 /**
  * Video.js + the official googleads/videojs-ima plugin — the most widely used
@@ -41,10 +37,8 @@ const PREROLL_TIMEOUT_MS = 8_000;
  * API to listen for.
  */
 // Safety net: if no ad-state event fires within this window (ad request stuck
-// or silently dropped), stop showing an indefinite spinner. Kept comfortably
-// above PREROLL_TIMEOUT_MS so contrib-ads' own 'adtimeout' is always the one
-// that fires first and reports it, not this generic fallback.
-const AD_EVENT_TIMEOUT_MS = PREROLL_TIMEOUT_MS + 4_000;
+// or silently dropped), stop showing an indefinite spinner.
+const AD_EVENT_TIMEOUT_MS = 8_000;
 
 export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -98,17 +92,33 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
         // before that completes can silently no-op.
         player.ready(() => {
           if (cancelled) return;
-          player.ima({ adTagUrl: mint.previewTagUrl, prerollTimeout: PREROLL_TIMEOUT_MS });
 
-          // contrib-ads only starts the ad break once BOTH 'adsready' (which
-          // videojs-ima triggers itself once the ad response is loaded) AND
-          // 'play' have fired — with no real content video, nothing ever
-          // calls play() on its own, so the ad would otherwise sit fully
-          // loaded but never actually start. Muted so autoplay policy can't
-          // block it. Calling play() on the underlying element directly
-          // (rather than the Player wrapper's play(), which was observed not
-          // to reliably flip paused/fire the media event at this point in the
-          // lifecycle) is what actually triggers contrib-ads' 'play' listener.
+          // playerMode: 'outstream' tells contrib-ads there is no content
+          // video between ad breaks (our case exactly — VPAID/SIMID units
+          // draw themselves, no base video). Without it, contrib-ads defaults
+          // to its "preroll before content" state machine, which races a
+          // fixed timeout against the ad response and — confirmed live in
+          // production — kills the ad break the instant that timeout elapses
+          // even if the ad had already loaded successfully. Outstream mode's
+          // states (OutstreamPending -> OutstreamPlayback -> OutstreamDone)
+          // don't have that race: playback starts directly off 'play', no
+          // competing timeout. Passed via contribAdsSettings since contrib-ads
+          // defines this option, not videojs-ima itself (confirmed by reading
+          // both packages' source — videojs-ima only forwards debug/timeout/
+          // prerollTimeout automatically; everything else needs this escape
+          // hatch).
+          player.ima({
+            adTagUrl: mint.previewTagUrl,
+            contribAdsSettings: { playerMode: "outstream" },
+          });
+
+          // Outstream mode still starts playback off the native 'play' event
+          // (per contrib-ads' own docs) — with no real content video, nothing
+          // calls play() on its own. Muted so autoplay policy can't block it.
+          // Calling play() on the underlying element directly (rather than
+          // the Player wrapper's play(), which was observed not to reliably
+          // flip paused/fire the media event at this point in the lifecycle)
+          // is what actually triggers it.
           const playResult = videoEl.play();
           if (playResult && typeof playResult.catch === "function") {
             playResult.catch(() => {
