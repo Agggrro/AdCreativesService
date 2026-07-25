@@ -3,9 +3,8 @@ const IMA_SDK_SRC = "https://imasdk.googleapis.com/js/sdkloader/ima3.js";
 let imaSdkPromise: Promise<void> | null = null;
 
 /**
- * Load Google's IMA SDK from its CDN exactly once per page. Both ImaPlayer
- * (direct integration) and VideoJsPlayer (videojs-ima, which does not bundle
- * the SDK itself — see its README) need it loaded first.
+ * Load Google's IMA SDK from its CDN exactly once per page. Used by
+ * ImaPlayer.tsx's direct IMA SDK integration.
  */
 export function loadImaSdk(): Promise<void> {
   if (typeof window !== "undefined" && window.google?.ima) return Promise.resolve();

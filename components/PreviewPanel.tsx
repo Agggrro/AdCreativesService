@@ -5,14 +5,14 @@ import { AlertCircle, Loader2, Play, RotateCcw } from "lucide-react";
 import type { PreviewMint } from "@/components/players/types";
 import { SandboxPlayer } from "@/components/players/SandboxPlayer";
 import { ImaPlayer } from "@/components/players/ImaPlayer";
-import { VideoJsPlayer } from "@/components/players/VideoJsPlayer";
+import { FluidPlayer } from "@/components/players/FluidPlayer";
 
-type PlayerKey = "sandbox" | "ima" | "videojs";
+type PlayerKey = "sandbox" | "ima" | "fluid";
 
 const PLAYERS: { key: PlayerKey; label: string }[] = [
   { key: "sandbox", label: "Sandbox" },
   { key: "ima", label: "Google IMA SDK" },
-  { key: "videojs", label: "Video.js" },
+  { key: "fluid", label: "Fluid Player" },
 ];
 
 /**
@@ -111,7 +111,7 @@ export function PreviewPanel({
         ) : tab === "ima" ? (
           <ImaPlayer key={launchToken} {...commonProps} />
         ) : (
-          <VideoJsPlayer key={launchToken} {...commonProps} />
+          <FluidPlayer key={launchToken} {...commonProps} />
         ))}
 
         {!launched && (

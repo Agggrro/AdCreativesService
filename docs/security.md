@@ -10,7 +10,7 @@
 | Dashboard | Authenticated users | Supabase Auth + RLS; users touch only their own data |
 | `GET /api/vast` | The open internet / ad players | Public, unauthenticated, **fail closed** |
 | `POST /api/vast/preview` | Signed-in dashboard users | Authenticated (no subscription check); never touches Stripe or the entitlement gate |
-| `GET /api/vast/preview/[token]` | Third-party player SDKs (IMA, Video.js), fetched with no session | Public by necessity; self-authorizing via HMAC signature + 120s expiry, **fail closed** like `/api/vast` |
+| `GET /api/vast/preview/[token]` | Third-party player SDKs (Google IMA, Fluid Player), fetched with no session | Public by necessity; self-authorizing via HMAC signature + 120s expiry, **fail closed** like `/api/vast` |
 | `POST /api/stripe/webhook` | Stripe | Signature-verified; treat unsigned/invalid as hostile |
 | Creative runtime assets | Player iframes on third-party pages | Signed, short-TTL, domain/referer allow-listed |
 

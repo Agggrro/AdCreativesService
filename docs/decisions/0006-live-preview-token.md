@@ -8,7 +8,7 @@
 The dashboard configurator needed a "player + Launch Ad" panel that runs a
 template with whatever is **currently typed into the form** — before the
 creative is saved — and, per the user's request, in more than just our own
-sandbox harness: Google IMA SDK and Video.js + `videojs-ima` as well, so a
+sandbox harness: Google IMA SDK and a third open-source player as well, so a
 buyer can validate the same VAST tag in the players the market actually uses.
 
 Both third-party SDKs want a fetchable ad tag URL (`adTagUrl`). That URL has to
@@ -39,7 +39,8 @@ Two alternatives were rejected:
   **stateless, HMAC-SHA256-signed, 120-second-TTL token** encoding everything
   `resolveInteractiveUrl()`/`buildInlineVast()` need — template id, format,
   validated config, the template's `runtime_keys`, a random preview id, and an
-  expiry — and returns both a `previewTagUrl` (for IMA/Video.js's `adTagUrl`)
+  expiry — and returns both a `previewTagUrl` (for the third-party players'
+  VAST tag URL option — `adTagUrl` for IMA, `vastTag` for Fluid Player)
   and a pre-resolved `{ scriptUrl, adParameters }` pair (for the Sandbox tab,
   no XML involved). No DB row is read or written beyond the template lookup.
 - `GET /api/vast/preview/[token]` is public by necessity (the player SDKs fetch
@@ -69,8 +70,9 @@ Two alternatives were rejected:
   window (the config a signed-in user typed into their own form) — if one
   leaks, the blast radius is one ephemeral, non-persisted ad render, not
   another user's data.
-- Of the three player backends, two (Sandbox, Google IMA SDK) are confirmed
-  working end-to-end in production. The third (Video.js + `videojs-ima`) has a
-  known, unresolved limitation with VPAID creatives — see the "Known
-  limitation" note in [architecture.md](../architecture.md) — left in place by
-  product decision since the other two already cover the goal.
+- All three player backends (Sandbox, Google IMA SDK, Fluid Player) are
+  confirmed working end-to-end in production, rendering the actual creative
+  content (not just reaching a "loaded" status). The third player was
+  originally Video.js + `videojs-ima`, replaced after hitting an unresolved
+  upstream `videojs-ima` limitation with VPAID — see the "Player history" note
+  in [architecture.md](../architecture.md).

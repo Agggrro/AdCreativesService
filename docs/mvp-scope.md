@@ -56,7 +56,7 @@ Remaining before a true end-to-end demo (needs external setup / assets):
       confirm the kill-switch flips on cancel. The dashboard configurator's
       "Launch Ad" panel (any signed-in user, any template, current unsaved
       config) now gives a fast in-product way to do this ad hoc — Sandbox,
-      Google IMA SDK, and Video.js + `videojs-ima` tabs — but the checked-off
+      Google IMA SDK, and Fluid Player tabs — but the checked-off
       state here still refers to validating the real, published Shoppable
       Video assets end-to-end at least once.
 - [ ] **`/security-review`** on payments, auth, and the public endpoints before push.

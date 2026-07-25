@@ -110,7 +110,7 @@ The dashboard configurator ([`app/dashboard/creatives/new`](../app/dashboard/cre
 has a "Launch Ad" panel ([`components/PreviewPanel.tsx`](../components/PreviewPanel.tsx))
 that runs a template with whatever is **currently typed into the form** — before the
 creative is saved — in three player backends: an in-house sandbox harness, Google IMA
-SDK, and Video.js + `videojs-ima`. This is a **separate, authenticated surface**, not a
+SDK, and Fluid Player. This is a **separate, authenticated surface**, not a
 variant of the public serving path above:
 
 1. `POST /api/vast/preview` — requires a signed-in dashboard user (no subscription
@@ -136,17 +136,27 @@ just the fixed subset `CreativeConfig` knows about — reaches `<AdParameters>` 
 also fixed a real bug: custom per-template fields like a Scratch & Reveal's `coverText`
 were previously silently dropped from production `<AdParameters>`).
 
-**Known limitation — Video.js + `videojs-ima` tab:** the Google IMA SDK and Sandbox
-tabs are fully working (verified in production). The Video.js tab requests the ad
-correctly (`playerMode: "outstream"` set via `contribAdsSettings`, confirmed live —
-see [`components/players/VideoJsPlayer.tsx`](../components/players/VideoJsPlayer.tsx)
-for the full history of fixes: a `player.ima()` API-usage bug, wrong event names, a
-`player.play()` timing bug, and finally the outstream-mode fix) but the ad never
-visibly renders — IMA's own `ima-ad-container` is created and stays `hide-ad-container`.
-This looks like an upstream `videojs-ima` limitation specific to **VPAID** creatives
-(VPAID is legacy and likely under-tested against the plugin's outstream path), not a
-bug in our integration. Left in the UI as-is per product decision — Sandbox and Google
-IMA SDK already cover the "try it in a real player" goal.
+**Player history:** the third tab originally used Video.js + `videojs-ima` +
+`videojs-contrib-ads`. That combination hit an unresolved upstream `videojs-ima`
+limitation with **VPAID** creatives — the ad request succeeded and its own
+outstream-mode state machine engaged correctly (`playerMode: "outstream"` via
+`contribAdsSettings`), but the ad never became visible; IMA's own `ima-ad-container`
+was created and stayed `hide-ad-container` regardless. It was replaced with
+[Fluid Player](https://github.com/fluid-player/fluid-player) (MIT, actively
+maintained, ~530KB, built-in VAST/VPAID support via `allowVPAID` — no separate ad
+plugin needed), configured as a single `preRoll` with no content `<source>` — the
+same "ad-only outstream" pattern Prebid's own outstream renderer uses for Fluid
+Player (`prebid/prebid-outstream`). See
+[`components/players/FluidPlayer.tsx`](../components/players/FluidPlayer.tsx).
+One integration gotcha worth knowing: Fluid Player restructures the DOM around
+whatever `<video>` element it's given, so — like `SandboxPlayer.tsx` — the element
+is created imperatively into an empty slot div rather than rendered directly in
+JSX; letting React believe it owns that node caused it to be wiped out from under
+the player on the next parent re-render (e.g. from an `onStatus` call).
+`vastVideoEndedCallback` doesn't reliably fire for VPAID (no real media file ever
+plays, so there's no native `ended` event to key off of) — the status line can stay
+on "Playing" after a VPAID creative's own internal timer completes; the ad itself
+renders and behaves correctly regardless.
 
 ### Stripe webhook `/api/stripe/webhook`
 
