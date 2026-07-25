@@ -19,8 +19,18 @@ import { loadImaSdk } from "./load-ima-sdk";
 // so no manual requestAds() call is needed (and calling one immediately after
 // player.ima(options) races ahead of that setup and throws).
 interface PlayerWithIma extends Player {
-  ima: (options: { adTagUrl: string }) => void;
+  ima: (options: { adTagUrl: string; prerollTimeout?: number }) => void;
 }
+
+// videojs-ima's own default prerollTimeout is 1000ms — the window contrib-ads
+// waits, after 'play', for the ad response to arrive before giving up and
+// resuming "content" (per its own source: "Prerolls took too long! Play
+// content instead."). That's tuned for real ad networks on a page that's
+// already fully loaded; our ad-request round trip alone routinely exceeds it
+// (confirmed in production: adsready ~450-700ms after play, but adtimeout
+// still fired at the full 1000ms mark and killed the ad break regardless of
+// the response having already arrived). Give it much more headroom.
+const PREROLL_TIMEOUT_MS = 8_000;
 
 /**
  * Video.js + the official googleads/videojs-ima plugin — the most widely used
@@ -31,9 +41,10 @@ interface PlayerWithIma extends Player {
  * API to listen for.
  */
 // Safety net: if no ad-state event fires within this window (ad request stuck
-// or silently dropped — e.g. the well-documented CORS/mixed-content class of
-// issue with IMA ad-tag requests), stop showing an indefinite spinner.
-const AD_EVENT_TIMEOUT_MS = 10_000;
+// or silently dropped), stop showing an indefinite spinner. Kept comfortably
+// above PREROLL_TIMEOUT_MS so contrib-ads' own 'adtimeout' is always the one
+// that fires first and reports it, not this generic fallback.
+const AD_EVENT_TIMEOUT_MS = PREROLL_TIMEOUT_MS + 4_000;
 
 export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -76,23 +87,6 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
         }) as unknown as PlayerWithIma;
         playerRef.current = player;
 
-        // TEMP DIAGNOSTIC: log every event in the ad lifecycle to see exactly
-        // where the sequence stalls in production.
-        const DIAG_EVENTS = [
-          "play", "playing", "adsready", "readyforpreroll", "adstart", "adend",
-          "adtimeout", "vjsadserror", "adserror", "contentplayback",
-          "contentchanged", "ads-ready", "ads-manager", "ads-loader",
-          "ads-ad-started", "ads-request",
-        ];
-        const diagLog: { ev: string; t: number }[] = [];
-        (window as unknown as { __vjsDiagLog?: typeof diagLog }).__vjsDiagLog = diagLog;
-        DIAG_EVENTS.forEach((ev) => {
-          player.on(ev, () => {
-            diagLog.push({ ev, t: Date.now() });
-            console.log("[VideoJsPlayer diag]", ev, diagLog);
-          });
-        });
-
         // videojs-contrib-ads' ad-state-machine events (plugin-agnostic).
         player.on("adstart", () => reportAdEvent("Playing"));
         player.on("adend", () => reportAdEvent("Complete"));
@@ -104,7 +98,7 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
         // before that completes can silently no-op.
         player.ready(() => {
           if (cancelled) return;
-          player.ima({ adTagUrl: mint.previewTagUrl });
+          player.ima({ adTagUrl: mint.previewTagUrl, prerollTimeout: PREROLL_TIMEOUT_MS });
 
           // contrib-ads only starts the ad break once BOTH 'adsready' (which
           // videojs-ima triggers itself once the ad response is loaded) AND
