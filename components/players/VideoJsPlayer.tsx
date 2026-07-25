@@ -76,6 +76,23 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
         }) as unknown as PlayerWithIma;
         playerRef.current = player;
 
+        // TEMP DIAGNOSTIC: log every event in the ad lifecycle to see exactly
+        // where the sequence stalls in production.
+        const DIAG_EVENTS = [
+          "play", "playing", "adsready", "readyforpreroll", "adstart", "adend",
+          "adtimeout", "vjsadserror", "adserror", "contentplayback",
+          "contentchanged", "ads-ready", "ads-manager", "ads-loader",
+          "ads-ad-started", "ads-request",
+        ];
+        const diagLog: { ev: string; t: number }[] = [];
+        (window as unknown as { __vjsDiagLog?: typeof diagLog }).__vjsDiagLog = diagLog;
+        DIAG_EVENTS.forEach((ev) => {
+          player.on(ev, () => {
+            diagLog.push({ ev, t: Date.now() });
+            console.log("[VideoJsPlayer diag]", ev, diagLog);
+          });
+        });
+
         // videojs-contrib-ads' ad-state-machine events (plugin-agnostic).
         player.on("adstart", () => reportAdEvent("Playing"));
         player.on("adend", () => reportAdEvent("Complete"));
