@@ -136,6 +136,18 @@ just the fixed subset `CreativeConfig` knows about — reaches `<AdParameters>` 
 also fixed a real bug: custom per-template fields like a Scratch & Reveal's `coverText`
 were previously silently dropped from production `<AdParameters>`).
 
+**Known limitation — Video.js + `videojs-ima` tab:** the Google IMA SDK and Sandbox
+tabs are fully working (verified in production). The Video.js tab requests the ad
+correctly (`playerMode: "outstream"` set via `contribAdsSettings`, confirmed live —
+see [`components/players/VideoJsPlayer.tsx`](../components/players/VideoJsPlayer.tsx)
+for the full history of fixes: a `player.ima()` API-usage bug, wrong event names, a
+`player.play()` timing bug, and finally the outstream-mode fix) but the ad never
+visibly renders — IMA's own `ima-ad-container` is created and stays `hide-ad-container`.
+This looks like an upstream `videojs-ima` limitation specific to **VPAID** creatives
+(VPAID is legacy and likely under-tested against the plugin's outstream path), not a
+bug in our integration. Left in the UI as-is per product decision — Sandbox and Google
+IMA SDK already cover the "try it in a real player" goal.
+
 ### Stripe webhook `/api/stripe/webhook`
 
 Source of truth for subscription state. Verifies the Stripe signature, then updates

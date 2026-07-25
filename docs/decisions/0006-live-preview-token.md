@@ -69,3 +69,8 @@ Two alternatives were rejected:
   window (the config a signed-in user typed into their own form) — if one
   leaks, the blast radius is one ephemeral, non-persisted ad render, not
   another user's data.
+- Of the three player backends, two (Sandbox, Google IMA SDK) are confirmed
+  working end-to-end in production. The third (Video.js + `videojs-ima`) has a
+  known, unresolved limitation with VPAID creatives — see the "Known
+  limitation" note in [architecture.md](../architecture.md) — left in place by
+  product decision since the other two already cover the goal.
