@@ -68,7 +68,8 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
 
         google.ima.settings.setVpaidMode(google.ima.ImaSdkSettings.VpaidMode.INSECURE);
 
-        const player = videojs(videoRef.current, {
+        const videoEl = videoRef.current;
+        const player = videojs(videoEl, {
           controls: true,
           fluid: true,
           muted: true,
@@ -81,20 +82,30 @@ export function VideoJsPlayer({ mint, onStatus }: PreviewPlayerProps) {
         player.on("adtimeout", () => reportAdEvent("Ad request timed out."));
         player.on("vjsadserror", () => reportAdEvent("Ad error."));
 
-        player.ima({ adTagUrl: mint.previewTagUrl });
+        // Deferred to player.ready(): video.js's Player wraps a lot of async
+        // setup around the tech attaching to the DOM, and calling ima()/play()
+        // before that completes can silently no-op.
+        player.ready(() => {
+          if (cancelled) return;
+          player.ima({ adTagUrl: mint.previewTagUrl });
 
-        // contrib-ads only starts the ad break once BOTH 'adsready' (which
-        // videojs-ima triggers itself once the ad response is loaded) AND
-        // 'play' have fired — with no real content video, nothing ever calls
-        // play() on its own, so the ad would otherwise sit fully loaded but
-        // never actually start. Muted so this isn't blocked by autoplay policy.
-        const playResult = player.play();
-        if (playResult && typeof playResult.catch === "function") {
-          playResult.catch(() => {
-            /* autoplay blocked; readyforpreroll will still fire once the
-               user interacts with the player's own play control */
-          });
-        }
+          // contrib-ads only starts the ad break once BOTH 'adsready' (which
+          // videojs-ima triggers itself once the ad response is loaded) AND
+          // 'play' have fired — with no real content video, nothing ever
+          // calls play() on its own, so the ad would otherwise sit fully
+          // loaded but never actually start. Muted so autoplay policy can't
+          // block it. Calling play() on the underlying element directly
+          // (rather than the Player wrapper's play(), which was observed not
+          // to reliably flip paused/fire the media event at this point in the
+          // lifecycle) is what actually triggers contrib-ads' 'play' listener.
+          const playResult = videoEl.play();
+          if (playResult && typeof playResult.catch === "function") {
+            playResult.catch(() => {
+              /* autoplay blocked; readyforpreroll will still fire once the
+                 user interacts with the player's own play control */
+            });
+          }
+        });
       })
       .catch(() => {
         clearTimeout(watchdog);
