@@ -40,6 +40,14 @@ Code-complete and building green:
 - [x] Billing: Checkout + webhook (source of truth) + idempotency
 - [x] Dashboard (subscriptions, templates, creatives with copyable tags)
 - [x] Telemetry beacon `GET /api/track` -> `creative_events`
+- [x] UI on the **Instrument** design system ([design-system.md](design-system.md),
+      [ADR-0007](decisions/0007-design-system-instrument.md)), bilingual RU/EN with a
+      top-bar switcher (locale in a cookie; a `profiles.locale` column is the follow-up)
+- [x] Three-section IA — Каталог / Мои креативы / Подписки
+      ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)); public
+      catalog with live demos replaces `/preview`; per-creative delivery counts from
+      `get_creative_overview()`. **Needs `supabase/schema.sql` re-applied** before the
+      counts and the serving state work against a live database
 
 Remaining before a true end-to-end demo (needs external setup / assets):
 

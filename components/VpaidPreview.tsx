@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDict } from "@/components/i18n/LocaleProvider";
 
 type Vpaid = {
   subscribe: (cb: (...a: unknown[]) => void, event: string) => void;
@@ -17,18 +18,48 @@ type Vpaid = {
 };
 
 /**
+ * Counts live hosts on the page. A VPAID unit publishes itself as the global
+ * `window.getVPAIDAd`, so a second host silently takes over the first one's
+ * factory — the failure looks like "the wrong mechanic rendered", which is very
+ * hard to read backwards. One well per page is a design rule for this reason
+ * (docs/design-system.md §7); this is the runtime tripwire behind it.
+ */
+let mountedHosts = 0;
+
+/**
  * Minimal in-browser VPAID host: loads a built unit and runs it in a slot so the
  * interactive mechanic can be tried by hand with sample config.
  */
 export function VpaidPreview({
   templateKey,
   config,
+  caption,
 }: {
   templateKey: string;
   config: Record<string, unknown>;
+  /** The well's one caption slot; the click-through readout replaces it (§7). */
+  caption: string;
 }) {
+  const dict = useDict();
   const slotRef = useRef<HTMLDivElement>(null);
   const [clicked, setClicked] = useState<string | null>(null);
+
+  // Depend on the config's *content*, not its object identity: a parent
+  // re-render (a locale switch, a client-side navigation) would otherwise
+  // restart the unit in the middle of someone's interaction.
+  const configKey = JSON.stringify(config);
+
+  useEffect(() => {
+    mountedHosts += 1;
+    if (process.env.NODE_ENV !== "production" && mountedHosts > 1) {
+      console.warn(
+        `VpaidPreview: ${mountedHosts} hosts mounted at once. VPAID units share the window.getVPAIDAd global, so only the last one loaded will render.`,
+      );
+    }
+    return () => {
+      mountedHosts -= 1;
+    };
+  }, []);
 
   useEffect(() => {
     const slot = slotRef.current;
@@ -78,22 +109,28 @@ export function VpaidPreview({
       script.remove();
       slot.innerHTML = "";
     };
-  }, [templateKey, config]);
+    // `configKey` is the content hash of `config`. Depending on the object
+    // itself would restart the unit on every parent render, mid-interaction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateKey, configKey]);
 
   return (
-    <div className="space-y-3">
+    <div className="mx-auto w-full max-w-[664px] rounded-ctl bg-well p-3">
       <div
         ref={slotRef}
-        className="relative mx-auto w-full max-w-[640px] overflow-hidden rounded-lg bg-black"
+        className="relative w-full overflow-hidden rounded-ctl bg-well-screen"
         style={{ aspectRatio: "16 / 9" }}
       />
-      <p className="text-center text-sm text-gray-500">
+      {/* One caption slot: the placeholder disclosure until a click-through
+          fires, the readout after (docs/design-system.md §7). */}
+      <p className="pt-3 text-center text-xs leading-4 text-well-fg">
         {clicked ? (
           <>
-            Click-through fired → <code className="text-gray-700">{clicked}</code>
+            <span className="text-well-live">{dict.preview.clickThrough}</span> →{" "}
+            <span className="data-instr break-all">{clicked}</span>
           </>
         ) : (
-          "Interact with the ad above — the click-through URL shows here."
+          caption
         )}
       </p>
     </div>

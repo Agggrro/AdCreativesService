@@ -94,6 +94,7 @@ export type Database = {
           id: string;
           user_id: string;
           template_id: string;
+          name: string | null;
           selected_format: string;
           config_json: Json;
           status: Database["public"]["Enums"]["creative_status"];
@@ -104,6 +105,7 @@ export type Database = {
           id?: string;
           user_id: string;
           template_id: string;
+          name?: string | null;
           selected_format: string;
           config_json?: Json;
           status?: Database["public"]["Enums"]["creative_status"];
@@ -114,6 +116,7 @@ export type Database = {
           id?: string;
           user_id?: string;
           template_id?: string;
+          name?: string | null;
           selected_format?: string;
           config_json?: Json;
           status?: Database["public"]["Enums"]["creative_status"];
@@ -233,6 +236,22 @@ export type Database = {
       get_creative_serving: {
         Args: { p_creative_id: string };
         Returns: Database["private"]["Views"]["creative_serving"]["Row"][];
+      };
+      // Dashboard analytics: the only read path into creative_events. Scoped to
+      // auth.uid() inside the function, hence no arguments (ADR-0008).
+      get_creative_overview: {
+        Args: Record<string, never>;
+        Returns: {
+          creative_id: string;
+          impressions: number;
+          starts: number;
+          q25: number;
+          q50: number;
+          q75: number;
+          completes: number;
+          is_entitled: boolean;
+          should_serve: boolean;
+        }[];
       };
     };
     Enums: {

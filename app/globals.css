@@ -1,26 +1,92 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Instrument — the AdInteract design system.
+ * Contract: docs/design-system.md · Rationale: docs/decisions/0007-design-system-instrument.md
+ *
+ * One light theme. Warm accent = action, cold semantics = state. Components
+ * consume these tokens; a literal hex in a component is a defect.
+ */
+@theme {
+  /* Neutrals — warm-biased, so they sit with Sienna instead of fighting it */
+  --color-surface: #ffffff;
+  --color-surface-sunken: #fbfaf9;
+  --color-ground: #f4f3f1;
+  --color-fill: #eae8e4;
+  --color-hairline: #dedbd6;
+  --color-line: #c4bfb7;
+  --color-fg: #1b1a18;
+  --color-fg-secondary: #403b36;
+  --color-fg-muted: #6e6862;
+  --color-fg-disabled: #948e85;
+
+  /* Accent (Sienna) — action or current selection only, max twice per screen */
+  --color-accent: #a24b2e;
+  --color-accent-hover: #85391f;
+  --color-accent-tint: #f7ebe4;
+
+  /* Semantics — deliberately cold, so an alarm can never read as an action */
+  --color-live: #1b7a52;
+  --color-live-fg: #12603f;
+  --color-live-bg: #e4f0ea;
+  --color-info: #2c5fa8;
+  --color-info-fg: #244f8c;
+  --color-info-bg: #e8eef8;
+  --color-dead: #b02537;
+  --color-dead-fg: #93202f;
+  --color-dead-bg: #fae8ea;
+  --color-idle: #c4bfb7;
+  --color-idle-fg: #6e6862;
+  --color-idle-bg: #eae8e4;
+
+  /* The single dark surface in the product: the player well */
+  --color-well: #17150f;
+  --color-well-screen: #221e18;
+  --color-well-line: #332e26;
+  --color-well-fg: #8c857a;
+  --color-well-fg-dim: #5a5348;
+  --color-well-live: #63c79a;
+  --color-well-accent: #e08a5e;
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* Radius 3px on controls and panels; nothing else is rounded */
+  --radius-ctl: 3px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ground);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+/*
+ * Instrument-panel legend: mono, uppercase, tracked. Used for every field
+ * label, table header, and metric caption.
+ */
+@utility label-instr {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+/* Machine-owned data: tags, ids, timecodes, counts — always digit-aligned */
+@utility data-instr {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Every interactive element gets the same visible focus state */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }

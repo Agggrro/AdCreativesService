@@ -17,11 +17,11 @@ Catalog of available interactive ad templates (admin-curated, read-only to users
 | --- | --- |
 | `id` | uuid PK |
 | `name`, `description` | display |
-| `type` | e.g. `shoppable_video`, `branching_story`, `lead_gen` |
-| `category` | grouping for the showcase |
+| `type` | e.g. `shoppable_video`, `branching_story`, `lead_gen`. **Unique** — the public catalog URL is `/catalog/<type hyphenated>` ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)) |
+| `category` | grouping for the catalog; populated (`commerce`, `interactive`) but not yet used as a filter |
 | `supported_standards` | array, e.g. `{simid, vpaid}` — drives the format picker |
-| `runtime_keys` | per-standard pointer to the runtime build (e.g. simid/vpaid asset ids) |
-| `preview_url` | showcase preview |
+| `runtime_keys` | per-standard pointer to the runtime build. Its first path segment is also the demo unit key used by `/api/preview-unit/<key>` |
+| `preview_url` | **Reserved, unused.** NULL in every row and rendered nowhere: the catalog shows a live demo rather than a thumbnail. Remove it or fill it — do not read it |
 | `config_schema` | JSON schema describing the fields a user must fill |
 | `pricing_tier` | links to a Stripe price / plan |
 | `created_at`, `updated_at` | |
@@ -34,9 +34,10 @@ A user's configured instance of a template.
 | `id` | uuid PK (this is the `creative_id` in the VAST URL) |
 | `user_id` | FK → auth user |
 | `template_id` | FK → templates |
+| `name` | optional user label; the UI falls back to the template name. Without it two creatives from one template differ only by uuid |
 | `selected_format` | `simid` \| `vpaid` \| … — user's choice; must be in template's `supported_standards` |
 | `config_json` | jsonb — validated against the template's `config_schema` |
-| `status` | `draft` \| `active` \| `paused` \| `archived` |
+| `status` | `draft` \| `active` \| `paused` \| `archived`. **Only `active` is reachable today** — it is hardcoded on insert and nothing updates it. The dashboard therefore shows a serving state derived from entitlement, not this column ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)); a per-creative kill switch needs one server action that does not exist yet |
 | `created_at`, `updated_at` | |
 
 ### `subscriptions`
@@ -61,8 +62,8 @@ Ingested ad events — the core value for media buyers. Append-only.
 | --- | --- |
 | `id` | bigint PK |
 | `creative_id` | FK |
-| `event_type` | `impression` \| `start` \| `q25` \| `q50` \| `q75` \| `complete` \| `interaction` \| `click` |
-| `meta` | jsonb (device, geo bucket, interaction detail) |
+| `event_type` | enum allows `impression` \| `start` \| `q25` \| `q50` \| `q75` \| `complete` \| `interaction` \| `click`; **only the first six are ever produced** |
+| `meta` | jsonb — intended for device / geo bucket / interaction detail. Nothing writes it today; every row is `{}` |
 | `occurred_at` | ts |
 
 > Volume note: this table can grow fast. MVP may use plain Postgres; revisit
@@ -71,6 +72,20 @@ Ingested ad events — the core value for media buyers. Append-only.
 Ingested by [`app/api/track/route.ts`](../app/api/track/route.ts) — a public,
 fire-and-forget beacon that maps VAST event names (start/firstQuartile/… plus
 impression/click) to the enum and inserts via the service role.
+
+**What is not collected**, so no screen may imply it: there is no `<ClickTracking>`
+element in the VAST builder, so `click` and `interaction` rows never appear and CTR is not
+computable; `error` beacons arrive but are dropped at ingest because the name is absent
+from the event map; and `/api/vast` writes nothing at all, so ad *requests* are uncounted
+and fill rate cannot be derived.
+
+**Read path.** The table has RLS enabled with **no policies**, so the session client reads
+zero rows by design. The dashboard reads aggregates through
+`public.get_creative_overview()` — a parameterless `SECURITY DEFINER` function scoped to
+`auth.uid()` that returns six counts plus `is_entitled` per creative, granted to
+`authenticated` only. It works because the function owner is exempt from RLS; running
+`alter table public.creative_events force row level security` would make it silently
+return zeros.
 
 ### `stripe_events` (webhook idempotency)
 Ledger of processed Stripe event ids. Service-role only; no client access.
@@ -120,7 +135,7 @@ EXECUTE is granted to `service_role` only and which returns an explicit TABLE
 | `templates` | **published** templates readable by anon + authenticated (public showcase); drafts hidden; writes admin-only (service role) |
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
-| `creative_events` | **no direct client access**; writes via serving/ingest layer, reads via aggregated/owner-scoped views |
+| `creative_events` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
 | `stripe_events` | **no direct client access**; written only by the webhook (service role) |
 
 RLS protects the **dashboard** path. It is intentionally not relied upon for the

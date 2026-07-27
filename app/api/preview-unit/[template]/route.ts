@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { CREATIVES_BUCKET } from "@/lib/storage";
+import { PREVIEW_UNIT_PATHS } from "@/lib/preview-units";
 
 // Serves a built VPAID unit JS for the in-browser preview harness. The unit code
 // is client-executed anyway (ADR-0003) and is rendered with SAMPLE config only —
@@ -7,13 +8,7 @@ import { CREATIVES_BUCKET } from "@/lib/storage";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PATHS: Record<string, string> = {
-  "scratch-reveal": "scratch-reveal/vpaid.js",
-  slider: "slider/vpaid.js",
-  quiz: "quiz/vpaid.js",
-  "age-gate": "age-gate/vpaid.js",
-  shoppable: "shoppable/vpaid/unit.js",
-};
+const PATHS = PREVIEW_UNIT_PATHS;
 
 export async function GET(
   _request: Request,

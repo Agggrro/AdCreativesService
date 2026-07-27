@@ -67,8 +67,10 @@ export async function POST(request: Request): Promise<Response> {
     customer: profile?.stripe_customer_id ?? undefined,
     customer_email: profile?.stripe_customer_id ? undefined : user.email,
     allow_promotion_codes: true,
-    success_url: `${siteUrl}/dashboard?checkout=success`,
-    cancel_url: `${siteUrl}/dashboard?checkout=cancelled`,
+    // Billing has its own section since ADR-0008 — land the buyer back where
+    // the subscription they just bought is listed, not on a redirect hop.
+    success_url: `${siteUrl}/dashboard/subscriptions?checkout=success`,
+    cancel_url: `${siteUrl}/dashboard/subscriptions?checkout=cancelled`,
   });
 
   return Response.json({ url: session.url });

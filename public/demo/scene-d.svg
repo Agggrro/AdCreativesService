@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" role="img" aria-label="Sample scene D">
+  <rect width="640" height="360" fill="#C4BFB7"/>
+  <rect x="0" y="0" width="640" height="360" fill="#DEDBD6" opacity="0.55"/>
+  <rect x="72" y="96" width="180" height="168" rx="4" fill="#EAE8E4"/>
+  <rect x="272" y="96" width="296" height="60" rx="3" fill="#EAE8E4"/>
+  <rect x="272" y="172" width="212" height="12" rx="3" fill="#EAE8E4"/>
+  <rect x="272" y="200" width="164" height="12" rx="3" fill="#EAE8E4"/>
+  <text x="272" y="256" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="15" letter-spacing="3" fill="#403B36">SAMPLE 04</text>
+</svg>

@@ -1,24 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { buttonClass, type ButtonVariant } from "@/components/ui/Button";
+import { useDict } from "@/components/i18n/LocaleProvider";
 
 type Props = {
   planKey: "single_weekly" | "single_monthly" | "ultimate_monthly";
   templateId?: string;
   children: React.ReactNode;
-  className?: string;
+  variant?: ButtonVariant;
 };
 
 export function SubscribeButton({
   planKey,
   templateId,
   children,
-  className,
+  variant = "secondary",
 }: Props) {
+  const dict = useDict();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function start() {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -30,24 +35,28 @@ export function SubscribeButton({
         window.location.href = data.url;
         return;
       }
-      alert(data.error ?? "Could not start checkout");
+      setError(data.error ?? dict.common.checkoutError);
     } catch {
-      alert("Could not start checkout");
+      setError(dict.common.checkoutError);
     }
     setLoading(false);
   }
 
   return (
-    <button
-      type="button"
-      onClick={start}
-      disabled={loading}
-      className={
-        className ??
-        "rounded-md bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
-      }
-    >
-      {loading ? "…" : children}
-    </button>
+    <span className="inline-flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={start}
+        disabled={loading}
+        className={buttonClass(variant)}
+      >
+        {loading ? dict.common.working : children}
+      </button>
+      {error && (
+        <span role="alert" className="text-[11px] text-dead-fg">
+          {error}
+        </span>
+      )}
+    </span>
   );
 }

@@ -13,6 +13,7 @@
 | `GET /api/vast/preview/[token]` | Third-party player SDKs (Google IMA, Fluid Player), fetched with no session | Public by necessity; self-authorizing via HMAC signature + 120s expiry, **fail closed** like `/api/vast` |
 | `POST /api/stripe/webhook` | Stripe | Signature-verified; treat unsigned/invalid as hostile |
 | Creative runtime assets | Player iframes on third-party pages | Signed, short-TTL, domain/referer allow-listed |
+| UI language cookie (`adinteract_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
 
 ## Secrets
 

@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { signIn } from "@/app/auth/actions";
+import { getDict } from "@/lib/i18n/server";
+import { Field, Notice, Panel } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { AppTopBar } from "@/components/AppTopBar";
 
 export default async function LoginPage({
   searchParams,
@@ -7,68 +11,53 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; message?: string }>;
 }) {
   const sp = await searchParams;
+  const { dict } = await getDict();
 
   return (
-    <main className="flex flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Sign in to AdInteract</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your interactive ad creatives.
+    <main className="flex flex-1 flex-col">
+      <AppTopBar />
+
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="flex w-full max-w-sm flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
+              {dict.auth.signInTitle}
+            </h1>
+            <p className="text-[13px] leading-5 text-fg-muted">
+              {dict.auth.signInSubtitle}
+            </p>
+          </div>
+
+          {sp.message === "check-email" && (
+            <Notice tone="info">{dict.auth.checkEmail}</Notice>
+          )}
+          {sp.error && <Notice tone="dead">{sp.error}</Notice>}
+
+          <Panel className="p-5">
+            <form action={signIn} className="flex flex-col gap-4">
+              <Field label={dict.common.email} name="email" type="email" />
+              <Field
+                label={dict.common.password}
+                name="password"
+                type="password"
+              />
+              <Button type="submit" variant="primary" className="w-full justify-center">
+                {dict.common.signIn}
+              </Button>
+            </form>
+          </Panel>
+
+          <p className="text-[13px] text-fg-muted">
+            {dict.auth.noAccount}{" "}
+            <Link
+              href="/signup"
+              className="font-medium text-fg underline underline-offset-4"
+            >
+              {dict.auth.createOne}
+            </Link>
           </p>
         </div>
-
-        {sp.message === "check-email" && (
-          <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
-            Check your email to confirm your account, then sign in.
-          </p>
-        )}
-        {sp.error && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {sp.error}
-          </p>
-        )}
-
-        <form action={signIn} className="space-y-4">
-          <Field label="Email" name="email" type="email" />
-          <Field label="Password" name="password" type="password" />
-          <button
-            type="submit"
-            className="w-full rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            Sign in
-          </button>
-        </form>
-
-        <p className="text-sm text-gray-500">
-          No account?{" "}
-          <Link href="/signup" className="font-medium text-black underline">
-            Create one
-          </Link>
-        </p>
       </div>
     </main>
-  );
-}
-
-function Field({
-  label,
-  name,
-  type,
-}: {
-  label: string;
-  name: string;
-  type: string;
-}) {
-  return (
-    <label className="block space-y-1">
-      <span className="text-sm font-medium">{label}</span>
-      <input
-        name={name}
-        type={type}
-        required
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-      />
-    </label>
   );
 }

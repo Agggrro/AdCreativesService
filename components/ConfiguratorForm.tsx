@@ -4,6 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import type { ConfigField } from "@/lib/config-schema";
 import { PreviewPanel } from "@/components/PreviewPanel";
+import { useDict } from "@/components/i18n/LocaleProvider";
+import { buttonClass } from "@/components/ui/Button";
+import { inputClass } from "@/components/ui/Field";
 
 type ConfiguratorTemplate = {
   id: string;
@@ -42,6 +45,7 @@ export function ConfiguratorForm({
   fields: ConfigField[];
   createCreative: (formData: FormData) => void;
 }) {
+  const dict = useDict();
   const [format, setFormat] = useState(template.supported_standards[0] ?? "");
   const [values, setValues] = useState<Record<string, string>>(() => initialValues(fields));
 
@@ -51,28 +55,52 @@ export function ConfiguratorForm({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
-      <form action={createCreative} className="space-y-5">
+      <form action={createCreative} className="flex flex-col gap-5">
         <input type="hidden" name="template_id" value={template.id} />
 
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium">Delivery format</legend>
-          <div className="flex gap-3">
-            {template.supported_standards.map((s) => (
-              <label
-                key={s}
-                className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm"
-              >
-                <input
-                  type="radio"
-                  name="selected_format"
-                  value={s}
-                  checked={format === s}
-                  onChange={() => setFormat(s)}
-                  required
-                />
-                <span className="uppercase">{s}</span>
-              </label>
-            ))}
+        <label className="flex flex-col gap-2">
+          <span className="label-instr">{dict.dashboard.creativeName}</span>
+          <input
+            name="name"
+            type="text"
+            maxLength={200}
+            placeholder={template.name}
+            className={inputClass}
+          />
+          <span className="text-xs text-fg-muted">
+            {dict.dashboard.creativeNameHelp}
+          </span>
+        </label>
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="label-instr">
+            {dict.configurator.deliveryFormat}
+          </legend>
+          <div className="inline-flex self-start rounded-ctl border border-line bg-surface">
+            {template.supported_standards.map((s) => {
+              const current = format === s;
+              return (
+                <label
+                  key={s}
+                  className={`cursor-pointer border-r border-hairline px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+                    current
+                      ? "bg-fill font-medium text-fg"
+                      : "text-fg-secondary hover:bg-fill"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="selected_format"
+                    value={s}
+                    checked={current}
+                    onChange={() => setFormat(s)}
+                    required
+                    className="sr-only"
+                  />
+                  {s}
+                </label>
+              );
+            })}
           </div>
         </fieldset>
 
@@ -80,26 +108,24 @@ export function ConfiguratorForm({
           <Field
             key={field.name}
             field={field}
+            requiredLabel={dict.configurator.required}
             value={values[field.name] ?? ""}
             onChange={(v) => setValue(field.name, v)}
           />
         ))}
 
         {fields.length === 0 && (
-          <p className="text-sm text-gray-500">
-            This template has no configurable fields.
+          <p className="text-[13px] text-fg-muted">
+            {dict.configurator.noFields}
           </p>
         )}
 
         <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            Create creative
+          <button type="submit" className={buttonClass("primary")}>
+            {dict.dashboard.createCreative}
           </button>
-          <Link href="/dashboard" className="text-sm text-gray-500 underline">
-            Cancel
+          <Link href="/dashboard" className={buttonClass("ghost")}>
+            {dict.common.cancel}
           </Link>
         </div>
       </form>
@@ -114,20 +140,19 @@ export function ConfiguratorForm({
 function Field({
   field,
   value,
+  requiredLabel,
   onChange,
 }: {
   field: ConfigField;
   value: string;
+  requiredLabel: string;
   onChange: (v: string) => void;
 }) {
-  const base =
-    "w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black";
-
   return (
-    <label className="block space-y-1">
-      <span className="text-sm font-medium">
+    <label className="flex flex-col gap-2">
+      <span className="label-instr">
         {field.label}
-        {field.required ? " *" : ""}
+        {field.required ? ` · ${requiredLabel}` : ""}
       </span>
 
       {field.type === "textarea" ? (
@@ -138,7 +163,7 @@ function Field({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
-          className={base}
+          className={inputClass}
         />
       ) : field.type === "select" ? (
         <select
@@ -146,7 +171,7 @@ function Field({
           required={field.required}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={base}
+          className={inputClass}
         >
           {!field.required && <option value="">—</option>}
           {(field.options ?? []).map((o) => (
@@ -156,15 +181,20 @@ function Field({
           ))}
         </select>
       ) : field.type === "range" ? (
-        <input
-          name={field.name}
-          type="range"
-          min={field.min ?? 0}
-          max={field.max ?? 100}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full"
-        />
+        <span className="flex items-center gap-3">
+          <input
+            name={field.name}
+            type="range"
+            min={field.min ?? 0}
+            max={field.max ?? 100}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full accent-fg-secondary"
+          />
+          <span className="data-instr w-10 shrink-0 text-right text-[13px] text-fg-secondary">
+            {value || "0"}
+          </span>
+        </span>
       ) : (
         <input
           name={field.name}
@@ -181,11 +211,11 @@ function Field({
           placeholder={field.placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={base}
+          className={inputClass}
         />
       )}
 
-      {field.help && <span className="text-xs text-gray-400">{field.help}</span>}
+      {field.help && <span className="text-xs text-fg-muted">{field.help}</span>}
     </label>
   );
 }

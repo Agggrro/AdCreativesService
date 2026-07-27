@@ -8,7 +8,20 @@
 --                     by design — there is no user session). See docs/security.md.
 --
 -- Idempotent: safe to re-run. Apply in the Supabase SQL editor or via CLI.
+--
+-- Apply it ATOMICALLY — the whole file is wrapped in one transaction below. A
+-- partial apply is a security event, not an inconvenience: functions are created
+-- with PUBLIC EXECUTE and revoked a few statements later, and RLS is enabled
+-- after the tables exist, so an abort in the middle can leave a definer function
+-- callable by `anon` or a table readable with no policy.
 -- ============================================================================
+
+begin;
+
+-- Default-closed for anything created later in this file (and by anyone after
+-- it): `create function` otherwise grants EXECUTE to PUBLIC, which briefly
+-- exposes every SECURITY DEFINER function to anon before its explicit revoke.
+alter default privileges in schema public revoke execute on functions from public;
 
 -- ---------------------------------------------------------------------------
 -- Enums
@@ -99,7 +112,7 @@ create table if not exists public.templates (
   category             text,
   supported_standards  text[] not null default '{}',  -- e.g. {simid,vpaid}
   runtime_keys         jsonb  not null default '{}',   -- per-standard asset pointers
-  preview_url          text,
+  preview_url          text,                           -- RESERVED, unused: the catalog shows a live demo, not a thumbnail (ADR-0008)
   config_schema        jsonb  not null default '{}',   -- JSON schema for the user config form
   pricing_tier         text,                           -- links to a Stripe price family
   is_published         boolean not null default false,
@@ -107,6 +120,22 @@ create table if not exists public.templates (
   updated_at           timestamptz not null default now()
 );
 comment on table public.templates is 'Interactive ad templates; optimized into one variant per supported standard.';
+
+-- The public catalog URL is `/catalog/<type hyphenated>` (ADR-0008), so `type`
+-- must identify exactly one template. If two templates of one type ever become a
+-- real need, add a dedicated `slug text unique` column — do not drop this index.
+--
+-- `if not exists` suppresses "already exists", NOT a uniqueness violation, so on
+-- a database that already holds duplicates this statement aborts the apply. Fail
+-- with a sentence someone can act on instead of a constraint name.
+do $$ begin
+  if exists (select 1 from public.templates group by type having count(*) > 1) then
+    raise exception
+      'ADR-0008: duplicate templates.type values block templates_type_key. Resolve them, or add a dedicated slug column first.';
+  end if;
+end $$;
+
+create unique index if not exists templates_type_key on public.templates (type);
 
 drop trigger if exists templates_set_updated_at on public.templates;
 create trigger templates_set_updated_at
@@ -120,6 +149,7 @@ create table if not exists public.creatives (
   id               uuid primary key default gen_random_uuid(),  -- = creative_id in the VAST URL
   user_id          uuid not null references auth.users(id)   on delete cascade,
   template_id      uuid not null references public.templates(id) on delete restrict,
+  name             text check (char_length(name) <= 200),      -- user's label; falls back to the template name in the UI
   selected_format  text not null,                              -- must be in template.supported_standards
   config_json      jsonb not null default '{}',
   status           creative_status not null default 'draft',
@@ -127,6 +157,9 @@ create table if not exists public.creatives (
   updated_at       timestamptz not null default now()
 );
 comment on table public.creatives is 'User-configured ad; its id is the public creative_id used by the VAST endpoint.';
+
+-- For databases created before ADR-0008 (this file is re-runnable, not migrated).
+alter table public.creatives add column if not exists name text;
 
 create index if not exists creatives_user_id_idx     on public.creatives (user_id);
 create index if not exists creatives_template_id_idx on public.creatives (template_id);
@@ -296,8 +329,22 @@ create policy subscriptions_select_own on public.subscriptions
 grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;
 grant all on all sequences in schema public to anon, authenticated, service_role;
-alter default privileges in schema public
-  grant all on tables to anon, authenticated, service_role;
+
+-- Two tables have no client contract at all: `creative_events` is written by the
+-- ingest beacon with the service role and read only through
+-- public.get_creative_overview(), and `stripe_events` is webhook-only. Take the
+-- table-level privileges away rather than relying on RLS alone — TRUNCATE is a
+-- table privilege that **no policy can gate**, and "RLS on, zero policies" does
+-- not stop it. SECURITY DEFINER functions are unaffected: they are checked
+-- against their owner, not the caller.
+revoke all on public.creative_events, public.stripe_events from anon, authenticated;
+
+-- Default-closed for future tables. The previous `grant all on tables` default
+-- meant any table created later was born readable AND writable by anon until
+-- someone remembered to enable RLS on it — a standing version of exactly the
+-- "RLS off for a moment" window that docs/security.md forbids.
+alter default privileges in schema public revoke all on tables from anon, authenticated;
+alter default privileges in schema public grant all on tables to service_role;
 alter default privileges in schema public
   grant all on sequences to anon, authenticated, service_role;
 
@@ -310,6 +357,42 @@ alter default privileges in schema public
 -- in app code. See docs/architecture.md.
 -- ============================================================================
 create schema if not exists private;
+
+-- ---------------------------------------------------------------------------
+-- Entitlement, defined once
+-- ---------------------------------------------------------------------------
+-- This predicate decides whether a tag serves. It is read by the serving view
+-- (hot path) and by the dashboard's overview RPC, and those two must never
+-- disagree: a drift would either dark a live tag or tell a buyer their dead tag
+-- is fine. One definition, three call sites.
+create or replace function private.is_entitled(p_user_id uuid, p_template_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1 from public.subscriptions s
+    where s.user_id = p_user_id
+      and s.status in ('active', 'trialing')
+      and (s.current_period_end is null or s.current_period_end > now())
+      and (s.plan_type = 'all_access'
+           or (s.plan_type = 'single' and s.template_id = p_template_id))
+  );
+$$;
+
+comment on function private.is_entitled(uuid, uuid) is
+  'The single definition of subscription entitlement. Callers are private.creative_serving and public.get_creative_overview.';
+
+revoke all on function private.is_entitled(uuid, uuid) from public;
+
+-- The two RPCs reach it as their owner, but a plain view checks function EXECUTE
+-- against the *invoking* role — so a direct service-role read of
+-- private.creative_serving needs this grant. Never grant it to `authenticated`:
+-- the (user_id, template_id) signature is a ready-made cross-tenant
+-- entitlement oracle.
+grant execute on function private.is_entitled(uuid, uuid) to service_role;
 
 create or replace view private.creative_serving as
 select
@@ -324,23 +407,10 @@ select
   t.supported_standards,
   -- Effective entitlement: an active/trialing, non-expired subscription that
   -- covers this creative's template (all-access, or single matching template).
-  exists (
-    select 1 from public.subscriptions s
-    where s.user_id = c.user_id
-      and s.status in ('active', 'trialing')
-      and (s.current_period_end is null or s.current_period_end > now())
-      and (s.plan_type = 'all_access'
-           or (s.plan_type = 'single' and s.template_id = c.template_id))
-  )                          as is_entitled,
+  private.is_entitled(c.user_id, c.template_id)                as is_entitled,
   -- Convenience: only serve the payload for an active creative that is entitled.
-  (c.status = 'active' and exists (
-    select 1 from public.subscriptions s
-    where s.user_id = c.user_id
-      and s.status in ('active', 'trialing')
-      and (s.current_period_end is null or s.current_period_end > now())
-      and (s.plan_type = 'all_access'
-           or (s.plan_type = 'single' and s.template_id = c.template_id))
-  ))                         as should_serve
+  (c.status = 'active' and private.is_entitled(c.user_id, c.template_id))
+                                                               as should_serve
 from public.creatives c
 join public.templates  t on t.id = c.template_id;
 
@@ -348,7 +418,9 @@ comment on view private.creative_serving is
   'Denormalized read for the public VAST endpoint. Service role only; not exposed via the API.';
 
 -- Lock down: only the service role may touch the private serving surface.
-revoke all on schema private from anon, authenticated;
+-- `from public` as well as the named roles — revoking from a role does not
+-- remove a privilege it holds via PUBLIC.
+revoke all on schema private from public, anon, authenticated;
 grant usage on schema private to service_role;
 revoke all on private.creative_serving from anon, authenticated;
 grant select on private.creative_serving to service_role;
@@ -390,6 +462,69 @@ $$;
 -- Only the service role may call it (revoking from PUBLIC also covers anon/authenticated).
 revoke all on function public.get_creative_serving(uuid) from public;
 grant execute on function public.get_creative_serving(uuid) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Dashboard analytics read (the "Мои креативы" section)
+-- ---------------------------------------------------------------------------
+-- `creative_events` has RLS enabled with no policies, so the session client
+-- reads zero rows and must stay that way: opening it with an owner policy would
+-- expose `meta` and per-row `occurred_at` forever in exchange for six integers,
+-- and PostgREST cannot aggregate, so counting would cost a round trip per
+-- creative. This function is the whole dashboard analytics surface.
+--
+-- It takes NO parameter on purpose: the only rows it can ever return are the
+-- caller's own. A p_creative_id argument is the shape that eventually ships
+-- without an ownership check.
+--
+-- It can read `creative_events` only because its owner is exempt from RLS. Two
+-- ways that silently degrades to zeros rather than failing loudly, both worth
+-- knowing before debugging an empty dashboard: running
+-- `alter table public.creative_events force row level security`, or applying
+-- this file as a role that neither owns the table nor has BYPASSRLS.
+create or replace function public.get_creative_overview()
+returns table (
+  creative_id  uuid,
+  impressions  bigint,
+  starts       bigint,
+  q25          bigint,
+  q50          bigint,
+  q75          bigint,
+  completes    bigint,
+  is_entitled  boolean,
+  should_serve boolean
+)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select
+    c.id,
+    count(e.*) filter (where e.event_type = 'impression'),
+    count(e.*) filter (where e.event_type = 'start'),
+    count(e.*) filter (where e.event_type = 'q25'),
+    count(e.*) filter (where e.event_type = 'q50'),
+    count(e.*) filter (where e.event_type = 'q75'),
+    count(e.*) filter (where e.event_type = 'complete'),
+    -- Both flags, from the one shared definition. `should_serve` matches the
+    -- serving gate exactly; the dashboard renders entitlement today only because
+    -- creatives.status has no update path, and the day a kill switch ships this
+    -- column is already here to tell the truth (ADR-0008).
+    private.is_entitled(c.user_id, c.template_id),
+    (c.status = 'active' and private.is_entitled(c.user_id, c.template_id))
+  from public.creatives c
+  left join public.creative_events e on e.creative_id = c.id
+  where c.user_id = (select auth.uid())
+  group by c.id;
+$$;
+
+comment on function public.get_creative_overview() is
+  'Per-creative funnel counts + entitlement for the signed-in owner. The only read path into creative_events.';
+
+revoke all on function public.get_creative_overview() from public;
+grant execute on function public.get_creative_overview() to authenticated;
+
+commit;
 
 -- ============================================================================
 -- End of schema

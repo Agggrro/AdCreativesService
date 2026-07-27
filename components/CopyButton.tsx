@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { buttonClass } from "@/components/ui/Button";
+import { useDict } from "@/components/i18n/LocaleProvider";
 
 export function CopyButton({ value }: { value: string }) {
+  const dict = useDict();
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -17,14 +20,13 @@ export function CopyButton({ value }: { value: string }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={copy}
-      className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
-      aria-label="Copy"
-    >
-      {copied ? <Check size={14} /> : <Copy size={14} />}
-      {copied ? "Copied" : "Copy"}
+    <button type="button" onClick={copy} className={buttonClass("secondary")}>
+      {copied ? (
+        <Check size={14} aria-hidden />
+      ) : (
+        <Copy size={14} aria-hidden />
+      )}
+      {copied ? dict.common.tagCopied : dict.common.copyTag}
     </button>
   );
 }

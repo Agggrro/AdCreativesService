@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" role="img" aria-label="Sample scene A">
+  <rect width="640" height="360" fill="#EAE8E4"/>
+  <circle cx="320" cy="164" r="86" fill="#DEDBD6"/>
+  <rect x="196" y="272" width="248" height="10" rx="3" fill="#C4BFB7"/>
+  <rect x="252" y="298" width="136" height="10" rx="3" fill="#DEDBD6"/>
+  <text x="320" y="172" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="15" letter-spacing="3" fill="#6E6862">SAMPLE 01</text>
+</svg>

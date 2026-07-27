@@ -21,6 +21,8 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0004](0004-mvp-on-free-tiers.md) | Run the MVP entirely on free tiers | Accepted |
 | [0005](0005-interactive-image-creatives.md) | Interactive-image creatives via VPAID/SIMID (not display) | Accepted |
 | [0006](0006-live-preview-token.md) | Stateless signed tokens for the live "Launch Ad" preview | Accepted |
+| [0007](0007-design-system-instrument.md) | "Instrument" design system: single light theme, Sienna accent, cold semantics | Accepted |
+| [0008](0008-catalog-first-information-architecture.md) | Catalog-first information architecture: three sections, public catalog, honest metrics | Accepted |
 
 ## Template
 

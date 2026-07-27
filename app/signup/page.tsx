@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { signUp } from "@/app/auth/actions";
+import { getDict } from "@/lib/i18n/server";
+import { Field, Notice, Panel } from "@/components/ui/Field";
+import { Button } from "@/components/ui/Button";
+import { AppTopBar } from "@/components/AppTopBar";
 
 export default async function SignupPage({
   searchParams,
@@ -7,57 +11,50 @@ export default async function SignupPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const sp = await searchParams;
+  const { dict } = await getDict();
 
   return (
-    <main className="flex flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Create your account</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Start building interactive ad creatives.
+    <main className="flex flex-1 flex-col">
+      <AppTopBar />
+
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="flex w-full max-w-sm flex-col gap-5">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
+              {dict.auth.signUpTitle}
+            </h1>
+            <p className="text-[13px] leading-5 text-fg-muted">
+              {dict.auth.signUpSubtitle}
+            </p>
+          </div>
+
+          {sp.error && <Notice tone="dead">{sp.error}</Notice>}
+
+          <Panel className="p-5">
+            <form action={signUp} className="flex flex-col gap-4">
+              <Field label={dict.common.email} name="email" type="email" />
+              <Field
+                label={dict.common.password}
+                name="password"
+                type="password"
+                minLength={8}
+              />
+              <Button type="submit" variant="primary" className="w-full justify-center">
+                {dict.auth.createAccount}
+              </Button>
+            </form>
+          </Panel>
+
+          <p className="text-[13px] text-fg-muted">
+            {dict.auth.haveAccount}{" "}
+            <Link
+              href="/login"
+              className="font-medium text-fg underline underline-offset-4"
+            >
+              {dict.common.signIn}
+            </Link>
           </p>
         </div>
-
-        {sp.error && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {sp.error}
-          </p>
-        )}
-
-        <form action={signUp} className="space-y-4">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Email</span>
-            <input
-              name="email"
-              type="email"
-              required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Password</span>
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black"
-            />
-          </label>
-          <button
-            type="submit"
-            className="w-full rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-          >
-            Create account
-          </button>
-        </form>
-
-        <p className="text-sm text-gray-500">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-black underline">
-            Sign in
-          </Link>
-        </p>
       </div>
     </main>
   );

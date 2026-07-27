@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Sample option A">
+  <rect width="200" height="200" fill="#EAE8E4"/>
+  <circle cx="100" cy="86" r="46" fill="#C4BFB7"/>
+  <rect x="46" y="150" width="108" height="10" rx="3" fill="#DEDBD6"/>
+  <text x="100" y="92" text-anchor="middle" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="14" letter-spacing="2" fill="#403B36">A</text>
+</svg>

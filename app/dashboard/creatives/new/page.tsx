@@ -1,46 +1,47 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createCreative } from "@/app/dashboard/creatives/actions";
 import { parseConfigSchema } from "@/lib/config-schema";
+import { getDict } from "@/lib/i18n/server";
 import { ConfiguratorForm } from "@/components/ConfiguratorForm";
+import { Notice } from "@/components/ui/Field";
+
+/** Error codes from the save action → copy, in the reader's language (§8). */
+function errorMessage(
+  dict: Awaited<ReturnType<typeof getDict>>["dict"],
+  code: string | undefined,
+  field: string | undefined,
+): string | null {
+  const c = dict.configurator;
+  switch (code) {
+    case "format_required":
+      return c.errFormatRequired;
+    case "template_not_found":
+      return c.errTemplateNotFound;
+    case "field_required":
+      return field ? `${c.errFieldRequired}: ${field}` : c.errFieldRequired;
+    case "name_too_long":
+      return c.errNameTooLong;
+    case "save_failed":
+      return c.errSaveFailed;
+    default:
+      return code ? c.errSaveFailed : null;
+  }
+}
 
 export default async function NewCreativePage({
   searchParams,
 }: {
-  searchParams: Promise<{ template?: string; error?: string }>;
+  searchParams: Promise<{ template?: string; error?: string; field?: string }>;
 }) {
   const sp = await searchParams;
+  // Picking a template is the catalog's job now — there is no second picker
+  // to keep in sync with it (ADR-0008).
+  if (!sp.template) redirect("/catalog");
+
   const supabase = await createServerSupabase();
-
-  // No template chosen yet → let the user pick one.
-  if (!sp.template) {
-    const { data: templates } = await supabase
-      .from("templates")
-      .select("id, name, description")
-      .eq("is_published", true)
-      .order("name");
-
-    return (
-      <div className="space-y-4">
-        <h1 className="text-xl font-semibold">Choose a template</h1>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {(templates ?? []).map((t) => (
-            <Link
-              key={t.id}
-              href={`/dashboard/creatives/new?template=${t.id}`}
-              className="rounded-lg border border-gray-200 p-4 hover:border-black"
-            >
-              <h2 className="font-medium">{t.name}</h2>
-              <p className="mt-1 text-sm text-gray-500">{t.description}</p>
-            </Link>
-          ))}
-          {(!templates || templates.length === 0) && (
-            <p className="text-sm text-gray-500">No templates published yet.</p>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const { dict } = await getDict();
 
   const { data: template } = await supabase
     .from("templates")
@@ -51,10 +52,15 @@ export default async function NewCreativePage({
 
   if (!template) {
     return (
-      <div className="space-y-3">
-        <p className="text-sm text-gray-500">Template not found.</p>
-        <Link href="/dashboard/creatives/new" className="underline">
-          Back to templates
+      <div className="flex flex-col gap-3">
+        <p className="text-[13px] text-fg-muted">
+          {dict.configurator.notFound}
+        </p>
+        <Link
+          href="/catalog"
+          className="text-[13px] font-medium text-fg underline underline-offset-4"
+        >
+          {dict.catalog.backToCatalog}
         </Link>
       </div>
     );
@@ -63,20 +69,20 @@ export default async function NewCreativePage({
   const { fields } = parseConfigSchema(template.config_schema);
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Configure: {template.name}</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Fill in the creative details, pick a delivery format, then try it in
-          the player before saving.
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
+          {dict.configurator.configureTitle}: {template.name}
+        </h1>
+        <p className="max-w-[66ch] text-[13px] leading-5 text-fg-muted">
+          {dict.configurator.configureSubtitle}
         </p>
       </div>
 
-      {sp.error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {sp.error}
-        </p>
-      )}
+      {(() => {
+        const message = errorMessage(dict, sp.error, sp.field);
+        return message ? <Notice tone="dead">{message}</Notice> : null;
+      })()}
 
       <ConfiguratorForm
         template={template}

@@ -6,12 +6,15 @@ import type { PreviewMint } from "@/components/players/types";
 import { SandboxPlayer } from "@/components/players/SandboxPlayer";
 import { ImaPlayer } from "@/components/players/ImaPlayer";
 import { FluidPlayer } from "@/components/players/FluidPlayer";
+import { useDict } from "@/components/i18n/LocaleProvider";
+import { buttonClass } from "@/components/ui/Button";
 
 type PlayerKey = "sandbox" | "ima" | "fluid";
 
+// Product names, not copy — they stay identical in both locales.
 const PLAYERS: { key: PlayerKey; label: string }[] = [
   { key: "sandbox", label: "Sandbox" },
-  { key: "ima", label: "Google IMA SDK" },
+  { key: "ima", label: "Google IMA" },
   { key: "fluid", label: "Fluid Player" },
 ];
 
@@ -20,6 +23,9 @@ const PLAYERS: { key: PlayerKey; label: string }[] = [
  * short-TTL VAST preview from whatever is currently typed into the form
  * (nothing saved to the DB) and runs it in whichever of the three player
  * backends is selected — same VAST tag, three different players.
+ *
+ * This is the one dark surface in the product: a creative is always judged
+ * against black (docs/design-system.md §7).
  */
 export function PreviewPanel({
   templateId,
@@ -30,6 +36,7 @@ export function PreviewPanel({
   format: string;
   fields: Record<string, string>;
 }) {
+  const dict = useDict();
   const [tab, setTab] = useState<PlayerKey>("sandbox");
   const [mint, setMint] = useState<PreviewMint | null>(null);
   const [launchToken, setLaunchToken] = useState(0);
@@ -38,12 +45,15 @@ export function PreviewPanel({
   const [status, setStatus] = useState<string | null>(null);
   const [clickThrough, setClickThrough] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
 
   async function launch() {
     setMinting(true);
     setError(null);
     setStatus(null);
     setClickThrough(null);
+    setLatencyMs(null);
+    const startedAt = performance.now();
     try {
       const res = await fetch("/api/vast/preview", {
         method: "POST",
@@ -54,15 +64,16 @@ export function PreviewPanel({
         | (PreviewMint & { error?: string })
         | null;
       if (!res.ok || !data) {
-        setError(data?.error || "Could not start the preview.");
+        setError(data?.error || dict.preview.errorStart);
         setMint(null);
         return;
       }
       setMint(data);
+      setLatencyMs(Math.round(performance.now() - startedAt));
       setExpiresAt(Date.now() + data.expiresInSeconds * 1000);
       setLaunchToken((t) => t + 1);
     } catch {
-      setError("Could not reach the preview endpoint.");
+      setError(dict.preview.errorReach);
       setMint(null);
     } finally {
       setMinting(false);
@@ -75,79 +86,109 @@ export function PreviewPanel({
     : null;
 
   return (
-    <div className="space-y-3">
-      <div>
-        <div className="flex gap-1 rounded-lg bg-gray-100 p-1 text-sm">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
+        <div className="inline-flex w-full rounded-ctl border border-line bg-surface">
           {PLAYERS.map((p) => (
             <button
               key={p.key}
               type="button"
               onClick={() => setTab(p.key)}
-              className={`flex-1 rounded-md px-2.5 py-1.5 font-medium transition-colors ${
+              aria-pressed={tab === p.key}
+              className={`flex-1 border-r border-hairline px-2 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 ${
                 tab === p.key
-                  ? "bg-white text-black shadow-sm"
-                  : "text-gray-500 hover:text-black"
+                  ? "bg-fill font-medium text-fg"
+                  : "text-fg-secondary hover:bg-fill"
               }`}
             >
               {p.label}
             </button>
           ))}
         </div>
-        <p className="mt-1.5 text-center text-xs text-gray-400">
-          Same VAST tag, three different players — what a real DSP would load.
+        <p className="text-[11px] leading-4 text-fg-muted">
+          {dict.preview.sameTag}
         </p>
       </div>
 
-      <div
-        className="relative w-full overflow-hidden rounded-xl bg-black shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_20px_40px_-15px_rgba(0,0,0,0.35)]"
-        style={{ aspectRatio: "16 / 9" }}
-      >
-        <span className="pointer-events-none absolute left-3 top-3 z-10 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur">
-          {format || "—"}
-        </span>
-
-        {commonProps && (tab === "sandbox" ? (
-          <SandboxPlayer key={launchToken} {...commonProps} />
-        ) : tab === "ima" ? (
-          <ImaPlayer key={launchToken} {...commonProps} />
-        ) : (
-          <FluidPlayer key={launchToken} {...commonProps} />
-        ))}
-
-        {!launched && (
-          <button
-            type="button"
-            onClick={launch}
-            disabled={minting || !format}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white transition-colors hover:bg-white/5 disabled:cursor-wait"
-          >
-            {minting ? (
-              <Loader2 className="animate-spin" size={26} />
-            ) : (
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/25 transition-transform group-hover:scale-105">
-                <Play size={22} className="ml-0.5 fill-white" />
+      <div className="rounded-ctl bg-well p-3">
+        {/* Instrument strip: what a buyer checks before pressing play */}
+        <div className="flex items-center justify-between gap-3 pb-3 font-mono text-[11px] uppercase tracking-[0.09em] text-well-fg">
+          <span className="data-instr">
+            {dict.preview.format} · {format || "—"}
+          </span>
+          {launched && !error && (
+            <span className="inline-flex items-center gap-1.5 text-well-live">
+              <span className="size-1.5 rounded-full bg-well-live" />
+              <span className="data-instr">
+                {dict.preview.served}
+                {latencyMs !== null ? ` · ${latencyMs} ${dict.preview.ms}` : ""}
               </span>
-            )}
-            <span className="text-sm font-medium">
-              {minting ? "Building VAST tag…" : "Launch Ad"}
             </span>
-          </button>
+          )}
+        </div>
+
+        <div
+          className="relative w-full overflow-hidden rounded-ctl bg-well-screen"
+          style={{ aspectRatio: "16 / 9" }}
+        >
+          {commonProps && (tab === "sandbox" ? (
+            <SandboxPlayer key={launchToken} {...commonProps} />
+          ) : tab === "ima" ? (
+            <ImaPlayer key={launchToken} {...commonProps} />
+          ) : (
+            <FluidPlayer key={launchToken} {...commonProps} />
+          ))}
+
+          {!launched && (
+            <button
+              type="button"
+              onClick={launch}
+              disabled={minting || !format}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white transition-colors hover:bg-white/5 disabled:cursor-wait"
+            >
+              {minting ? (
+                <Loader2 className="animate-spin" size={26} aria-hidden />
+              ) : (
+                <span className="flex size-12 items-center justify-center rounded-ctl border border-well-line bg-well">
+                  <Play size={20} className="fill-white" aria-hidden />
+                </span>
+              )}
+              <span className="text-[13px] font-medium">
+                {minting ? dict.preview.building : dict.preview.launch}
+              </span>
+            </button>
+          )}
+        </div>
+
+        {launched && expiresAt && (
+          <ExpiryHint
+            expiresAt={expiresAt}
+            validFor={dict.preview.validFor}
+            seconds={dict.preview.seconds}
+            expired={dict.preview.expired}
+          />
         )}
       </div>
 
-      <div className="flex items-start justify-between gap-3 text-xs">
-        <p className="min-w-0 flex-1 text-gray-500">
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 text-[11px] leading-4 text-fg-muted">
           {error ? (
-            <span className="inline-flex items-center gap-1 text-red-600">
-              <AlertCircle size={13} /> {error}
+            <span
+              role="alert"
+              className="inline-flex items-start gap-1 text-dead-fg"
+            >
+              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+              {error}
             </span>
           ) : clickThrough ? (
             <>
-              Click-through fired →{" "}
-              <code className="break-all text-gray-700">{clickThrough}</code>
+              {dict.preview.clickThrough} →{" "}
+              <code className="data-instr break-all text-fg-secondary">
+                {clickThrough}
+              </code>
             </>
           ) : (
-            status ?? "Fill in the fields, then launch the ad above."
+            status ?? dict.preview.idleHint
           )}
         </p>
         {launched && (
@@ -155,19 +196,27 @@ export function PreviewPanel({
             type="button"
             onClick={launch}
             disabled={minting}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-gray-300 px-2 py-1 font-medium hover:bg-gray-50 disabled:opacity-50"
+            className={buttonClass("secondary", "shrink-0")}
           >
-            <RotateCcw size={12} /> Restart
+            <RotateCcw size={13} aria-hidden /> {dict.preview.restart}
           </button>
         )}
       </div>
-
-      {launched && expiresAt && <ExpiryHint expiresAt={expiresAt} />}
     </div>
   );
 }
 
-function ExpiryHint({ expiresAt }: { expiresAt: number }) {
+function ExpiryHint({
+  expiresAt,
+  validFor,
+  seconds,
+  expired,
+}: {
+  expiresAt: number;
+  validFor: string;
+  seconds: string;
+  expired: string;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -176,10 +225,8 @@ function ExpiryHint({ expiresAt }: { expiresAt: number }) {
 
   const remaining = Math.max(0, Math.round((expiresAt - now) / 1000));
   return (
-    <p className="text-center text-[11px] text-gray-400">
-      {remaining > 0
-        ? `Preview tag valid for ${remaining}s — Launch/Restart mints a fresh one.`
-        : "Preview tag expired — click Restart to mint a new one."}
+    <p className="data-instr pt-3 text-[11px] text-well-fg">
+      {remaining > 0 ? `${validFor} ${remaining}${seconds}` : expired}
     </p>
   );
 }

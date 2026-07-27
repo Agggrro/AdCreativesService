@@ -38,12 +38,37 @@ Standard authenticated Next.js app. All data access goes through Supabase with R
 so a user can only ever see/modify their own creatives and subscriptions. This layer
 is **not** performance-critical and may use the Node runtime freely.
 
-Implemented: public showcase ([`app/page.tsx`](../app/page.tsx)); email/password auth
-([`app/login`](../app/login), [`app/signup`](../app/signup),
-[`app/auth/`](../app/auth) + [`middleware.ts`](../middleware.ts) for session refresh);
-protected dashboard ([`app/dashboard/`](../app/dashboard)) for subscriptions, the
-template catalog, the creative configurator, and copyable VAST tag URLs. Browser/SSR
-Supabase clients live in [`lib/supabase/`](../lib/supabase).
+Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture.md):
+
+| Route | Access | What it does |
+| --- | --- | --- |
+| `/` | public | Landing; renders the catalog grid at teaser length |
+| `/catalog`, `/catalog/[slug]` | public | Template catalog and a detail page with one live in-browser demo. Replaces the old `/preview` fixtures; `/preview` is a permanent redirect |
+| `/login`, `/signup`, `/auth/*` | public | Email/password auth; [`middleware.ts`](../middleware.ts) refreshes the session |
+| `/dashboard` | session | Redirect only — to `/dashboard/creatives`, or `/catalog` for a user with none |
+| `/dashboard/creatives`, `/dashboard/creatives/[id]` | session | The user's creatives, their VAST tags, and delivery counts |
+| `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
+| `/dashboard/subscriptions` | session | All billing; Stripe checkout returns here |
+
+The public catalog reads `templates` as `anon` — `templates_select_published` already
+allows it — and its demo runs a built unit straight from `/api/preview-unit/<key>`, with
+sample config derived from the template's own `config_schema` defaults
+([`lib/template-demo.ts`](../lib/template-demo.ts)). Browser/SSR Supabase clients live in
+[`lib/supabase/`](../lib/supabase).
+
+Dashboard analytics are read through the owner-scoped aggregate
+`public.get_creative_overview()` (see [data-model.md](data-model.md)); `creative_events`
+itself stays unreadable from the client.
+
+The UI is bilingual (RU/EN). Copy lives in [`lib/i18n/dictionaries.ts`](../lib/i18n/dictionaries.ts)
+with the English dictionary typed against the Russian one, so a missing translation is a
+build error. Server components read the locale from a cookie
+([`lib/i18n/server.ts`](../lib/i18n/server.ts)), the root layout hands it to client
+components through a context provider, and the top-bar switcher persists the choice with
+a server action ([`app/actions/locale.ts`](../app/actions/locale.ts)). **This is a
+dashboard-layer concern only — no locale logic exists on, or may be added to, the
+ad-serving path,** which has neither a session nor an interface. Visual rules for all of
+it are fixed in [design-system.md](design-system.md).
 
 ## B. Database
 
