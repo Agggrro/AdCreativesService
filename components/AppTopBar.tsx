@@ -24,7 +24,7 @@ export async function AppTopBar() {
   return (
     <TopBar
       dict={dict}
-      brandHref={user ? "/dashboard/creatives" : "/"}
+      brandHref="/"
       nav={user ? mainNav(dict) : []}
       right={
         user ? (
