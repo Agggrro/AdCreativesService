@@ -48,9 +48,6 @@ const ru = {
       "Настройте шаблон, получите динамический VAST-тег и вставьте его в DSP. Поддерживаются SIMID и VPAID.",
     ctaStart: "Начать бесплатно",
     ctaDashboard: "Перейти в кабинет",
-    showcase: "Витрина шаблонов",
-    empty: "Пока ни один шаблон не опубликован.",
-    tryPreview: "Попробовать механику",
   },
   auth: {
     signInTitle: "Вход в AdInteract",
@@ -175,6 +172,9 @@ const ru = {
     demoTitle: "Как это работает",
     demoHint:
       "Пример с нейтральными заглушками — рекламодатель загружает свои изображения и ссылки.",
+    heroHint:
+      "Демонстрационные изображения — рекламодатель загружает свои.",
+    heroSwitcher: "Переключатель шаблонов",
     noDemo:
       "Демо в браузере для этого шаблона пока нет. Механику можно собрать в конфигураторе и проверить в плеере.",
     configure: "Настроить креатив",
@@ -229,9 +229,6 @@ const en: Dict = {
       "Configure a template, get a dynamic VAST tag for your DSP, and serve shoppable, interactive ads. SIMID and VPAID supported.",
     ctaStart: "Start free trial",
     ctaDashboard: "Go to dashboard",
-    showcase: "Template showcase",
-    empty: "No templates published yet.",
-    tryPreview: "Try the mechanic",
   },
   auth: {
     signInTitle: "Sign in to AdInteract",
@@ -355,6 +352,8 @@ const en: Dict = {
     demoTitle: "How it works",
     demoHint:
       "A sample with neutral placeholders — advertisers supply their own images and links.",
+    heroHint: "Demo imagery shown — advertisers supply their own.",
+    heroSwitcher: "Template switcher",
     noDemo:
       "No in-browser demo for this template yet. You can still configure the mechanic and check it in a player.",
     configure: "Configure creative",

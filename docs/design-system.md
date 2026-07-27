@@ -219,11 +219,34 @@ the chip that quietly ships at weight 400, is how a system starts drifting.
 
 ### Segmented controls
 
-Language, delivery format, and player backend all use the same shape: mono `chip` type,
-1px `line` border, `fill` on the current
+Language, delivery format, player backend, and the landing hero's template switcher all
+use the same shape: mono `chip` type, 1px `line` border, `fill` on the current
 segment, hairline dividers between segments. The wrapper must **not** clip overflow —
 a focus outline drawn at 2px offset inside an `overflow-hidden` box is invisible. Round
 the first and last segment instead.
+
+### Landing hero — one well, switched by tabs
+
+The landing page (`/`) leads with a segmented template switcher above a single **demo
+well** (§7) — exactly the old `/preview` shape, restored as the site's front door. This is
+**not** the catalog-tile grid and does not relax its rule: at any moment exactly one VPAID
+unit is mounted, because switching tabs unmounts the previous one before mounting the
+next. A grid of simultaneously-live tiles is still forbidden; a single well whose content
+is swapped by a segmented control is the pattern that rule was always compatible with.
+
+- Content order: eyebrow/headline and one-line pitch → the switcher → the well → one
+  primary CTA (`Start free trial` for a visitor, `Go to dashboard` when signed in).
+- Every published template with a working demo unit gets a tab, derived the same way as
+  `/catalog/[slug]` (`lib/template-demo.ts`) — the switcher is not a hand-maintained
+  fixture list. A template with no resolvable demo unit is left out of the tab strip
+  rather than shown broken.
+- **Exception to the placeholder-imagery rule below:** this is the single highest-visibility
+  surface in the product, and the previous shipped version used photographic sample images
+  rather than neutral placeholders. `image`-typed fields here render a photo (a seeded,
+  deterministic third-party image service), not the `public/demo/` SVGs — a deliberate,
+  scoped call, not a precedent for the catalog. The image source is out-of-repo and
+  therefore a real, accepted dependency: if it is unreachable the affected background
+  simply doesn't load; nothing else on the page depends on it.
 
 ### Inputs
 
@@ -320,8 +343,9 @@ never two stacked captions.
   different browser starts at the default locale.
 - **Not everything visible is UI copy.** Template names and descriptions come from the
   `templates` table and stay as authored. So does the sample content inside a demo
-  creative — it is derived from the template's own `config_schema` defaults plus the
-  placeholder assets in `public/demo/`, which is stand-in advertiser material, not
+  creative — it is derived from the template's own `config_schema` defaults plus
+  placeholder images (`public/demo/` on the catalog, seeded photographic placeholders on
+  the landing hero — §6), which is stand-in advertiser material, not
   interface language. Technical status words that the ad industry uses in
   English (`Live`, `SIMID 1.1`, `VPAID 2.0`) are also left untranslated on purpose —
   translating them would make the dashboard harder to match against a DSP.

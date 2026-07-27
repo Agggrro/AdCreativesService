@@ -2,8 +2,11 @@ import { permanentRedirect } from "next/navigation";
 import { templateSlug } from "@/lib/template-demo";
 
 /**
- * `/preview` was the public demo page with four hardcoded fixtures. It is now
- * the catalog (ADR-0008), which is DB-backed and reachable after login.
+ * `/preview` was the public demo page: a tab strip switching a single live
+ * player. That experience is now the landing page itself (`/`) — restored as
+ * the site's front door rather than a side page — so legacy links land there
+ * with the same template preselected, instead of on `/catalog`'s per-template
+ * detail page.
  *
  * The legacy `?t=` keys were runtime unit keys, which are not the catalog's
  * slugs — `shoppable` is the unit behind the `shoppable_video` template — so the
@@ -24,5 +27,5 @@ export default async function PreviewRedirect({
 }) {
   const { t } = await searchParams;
   const slug = t ? LEGACY_SLUGS[t] : undefined;
-  permanentRedirect(slug ? `/catalog/${slug}` : "/catalog");
+  permanentRedirect(slug ? `/?t=${slug}` : "/");
 }

@@ -27,11 +27,32 @@ const DEMO_CLICK_THROUGH = "https://example.com/offer";
 /**
  * The only sample content the schema genuinely cannot supply: fields whose
  * default is absent because a real advertiser must always write them.
+ *
+ * `shoppable.videoUrl` is here rather than falling through to the generic
+ * "url" case: it's a `<video src>`, not a click-through, so `example.com`
+ * would render a black box. Small (~1.1MB), CC0, chosen for a landing page
+ * that needs it to load fast.
  */
 const OVERRIDES: Record<string, string> = {
   "quiz.option1Label": "Option A",
   "quiz.option2Label": "Option B",
+  "shoppable.videoUrl":
+    "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
 };
+
+/**
+ * `"placeholder"` (default) is the neutral, self-hosted `public/demo/` set used
+ * by the catalog. `"photo"` is the seeded-photographic exception carved out for
+ * the landing hero only (docs/design-system.md §6, "Landing hero") — the
+ * product's highest-visibility surface, restoring what it looked like before.
+ */
+export type DemoImageStyle = "placeholder" | "photo";
+
+/** A deterministic photographic placeholder — same seed, same image, every load. */
+function photoUrl(seed: string, square: boolean): string {
+  const size = square ? "200/200" : "640/360";
+  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${size}`;
+}
 
 /**
  * The demo unit key for a template: the first path segment of
@@ -58,16 +79,22 @@ function pick<T>(pool: T[], seed: string): T {
   return pool[hash % pool.length];
 }
 
-function demoValue(field: ConfigField, unitKey: string): string | number {
+function demoValue(
+  field: ConfigField,
+  unitKey: string,
+  imageStyle: DemoImageStyle,
+): string | number {
   const override = OVERRIDES[`${unitKey}.${field.name}`];
   if (override !== undefined) return override;
   if (field.default !== undefined) return field.default;
 
   switch (field.type) {
-    case "image":
-      return /option|thumb|icon/i.test(field.name)
-        ? pick(SQUARE_PLACEHOLDERS, field.name)
-        : pick(WIDE_PLACEHOLDERS, field.name);
+    case "image": {
+      const square = /option|thumb|icon/i.test(field.name);
+      return imageStyle === "photo"
+        ? photoUrl(`${unitKey}-${field.name}`, square)
+        : pick(square ? SQUARE_PLACEHOLDERS : WIDE_PLACEHOLDERS, field.name);
+    }
     case "url":
       return DEMO_CLICK_THROUGH;
     case "number":
@@ -88,11 +115,12 @@ function demoValue(field: ConfigField, unitKey: string): string | number {
 export function demoConfig(
   configSchema: Json,
   unitKey: string,
+  imageStyle: DemoImageStyle = "placeholder",
 ): Record<string, unknown> {
   const { fields } = parseConfigSchema(configSchema);
   const config: Record<string, unknown> = {};
   for (const field of fields) {
-    config[field.name] = demoValue(field, unitKey);
+    config[field.name] = demoValue(field, unitKey, imageStyle);
   }
   return config;
 }
