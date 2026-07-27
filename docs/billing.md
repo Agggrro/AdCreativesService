@@ -25,6 +25,23 @@ monthly interval is only a Stripe price detail that determines the next `period_
 > **Trial note:** the 7-day trial is applied on the user's first subscription. Stripe
 > trials require a subscription object (that's why all plans are recurring, not
 > one-time purchases).
+>
+> "First" means **no prior row in `subscriptions` at all**, regardless of that row's
+> status — active, canceled, incomplete, whatever. `POST /api/checkout` checks this
+> before creating the Stripe session (`app/api/checkout/route.ts`) so that
+> cancel-then-resubscribe cannot mint a fresh trial each time (`trialing` is an
+> entitled status, so an unconditional trial would be a permanent free ride). The
+> corollary: a card that fails 3DS mid-checkout still creates an `incomplete` row and
+> permanently spends that user's trial eligibility — intentional (fails safe), but
+> worth knowing for support.
+>
+> **Known residual gap:** the check is read-then-write, not an atomic claim. Two
+> literally concurrent checkout requests from the same user before either webhook
+> lands could both see "no prior row" and both get a trial. Narrow (requires
+> deliberately simultaneous requests, not just clicking subscribe twice in sequence)
+> and tracked as follow-up hardening — an atomic claim needs a dedicated column
+> (e.g. `profiles.trial_claimed_at`), which is a schema change deliberately not
+> bundled into this fix.
 
 ## Entitlement rule (used by the VAST gate)
 

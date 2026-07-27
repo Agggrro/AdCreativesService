@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { verifyTrackToken } from "@/lib/track-token";
 import type { CreativeEventType } from "@/types/database.types";
 
 // Public tracking beacon hit by the player for VAST events. Fire-and-forget:
@@ -38,7 +39,16 @@ export async function GET(request: Request): Promise<Response> {
     const eventName = url.searchParams.get("e") ?? "";
     const eventType = EVENT_MAP[eventName];
 
-    if (cid && UUID_RE.test(cid) && eventType) {
+    // Every beacon the VAST builder emits is signed (lib/track-token.ts) — a
+    // hit with no valid signature is either forged or stale, and is dropped
+    // the same way an unentitled creative_id is dropped: silently, no error
+    // surfaced to the caller (this endpoint is fire-and-forget by contract).
+    if (
+      cid &&
+      UUID_RE.test(cid) &&
+      eventType &&
+      verifyTrackToken(cid, eventName, url.searchParams.get("exp"), url.searchParams.get("sig"))
+    ) {
       const supabase = createServiceClient();
       // Ignore FK/insert errors (unknown creative, etc.) — beacon is best-effort.
       await supabase

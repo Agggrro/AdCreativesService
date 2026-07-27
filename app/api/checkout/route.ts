@@ -48,6 +48,18 @@ export async function POST(request: Request): Promise<Response> {
     .eq("id", user.id)
     .maybeSingle();
 
+  // Trial is for a user's first subscription only (docs/billing.md). Any prior
+  // row — active, canceled, whatever — means they've already had one; without
+  // this check, subscribe → serve for 7 days → cancel before the first charge
+  // → repeat is a permanent free ride, since `trialing` is an entitled status.
+  const { data: priorSubscription } = await supabase
+    .from("subscriptions")
+    .select("id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  const isFirstSubscription = !priorSubscription;
+
   const stripe = getStripe();
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin;
@@ -62,7 +74,10 @@ export async function POST(request: Request): Promise<Response> {
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: { trial_period_days: TRIAL_PERIOD_DAYS, metadata },
+    subscription_data: {
+      ...(isFirstSubscription ? { trial_period_days: TRIAL_PERIOD_DAYS } : {}),
+      metadata,
+    },
     metadata,
     customer: profile?.stripe_customer_id ?? undefined,
     customer_email: profile?.stripe_customer_id ? undefined : user.email,

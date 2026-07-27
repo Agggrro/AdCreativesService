@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getStripe, mapStripeStatus, getCurrentPeriodEnd } from "@/lib/stripe";
-import type { Database, SubscriptionStatus } from "@/types/database.types";
+import type { Database } from "@/types/database.types";
 
 // Needs the raw body for signature verification — Node runtime, no body parsing.
 export const runtime = "nodejs";
@@ -55,9 +55,33 @@ export async function POST(request: Request): Promise<Response> {
         );
         break;
       case "invoice.payment_failed": {
-        const subId = (event.data.object as unknown as { subscription?: string })
-          .subscription;
-        if (subId) await setStatus(supabase, subId, "past_due");
+        // `Invoice.subscription` was removed from the pinned API version — the
+        // subscription now lives under `parent.subscription_details` (stripe@22
+        // types have no top-level `subscription` field on Invoice at all, so a
+        // cast can't paper over this the way `getCurrentPeriodEnd` does for a
+        // field that merely moved). No cast needed: the SDK type already models
+        // this shape.
+        const invoice = event.data.object as Stripe.Invoice;
+        const subRef = invoice.parent?.subscription_details?.subscription;
+        const subId = typeof subRef === "string" ? subRef : subRef?.id;
+        if (subId) {
+          // Re-retrieve and run through the same full upsert every other
+          // subscription event uses, rather than force-setting `past_due`
+          // directly. Stripe does not guarantee event ordering; a blind
+          // overwrite could regress an already-recovered subscription back to
+          // past_due if this event is delivered (or retried) after a later
+          // customer.subscription.updated already synced the real status.
+          const sub = await stripe.subscriptions.retrieve(subId);
+          await upsertSubscription(supabase, sub);
+        } else {
+          // A subscription-mode-only product should never see this: log it
+          // rather than throwing, since retrying can't produce a subscription
+          // id that doesn't exist.
+          console.error(
+            "invoice.payment_failed: no subscription on invoice.parent.subscription_details",
+            { invoiceId: invoice.id },
+          );
+        }
         break;
       }
       default:
@@ -133,16 +157,4 @@ async function handleCheckoutCompleted(
     const sub = await stripe.subscriptions.retrieve(subId);
     await upsertSubscription(supabase, sub);
   }
-}
-
-async function setStatus(
-  supabase: DB,
-  stripeSubscriptionId: string,
-  status: SubscriptionStatus,
-): Promise<void> {
-  const { error } = await supabase
-    .from("subscriptions")
-    .update({ status })
-    .eq("stripe_subscription_id", stripeSubscriptionId);
-  if (error) throw new Error(error.message);
 }

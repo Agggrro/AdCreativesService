@@ -2,6 +2,7 @@ import type { Json } from "../../types/database.types";
 import type { VastBuildContext } from "./types";
 import { getAdapter } from "./adapters";
 import { cdata, escapeXml, indent } from "./xml";
+import { signTrackToken } from "../track-token";
 
 /** Narrow an arbitrary Json value down to a plain object, or {} otherwise. */
 function asRecord(json: Json): Record<string, Json> {
@@ -36,14 +37,20 @@ export function formatDuration(seconds: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-/** Build a tracking/beacon URL for the ingest endpoint (see step 7). */
+/**
+ * Build a signed tracking/beacon URL for the ingest endpoint (see step 7).
+ * Signed so a party who only knows `creativeId` (visible in the VAST tag
+ * itself) cannot mint arbitrary hits against `/api/track` — see
+ * lib/track-token.ts and docs/security.md.
+ */
 export function trackingUrl(
   siteUrl: string,
   creativeId: string,
   event: string,
 ): string {
   const base = siteUrl.replace(/\/+$/, "");
-  return `${base}/api/track?cid=${encodeURIComponent(creativeId)}&e=${encodeURIComponent(event)}`;
+  const { exp, sig } = signTrackToken(creativeId, event);
+  return `${base}/api/track?cid=${encodeURIComponent(creativeId)}&e=${encodeURIComponent(event)}&exp=${exp}&sig=${encodeURIComponent(sig)}`;
 }
 
 /** Build a full inline VAST 4.2 document for an entitled creative. */

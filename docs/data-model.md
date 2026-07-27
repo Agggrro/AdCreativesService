@@ -71,7 +71,12 @@ Ingested ad events — the core value for media buyers. Append-only.
 
 Ingested by [`app/api/track/route.ts`](../app/api/track/route.ts) — a public,
 fire-and-forget beacon that maps VAST event names (start/firstQuartile/… plus
-impression/click) to the enum and inserts via the service role.
+impression/click) to the enum and inserts via the service role. Each beacon URL
+is HMAC-signed at VAST-build time with a 1-hour expiry
+([`lib/track-token.ts`](../lib/track-token.ts)) — a `creative_id` is visible in
+the VAST tag itself, so without a signature anyone holding a tag could forge
+hits for it, and these counts now feed a customer-facing dashboard. See
+[security.md](security.md).
 
 **What is not collected**, so no screen may imply it: there is no `<ClickTracking>`
 element in the VAST builder, so `click` and `interaction` rows never appear and CTR is not
