@@ -243,10 +243,16 @@ is swapped by a segmented control is the pattern that rule was always compatible
 - **Exception to the placeholder-imagery rule below:** this is the single highest-visibility
   surface in the product, and the previous shipped version used photographic sample images
   rather than neutral placeholders. `image`-typed fields here render a photo (a seeded,
-  deterministic third-party image service), not the `public/demo/` SVGs — a deliberate,
-  scoped call, not a precedent for the catalog. The image source is out-of-repo and
-  therefore a real, accepted dependency: if it is unreachable the affected background
-  simply doesn't load; nothing else on the page depends on it.
+  deterministic third-party image service), not the `public/demo/` SVGs. The image source
+  is out-of-repo and therefore a real, accepted dependency: if it is unreachable the
+  affected background simply doesn't load; nothing else on the page depends on it.
+- **Same exception on `/catalog/[slug]`:** a template's own detail page runs the identical
+  demo unit built the same way (`lib/template-demo.ts`), so it uses the same photographic
+  imagery rather than the neutral SVGs — a gray placeholder well right below "how it
+  works" reads as broken, not neutral. The catalog **grid** (`CatalogGrid`, tiles on
+  `/catalog` and the landing teaser) is unaffected: it renders no unit and no imagery at
+  all, so the placeholder-imagery rule below still applies wherever a `public/demo/` SVG
+  would otherwise be the only option (e.g. a future static thumbnail).
 
 ### Inputs
 

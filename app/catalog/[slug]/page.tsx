@@ -33,7 +33,10 @@ export default async function TemplatePage({
 
   const user = auth.user;
   const unitKey = demoUnitKey(template.runtime_keys);
-  const config = unitKey ? demoConfig(template.config_schema, unitKey) : null;
+  // "photo" (not the neutral public/demo/ placeholders): the same seeded
+  // photographic demo imagery as the landing hero, so a template's own page
+  // never shows an empty gray well (docs/design-system.md §6).
+  const config = unitKey ? demoConfig(template.config_schema, unitKey, "photo") : null;
 
   return (
     <main className="flex flex-1 flex-col">

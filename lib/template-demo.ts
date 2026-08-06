@@ -29,9 +29,10 @@ const DEMO_CLICK_THROUGH = "https://example.com/offer";
  * default is absent because a real advertiser must always write them.
  *
  * `shoppable.videoUrl` is here rather than falling through to the generic
- * "url" case: it's a `<video src>`, not a click-through, so `example.com`
- * would render a black box. Small (~1.1MB), CC0, chosen for a landing page
- * that needs it to load fast.
+ * "image" case (its config-schema type, since ADR-0010, so it also gets the
+ * upload widget): a demo unit needs an actual playable clip, not a picsum
+ * still. Small (~1.1MB), CC0, chosen for a landing page that needs it to load
+ * fast.
  */
 const OVERRIDES: Record<string, string> = {
   "quiz.option1Label": "Option A",
@@ -41,10 +42,12 @@ const OVERRIDES: Record<string, string> = {
 };
 
 /**
- * `"placeholder"` (default) is the neutral, self-hosted `public/demo/` set used
- * by the catalog. `"photo"` is the seeded-photographic exception carved out for
- * the landing hero only (docs/design-system.md §6, "Landing hero") — the
- * product's highest-visibility surface, restoring what it looked like before.
+ * `"photo"` — seeded-photographic imagery — is what both live demo surfaces
+ * (the landing hero and each template's own detail page) use, so a demo unit
+ * never shows an empty gray well (docs/design-system.md §6, "Landing hero").
+ * `"placeholder"` is the neutral, self-hosted `public/demo/` fallback; it has
+ * no caller today but stays available for a demo surface that wants to stay
+ * off the third-party image service.
  */
 export type DemoImageStyle = "placeholder" | "photo";
 
