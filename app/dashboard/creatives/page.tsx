@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
@@ -78,6 +79,7 @@ export default async function MyCreativesPage() {
                   <th className={HEAD}>{dict.dashboard.status}</th>
                   <th className={HEAD}>{dict.dashboard.vastTag}</th>
                   <th className={HEAD} />
+                  <th className={HEAD} />
                 </tr>
               </thead>
               <tbody>
@@ -142,6 +144,11 @@ export default async function MyCreativesPage() {
                       </td>
                       <td className={`${CELL} whitespace-nowrap text-right`}>
                         <CopyButton value={tag} />
+                      </td>
+                      <td className={`${CELL} whitespace-nowrap text-right`}>
+                        <LinkButton href={`/dashboard/creatives/${c.id}/edit`} variant="secondary">
+                          <Pencil size={14} aria-hidden /> {dict.dashboard.edit}
+                        </LinkButton>
                       </td>
                     </tr>
                   );
