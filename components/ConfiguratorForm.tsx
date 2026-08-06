@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { ConfigField } from "@/lib/config-schema";
+import { MediaUploadField } from "@/components/MediaUploadField";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { buttonClass } from "@/components/ui/Button";
@@ -14,7 +15,7 @@ type ConfiguratorTemplate = {
   supported_standards: string[];
 };
 
-function initialValues(fields: ConfigField[]): Record<string, string> {
+function defaultValues(fields: ConfigField[]): Record<string, string> {
   const init: Record<string, string> = {};
   for (const field of fields) {
     if (field.default !== undefined) {
@@ -32,22 +33,42 @@ function initialValues(fields: ConfigField[]): Record<string, string> {
 /**
  * Client wrapper around the schema-driven configurator form. Lifts field
  * values into state (previously uncontrolled DOM inputs) so the live preview
- * panel can see exactly what's currently typed, while the "Create creative"
- * Server Action keeps working unchanged (same `name` attributes, same
- * `<form action=...>` — FormData parsing on the server is untouched).
+ * panel can see exactly what's currently typed, while the Server Action
+ * keeps working unchanged (same `name` attributes, same `<form action=...>`
+ * — FormData parsing on the server is untouched). Shared by the "create"
+ * (`/dashboard/creatives/new`) and "edit" (`/dashboard/creatives/[id]/edit`)
+ * pages — same schema-driven fields, a different action and starting values.
  */
 export function ConfiguratorForm({
   template,
   fields,
-  createCreative,
+  action,
+  submitLabel,
+  cancelHref = "/dashboard",
+  creativeId,
+  initialName = "",
+  initialFormat,
+  initialFieldValues,
 }: {
   template: ConfiguratorTemplate;
   fields: ConfigField[];
-  createCreative: (formData: FormData) => void;
+  action: (formData: FormData) => void;
+  submitLabel: string;
+  cancelHref?: string;
+  /** Present only in edit mode; renders the hidden `creative_id` the update action needs. */
+  creativeId?: string;
+  initialName?: string;
+  initialFormat?: string;
+  /** Present only in edit mode; overrides the schema-default starting values. */
+  initialFieldValues?: Record<string, string>;
 }) {
   const dict = useDict();
-  const [format, setFormat] = useState(template.supported_standards[0] ?? "");
-  const [values, setValues] = useState<Record<string, string>>(() => initialValues(fields));
+  const [format, setFormat] = useState(
+    initialFormat ?? template.supported_standards[0] ?? "",
+  );
+  const [values, setValues] = useState<Record<string, string>>(
+    () => initialFieldValues ?? defaultValues(fields),
+  );
 
   function setValue(name: string, v: string) {
     setValues((prev) => ({ ...prev, [name]: v }));
@@ -55,8 +76,9 @@ export function ConfiguratorForm({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
-      <form action={createCreative} className="flex flex-col gap-5">
+      <form action={action} className="flex flex-col gap-5">
         <input type="hidden" name="template_id" value={template.id} />
+        {creativeId && <input type="hidden" name="creative_id" value={creativeId} />}
 
         <label className="flex flex-col gap-2">
           <span className="label-instr">{dict.dashboard.creativeName}</span>
@@ -65,6 +87,7 @@ export function ConfiguratorForm({
             type="text"
             maxLength={200}
             placeholder={template.name}
+            defaultValue={initialName}
             className={inputClass}
           />
           <span className="text-xs text-fg-muted">
@@ -122,9 +145,9 @@ export function ConfiguratorForm({
 
         <div className="flex items-center gap-3">
           <button type="submit" className={buttonClass("primary")}>
-            {dict.dashboard.createCreative}
+            {submitLabel}
           </button>
-          <Link href="/dashboard" className={buttonClass("ghost")}>
+          <Link href={cancelHref} className={buttonClass("ghost")}>
             {dict.common.cancel}
           </Link>
         </div>
@@ -195,16 +218,12 @@ function Field({
             {value || "0"}
           </span>
         </span>
+      ) : field.type === "image" ? (
+        <MediaUploadField field={field} value={value} onChange={onChange} />
       ) : (
         <input
           name={field.name}
-          type={
-            field.type === "number"
-              ? "number"
-              : field.type === "url" || field.type === "image"
-                ? "url"
-                : "text"
-          }
+          type={field.type === "number" ? "number" : field.type === "url" ? "url" : "text"}
           required={field.required}
           min={field.type === "number" ? field.min : undefined}
           max={field.type === "number" ? field.max : undefined}

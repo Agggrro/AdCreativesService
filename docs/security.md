@@ -15,6 +15,7 @@
 | Creative runtime assets | Player iframes on third-party pages | Signed, short-TTL, domain/referer allow-listed |
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
 | UI language cookie (`adinteract_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
+| Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage (no app server in the path) | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
 
 ## Secrets
 
@@ -63,7 +64,8 @@
   verify or whose `exp` has passed.
 - **Expiry is generous on purpose (1 hour, not the preview token's 120s):** a
   beacon must stay valid for the full lifetime of one ad play — buffering, a
-  configurable `durationSeconds`, a slow connection — not just until the VAST
+  slow connection, and (since ADR-0009) a creative that has no fixed end time
+  at all and stays live until the viewer closes it — not just until the VAST
   document is fetched.
 - **Still fail silent, not fail loud:** an invalid signature drops the beacon
   with the same 204 as a valid one processed successfully. This endpoint has
@@ -107,6 +109,12 @@ RLS protects the authenticated dashboard path only. The serving path deliberatel
 bypasses it via a scoped service-role read. Both facts must stay true together: if RLS
 weakens, the dashboard leaks; if the service-role read widens beyond the serving
 record, the blast radius of the public path grows. Keep both tight.
+
+The `creative-media` Storage bucket's public-read is a deliberate, documented
+exception to "RLS protects the dashboard path" — reads are meant to be public (any
+viewer's ad player fetches the URL with no session), so `public = true` bypassing
+RLS for GETs is correct here, not a gap. The same class of exception as
+`templates_select_published`. Writes stay RLS-gated to the uploader's own path.
 
 ## Pre-push checklist (security-sensitive changes)
 

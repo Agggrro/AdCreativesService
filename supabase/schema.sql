@@ -320,6 +320,64 @@ create policy subscriptions_select_own on public.subscriptions
 -- (ingest) or future owner-scoped aggregate views.
 
 -- ---------------------------------------------------------------------------
+-- Storage: creative-media (advertiser-uploaded creative assets)
+-- ----------------------------------------------------------------------------
+-- Distinct from the `creatives` bucket (private, signed URLs, runtime VPAID/SIMID
+-- units — see runtime/README.md): this one holds advertiser-uploaded pictures/
+-- gifs/video for "image"-typed config fields (ADR-0010). Public-read, because the
+-- URL is baked into <AdParameters> and must keep resolving for the creative's
+-- lifetime — a short-TTL signed URL is the wrong shape here. Uploads go straight
+-- from the browser (anon key, the user's own session) to Storage, gated by the
+-- policies below; the app server never sees the file.
+--
+-- `storage.objects` already has RLS enabled by default in every Supabase
+-- project; only the bucket + policies need declaring here.
+-- No SVG: it's XML and can carry a <script>/onload payload that executes on
+-- direct navigation to the object's public URL, unlike every raster format
+-- here, none of which can execute script (/security-review finding).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('creative-media', 'creative-media', true, 26214400, array[
+  'image/jpeg','image/png','image/webp','image/gif','image/avif',
+  'video/webm','video/mp4','video/x-m4v','video/quicktime','video/ogg'
+])
+on conflict (id) do update set
+  public             = excluded.public,
+  file_size_limit    = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+-- Path convention: {auth.uid()}/{filename} — the first path segment is the
+-- owner, mirroring the creatives_*_own policies above. Not {creative_id}/...:
+-- upload can happen before a creative row exists (mid-configuration on
+-- /dashboard/creatives/new).
+drop policy if exists creative_media_insert_own on storage.objects;
+create policy creative_media_insert_own on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'creative-media'
+    and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+drop policy if exists creative_media_update_own on storage.objects;
+create policy creative_media_update_own on storage.objects
+  for update to authenticated
+  using (bucket_id = 'creative-media'
+    and (storage.foldername(name))[1] = (select auth.uid())::text)
+  with check (bucket_id = 'creative-media'
+    and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+drop policy if exists creative_media_delete_own on storage.objects;
+create policy creative_media_delete_own on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'creative-media'
+    and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+-- Belt-and-suspenders: a public bucket already serves GET via the public object
+-- URL without going through RLS, but this keeps .list()/.download() working and
+-- the read intent explicit and auditable (same class as templates_select_published).
+drop policy if exists creative_media_select_public on storage.objects;
+create policy creative_media_select_public on storage.objects
+  for select to anon, authenticated
+  using (bucket_id = 'creative-media');
+
+-- ---------------------------------------------------------------------------
 -- Table grants for the API roles
 -- ---------------------------------------------------------------------------
 -- Supabase normally auto-grants these; we set them explicitly so the schema is

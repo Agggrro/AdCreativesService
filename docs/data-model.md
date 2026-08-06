@@ -132,6 +132,15 @@ only. Because PostgREST does not expose `private`, the endpoint reads through th
 EXECUTE is granted to `service_role` only and which returns an explicit TABLE
 (self-contained for introspection). See [security.md](security.md).
 
+## Storage buckets
+
+Two Supabase Storage buckets, deliberately different trust models:
+
+| Bucket | Access | Holds | Notes |
+| --- | --- | --- | --- |
+| `creatives` | **Private** — short-TTL (120s) `createSignedUrl` only | Runtime SIMID/VPAID units (code) | Signed so a stolen URL expires fast (ADR-0003). Uploaded manually via the Supabase dashboard/CLI (see `runtime/README.md`) |
+| `creative-media` | **Public-read** | Advertiser-uploaded images/gifs/video for `"image"`-typed config fields | Public because the URL is baked into `<AdParameters>` and must keep resolving for the creative's lifetime. Created declaratively in `supabase/schema.sql`. Uploads go straight from the browser, RLS-gated to the uploader's own `{auth.uid()}/...` path prefix. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
+
 ## RLS intent
 
 | Table | Policy intent |
@@ -142,6 +151,7 @@ EXECUTE is granted to `service_role` only and which returns an explicit TABLE
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
 | `creative_events` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
 | `stripe_events` | **no direct client access**; written only by the webhook (service role) |
+| `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent |
 
 RLS protects the **dashboard** path. It is intentionally not relied upon for the
 public VAST path, which uses a narrowly scoped service-role read.

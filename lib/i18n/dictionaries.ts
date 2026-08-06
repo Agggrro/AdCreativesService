@@ -106,6 +106,8 @@ const ru = {
     statsUnavailable:
       "Статистика сейчас недоступна, поэтому цифры и состояние отдачи скрыты — показывать неверные мы не будем. Обновите страницу через минуту; если не пройдёт, напишите нам.",
     createCreative: "Создать креатив",
+    edit: "Изменить",
+    saveChanges: "Сохранить изменения",
     vastTag: "VAST-тег",
     template: "Шаблон",
     description: "Описание",
@@ -142,6 +144,17 @@ const ru = {
     errNameTooLong: "Название длиннее 200 символов — сократите его.",
     errSaveFailed:
       "Не удалось сохранить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
+    media: {
+      uploadTab: "Загрузить",
+      urlTab: "Ссылка",
+      chooseFile: "Выбрать файл",
+      uploading: "Загружается…",
+      uploaded: "Файл загружен",
+      replace: "Заменить",
+      errTooLarge: "Файл больше 25 МБ — уменьшите размер.",
+      errWrongType: "Неподдерживаемый формат файла.",
+      errUploadFailed: "Не удалось загрузить файл. Попробуйте ещё раз.",
+    },
   },
   preview: {
     sameTag:
@@ -161,6 +174,13 @@ const ru = {
     expired: "Тег превью истёк — нажмите «Перезапустить», чтобы получить новый.",
     served: "Реклама отдана",
     format: "Формат",
+    loadingUnit: "Загружаем интерактивный блок…",
+    unitLoadFailed: "Не удалось загрузить интерактивный блок.",
+    unitStartFailed: "Интерактивный блок не запустился.",
+    playing: "Идёт показ",
+    complete: "Досмотрено",
+    sandboxVpaidOnly:
+      "Песочница запускает только VPAID-блоки. Чтобы проверить SIMID, переключитесь на Google IMA или Fluid Player.",
   },
   catalog: {
     title: "Каталог шаблонов",
@@ -286,6 +306,8 @@ const en: Dict = {
     statsUnavailable:
       "Delivery numbers are unavailable right now, so counts and serving state are hidden rather than shown wrong. Refresh in a minute; if it persists, contact us.",
     createCreative: "Create creative",
+    edit: "Edit",
+    saveChanges: "Save changes",
     vastTag: "VAST tag",
     template: "Template",
     description: "Description",
@@ -323,6 +345,17 @@ const en: Dict = {
     errNameTooLong: "The name is longer than 200 characters — shorten it.",
     errSaveFailed:
       "Could not save the creative. Try again; if it keeps failing, contact us.",
+    media: {
+      uploadTab: "Upload",
+      urlTab: "URL",
+      chooseFile: "Choose file",
+      uploading: "Uploading…",
+      uploaded: "File uploaded",
+      replace: "Replace",
+      errTooLarge: "File is larger than 25MB — reduce its size.",
+      errWrongType: "Unsupported file type.",
+      errUploadFailed: "Could not upload the file. Try again.",
+    },
   },
   preview: {
     sameTag: "The same VAST tag in three players — what a real DSP would load.",
@@ -341,6 +374,13 @@ const en: Dict = {
     expired: "Preview tag expired — press Restart to mint a new one.",
     served: "Ad served",
     format: "Format",
+    loadingUnit: "Loading interactive unit…",
+    unitLoadFailed: "Could not load the interactive unit.",
+    unitStartFailed: "The interactive unit failed to start.",
+    playing: "Playing",
+    complete: "Complete",
+    sandboxVpaidOnly:
+      "The sandbox runs VPAID units only. Switch to Google IMA or Fluid Player to test SIMID.",
   },
   catalog: {
     title: "Template catalog",
