@@ -13,9 +13,8 @@ var TEMPLATE = {
 
     function layer(url) {
       var d = document.createElement("div");
-      d.style.cssText =
-        "position:absolute;inset:0;background:#000 center/cover no-repeat;";
-      if (url) d.style.backgroundImage = "url('" + url + "')";
+      d.style.cssText = "position:absolute;inset:0;overflow:hidden;";
+      d.appendChild(adInteractMediaLayer(url));
       return d;
     }
 

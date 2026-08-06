@@ -45,10 +45,8 @@ var TEMPLATE = {
         "color:#fff;cursor:pointer;min-width:120px;";
       if (opt.img) {
         var im = document.createElement("div");
-        im.style.cssText =
-          "width:110px;height:110px;border-radius:8px;background:#000 center/cover no-repeat;background-image:url('" +
-          opt.img +
-          "');";
+        im.style.cssText = "width:110px;height:110px;border-radius:8px;overflow:hidden;";
+        im.appendChild(adInteractMediaLayer(opt.img));
         b.appendChild(im);
       }
       var cap = document.createElement("span");

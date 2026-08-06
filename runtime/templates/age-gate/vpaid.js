@@ -13,9 +13,8 @@ var TEMPLATE = {
 
     var bg = document.createElement("div");
     bg.style.cssText =
-      "position:absolute;inset:0;background:#000 center/cover no-repeat;filter:blur(18px);transform:scale(1.1);";
-    if (params.backgroundImageUrl)
-      bg.style.backgroundImage = "url('" + params.backgroundImageUrl + "')";
+      "position:absolute;inset:0;overflow:hidden;filter:blur(10px);transform:scale(1.1);";
+    bg.appendChild(adInteractMediaLayer(params.backgroundImageUrl));
     slot.appendChild(bg);
 
     var panel = document.createElement("div");
@@ -58,7 +57,7 @@ var TEMPLATE = {
     deny.addEventListener("click", function () {
       panel.innerHTML =
         '<div style="font:600 18px sans-serif">You must be 18+ to view this content.</div>';
-      api.emit("AdStopped");
+      api.stop();
     });
 
     buttons.appendChild(confirm);

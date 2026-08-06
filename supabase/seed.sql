@@ -19,11 +19,10 @@ insert into public.templates (
     array['simid', 'vpaid'],
     '{"simid":"shoppable/simid/index.html","vpaid":"shoppable/vpaid/unit.js"}'::jsonb,
     '{"fields":[
-       {"name":"videoUrl","label":"Video URL","type":"url","required":true},
+       {"name":"videoUrl","label":"Video URL","type":"image","required":true},
        {"name":"clickThroughUrl","label":"Click-through URL","type":"url"},
        {"name":"productName","label":"Product name","type":"text"},
-       {"name":"productImageUrl","label":"Product image URL","type":"image"},
-       {"name":"durationSeconds","label":"Duration (s)","type":"number"}
+       {"name":"productImageUrl","label":"Product image URL","type":"image"}
      ]}'::jsonb,
     'standard',
     true
@@ -42,8 +41,7 @@ insert into public.templates (
        {"name":"coverText","label":"Cover text","type":"text","default":"Scratch to reveal"},
        {"name":"coverColor","label":"Cover color (hex)","type":"text","default":"#3a3a3a"},
        {"name":"revealThreshold","label":"Reveal threshold (%)","type":"range","min":10,"max":90,"default":40},
-       {"name":"ctaText","label":"Button text","type":"text","default":"Watch full video"},
-       {"name":"durationSeconds","label":"Duration (s)","type":"number","default":15}
+       {"name":"ctaText","label":"Button text","type":"text","default":"Watch full video"}
      ]}'::jsonb,
     'standard',
     true
@@ -61,8 +59,7 @@ insert into public.templates (
        {"name":"imageAfterUrl","label":"After image URL","type":"image","required":true},
        {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true},
        {"name":"startPercent","label":"Start position (%)","type":"range","min":0,"max":100,"default":50},
-       {"name":"ctaText","label":"Button text","type":"text","default":"See more"},
-       {"name":"durationSeconds","label":"Duration (s)","type":"number","default":15}
+       {"name":"ctaText","label":"Button text","type":"text","default":"See more"}
      ]}'::jsonb,
     'standard',
     true
@@ -87,8 +84,7 @@ insert into public.templates (
        {"name":"option4ImageUrl","label":"Option 4 image URL","type":"image"},
        {"name":"resultText","label":"Result heading","type":"text","default":"See your matches"},
        {"name":"ctaText","label":"Button text","type":"text","default":"Continue"},
-       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true},
-       {"name":"durationSeconds","label":"Duration (s)","type":"number","default":15}
+       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true}
      ]}'::jsonb,
     'standard',
     true
@@ -107,8 +103,7 @@ insert into public.templates (
        {"name":"subtext","label":"Subtext","type":"text"},
        {"name":"confirmText","label":"Confirm button","type":"text","default":"I am 18 or older"},
        {"name":"denyText","label":"Deny button","type":"text","default":"Leave"},
-       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true},
-       {"name":"durationSeconds","label":"Duration (s)","type":"number","default":15}
+       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true}
      ]}'::jsonb,
     'standard',
     true

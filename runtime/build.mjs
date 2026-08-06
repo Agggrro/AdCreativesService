@@ -19,6 +19,15 @@ const root = dirname(fileURLToPath(import.meta.url));
 const vpaidBase = readFileSync(join(root, "lib", "vpaid-base.js"), "utf8");
 const templatesDir = join(root, "templates");
 
+// Output path relative to dist/<name>/, keyed by template dir name. Every
+// template's built unit lands at `dist/<name>/vpaid.js` to match its
+// `templates.runtime_keys.vpaid` storage path — except `shoppable`, whose
+// key is nested one level deeper (`shoppable/vpaid/unit.js`, predating the
+// other four templates' shared-base convention).
+const OUTPUT_RELATIVE_PATH = {
+  shoppable: "vpaid/unit.js",
+};
+
 let built = 0;
 for (const name of readdirSync(templatesDir)) {
   const dir = join(templatesDir, name);
@@ -30,10 +39,11 @@ for (const name of readdirSync(templatesDir)) {
   const render = readFileSync(renderPath, "utf8");
   // render defines `var TEMPLATE`; base references it in getVPAIDAd.
   const out = `${render}\n${vpaidBase}`;
-  const outDir = join(root, "dist", name);
-  mkdirSync(outDir, { recursive: true });
-  writeFileSync(join(outDir, "vpaid.js"), out);
-  console.log(`built ${name}/vpaid.js`);
+  const outRelative = OUTPUT_RELATIVE_PATH[name] || "vpaid.js";
+  const outPath = join(root, "dist", name, outRelative);
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, out);
+  console.log(`built ${name}/${outRelative}`);
   built++;
 }
 
