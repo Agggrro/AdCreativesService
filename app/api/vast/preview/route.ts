@@ -1,4 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
+import { getRequestOrigin } from "@/lib/site";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { parseConfigSchema, coerceFieldValue } from "@/lib/config-schema";
@@ -120,10 +121,13 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin).replace(
-    /\/+$/,
-    "",
-  );
+  // The preview tag is fetched by a player running on the very page that minted
+  // it, so its origin must be that page's — not the canonical NEXT_PUBLIC_SITE_URL.
+  // Those differ in local development (the env var is pinned to http://localhost:3000),
+  // and a protocol mismatch is fatal rather than cosmetic: under `npm run dev:https`
+  // the page is https, so an http tag URL makes Google IMA's request a
+  // mixed-content/private-network failure that surfaces only as code 1005.
+  const siteUrl = getRequestOrigin(request);
 
   return Response.json({
     previewTagUrl: `${siteUrl}/api/vast/preview/${minted.token}`,

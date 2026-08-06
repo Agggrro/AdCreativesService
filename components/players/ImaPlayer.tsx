@@ -26,12 +26,38 @@ export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps
 
     onStatus("Loading Google IMA SDK…");
 
+    // IMA issues its ad request from a bridge iframe on imasdk.googleapis.com —
+    // a *public* address space. When the tag lives on localhost (any local dev
+    // server) that request is public→loopback, which Chrome's Private Network
+    // Access refuses: first for want of a secure context, then, over https, for
+    // want of a permission the third-party bridge cannot ask for. No response
+    // header fixes it, because the restriction is on the requesting context.
+    //
+    // So on loopback only, fetch the VAST ourselves — same-origin with the page,
+    // so PNA never applies — and hand IMA the document via `adsResponse`. IMA
+    // parses exactly the same XML it would have fetched; only who performs the
+    // GET differs. A deployed tag is a public address, so production keeps the
+    // full adTagUrl path and its fidelity to what a real DSP does.
+    const tagUrl = new URL(mint.previewTagUrl);
+    const isLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(tagUrl.hostname);
+
     loadImaSdk()
-      .then(() => {
+      .then(async () => {
         if (cancelled) return;
         const container = containerRef.current;
         const video = videoRef.current;
         if (!container || !video) return;
+
+        let adsResponse: string | null = null;
+        if (isLoopback) {
+          try {
+            adsResponse = await (await fetch(mint.previewTagUrl)).text();
+          } catch {
+            onStatus("Could not fetch the preview VAST tag.");
+            return;
+          }
+          if (cancelled) return;
+        }
 
         google.ima.settings.setVpaidMode(google.ima.ImaSdkSettings.VpaidMode.INSECURE);
 
@@ -84,7 +110,11 @@ export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps
         );
 
         const adsRequest = new google.ima.AdsRequest();
-        adsRequest.adTagUrl = mint.previewTagUrl;
+        if (adsResponse !== null) {
+          adsRequest.adsResponse = adsResponse;
+        } else {
+          adsRequest.adTagUrl = mint.previewTagUrl;
+        }
         adsRequest.linearAdSlotWidth = container.clientWidth || 640;
         adsRequest.linearAdSlotHeight = container.clientHeight || 360;
         adsRequest.nonLinearAdSlotWidth = container.clientWidth || 640;

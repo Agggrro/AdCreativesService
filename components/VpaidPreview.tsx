@@ -67,10 +67,17 @@ export function VpaidPreview({
     slot.innerHTML = "";
     setClicked(null);
 
+    // Visible whenever the template actually has a base video (Shoppable
+    // Video): this is the slot a real player would render it into, and hiding
+    // it unconditionally left that demo as a blank well with only its overlay.
+    // Image-only templates draw into the slot itself and keep theirs hidden.
+    const hasVideo = typeof config.videoUrl === "string";
     const video = document.createElement("video");
     video.muted = true;
     video.playsInline = true;
-    video.style.display = "none";
+    video.style.cssText = hasVideo
+      ? "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;"
+      : "display:none;";
     slot.appendChild(video);
 
     let ad: Vpaid | null = null;

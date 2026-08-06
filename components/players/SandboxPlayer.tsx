@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { PreviewPlayerProps } from "./types";
+import { useDict } from "@/components/i18n/LocaleProvider";
 
 type Vpaid = {
   subscribe: (cb: (...a: unknown[]) => void, event: string) => void;
@@ -26,18 +27,37 @@ type Vpaid = {
  * (new key) on every Launch/Restart, so mounting here doubles as launching.
  */
 export function SandboxPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps) {
+  const dict = useDict();
   const slotRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const slot = slotRef.current;
     if (!slot) return;
     slot.innerHTML = "";
-    onStatus("Loading interactive unit…");
 
+    // This harness is a VPAID host: it loads the unit as a <script> and calls
+    // getVPAIDAd(). A SIMID creative is an HTML document meant for a sandboxed
+    // iframe over postMessage, so loading it here yields no factory and used to
+    // surface as a misleading "could not load" error. Say what's actually true.
+    if (mint.sandbox.format !== "vpaid") {
+      onStatus(dict.preview.sandboxVpaidOnly);
+      return;
+    }
+
+    onStatus(dict.preview.loadingUnit);
+
+    // The videoSlot is what a real player would show for the base video, so it
+    // has to be visible whenever the creative actually has one — hiding it
+    // unconditionally rendered every video-backed template (Shoppable Video) as
+    // a blank well with only its overlay drawn. Image-only templates have no
+    // videoUrl and draw straight into the slot, so theirs stays hidden.
+    const hasVideo = typeof mint.sandbox.adParameters.videoUrl === "string";
     const video = document.createElement("video");
     video.muted = true;
     video.playsInline = true;
-    video.style.display = "none";
+    video.style.cssText = hasVideo
+      ? "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;"
+      : "display:none;";
     slot.appendChild(video);
 
     let ad: Vpaid | null = null;
@@ -46,7 +66,7 @@ export function SandboxPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerP
     script.onload = () => {
       const factory = (window as unknown as { getVPAIDAd?: () => Vpaid }).getVPAIDAd;
       if (typeof factory !== "function") {
-        onStatus("Could not load the interactive unit.");
+        onStatus(dict.preview.unitLoadFailed);
         return;
       }
       try {
@@ -54,8 +74,8 @@ export function SandboxPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerP
         ad.subscribe((...a) => {
           onClickThrough(String(a[0] || "(click-through)"));
         }, "AdClickThru");
-        ad.subscribe(() => onStatus("Playing"), "AdStarted");
-        ad.subscribe(() => onStatus("Complete"), "AdVideoComplete");
+        ad.subscribe(() => onStatus(dict.preview.playing), "AdStarted");
+        ad.subscribe(() => onStatus(dict.preview.complete), "AdVideoComplete");
         ad.initAd(
           slot.clientWidth || 640,
           slot.clientHeight || 360,
@@ -66,10 +86,10 @@ export function SandboxPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerP
         );
         ad.startAd();
       } catch {
-        onStatus("The interactive unit failed to start.");
+        onStatus(dict.preview.unitStartFailed);
       }
     };
-    script.onerror = () => onStatus("Could not load the interactive unit.");
+    script.onerror = () => onStatus(dict.preview.unitLoadFailed);
     document.body.appendChild(script);
 
     return () => {

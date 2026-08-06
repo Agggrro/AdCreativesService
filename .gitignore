@@ -51,3 +51,5 @@ Thumbs.db
 
 # Claude Code local/personal settings (keep shared config, not local overrides)
 .claude/settings.local.json
+
+certificates

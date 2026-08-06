@@ -131,17 +131,19 @@ Adding a new standard = adding an adapter, not touching the endpoint. See
 
 ### Live preview: `POST /api/vast/preview` + `GET /api/vast/preview/[token]`
 
-The dashboard configurator ([`app/dashboard/creatives/new`](../app/dashboard/creatives/new))
-has a "Launch Ad" panel ([`components/PreviewPanel.tsx`](../components/PreviewPanel.tsx))
+The dashboard configurator ([`components/ConfiguratorForm.tsx`](../components/ConfiguratorForm.tsx),
+shared by [`app/dashboard/creatives/new`](../app/dashboard/creatives/new) and
+[`app/dashboard/creatives/[id]/edit`](../app/dashboard/creatives/[id]/edit)) has a
+"Launch Ad" panel ([`components/PreviewPanel.tsx`](../components/PreviewPanel.tsx))
 that runs a template with whatever is **currently typed into the form** — before the
-creative is saved — in three player backends: an in-house sandbox harness, Google IMA
-SDK, and Fluid Player. This is a **separate, authenticated surface**, not a
-variant of the public serving path above:
+creative is saved (or the edit committed) — in three player backends: an in-house
+sandbox harness, Google IMA SDK, and Fluid Player. This is a **separate, authenticated
+surface**, not a variant of the public serving path above:
 
 1. `POST /api/vast/preview` — requires a signed-in dashboard user (no subscription
    check: preview is a try-before-you-configure surface, open to any account). Takes
    `{ templateId, format, fields }`, validates them the same way
-   `createCreative` does, and mints a **stateless, HMAC-signed, 120s-TTL token**
+   `createCreative`/`updateCreative` do, and mints a **stateless, HMAC-signed, 120s-TTL token**
    (`lib/vast/preview-token.ts`) encoding the template/format/config — no DB row is
    read or written. A stateless token was chosen over a server-side cache because the
    stack has no Redis/KV and Vercel functions don't share memory across invocations
@@ -183,6 +185,47 @@ plays, so there's no native `ended` event to key off of) — the status line can
 on "Playing" after a VPAID creative's own internal timer completes; the ad itself
 renders and behaves correctly regardless.
 
+**What each tab can and can't test.** The three tabs are not interchangeable, and a
+failure in one is not automatically a defect in the creative:
+
+- **Sandbox is a VPAID host only.** It loads the unit as a `<script>` and calls
+  `getVPAIDAd()`. A SIMID creative is an HTML document meant to run in a sandboxed
+  iframe over `postMessage`, so this harness cannot execute it — selecting SIMID says
+  so plainly rather than surfacing a misleading load error. Use IMA or Fluid for SIMID.
+- **Sandbox and Fluid do not fetch the ad tag the same way IMA does.** Sandbox never
+  requests `/api/vast/preview/[token]` at all — it uses the signed unit URL and the
+  minted `adParameters` directly. So "works in Sandbox, fails in IMA/Fluid" points at
+  the *ad request*, not the creative.
+- **IMA cannot fetch a `localhost` tag at all — on loopback the tab hands it the VAST
+  directly.** IMA issues its ad request from a bridge iframe on `imasdk.googleapis.com`,
+  a *public* address space; a tag on `localhost` is *loopback*. Chrome's **Private
+  Network Access** refuses that direction in two successive gates: first for want of a
+  secure context (plain `next dev` is `http://`, so the bridge is too), then — once
+  served over https — with *"Permission was denied for this request to access the
+  `loopback` address space"*, a permission the third-party bridge has no way to
+  request. **No response header fixes this**; the restriction is on the requesting
+  context, not the response. Either way IMA reports only the generic code **1005
+  `FAILED_TO_REQUEST_ADS`**.
+  `ImaPlayer.tsx` therefore detects a loopback tag host and fetches the VAST itself
+  (same-origin with the page, so PNA never applies), passing it to IMA via
+  `adsRequest.adsResponse` instead of `adTagUrl`. IMA parses the identical document —
+  only who performs the GET differs. A deployed tag is a public address, so production
+  keeps the `adTagUrl` path and its full fidelity to what a real DSP does.
+  `npm run dev:https` is still worth using locally: the VAST's tracking beacons point
+  at the same origin, and over plain http on an https page they'd be mixed content.
+- **Fluid Player detects VPAID by position, not capability.** It tests only
+  `mediaFileList[0].apiFramework`, so the VPAID `<MediaFile>` must be emitted before
+  the base-video fallback or Fluid plays the fallback and never loads the unit —
+  which is why Shoppable Video (the one template with a base video) failed there
+  while image-only templates worked. Handled in `lib/vast/adapters/vpaid.ts`; don't
+  "tidy" that ordering.
+- **1005 is an ad-*request* failure, never an asset or VAST-validity problem.** Don't
+  go looking in the VAST builder for it. Ad blockers cause the same code by a different
+  route (`imasdk.googleapis.com` and paths containing `/vast/` are common blocklist
+  entries). Either way, confirm whether the request reached the server before touching
+  ad-serving code: the endpoint's output can be verified independently of any browser
+  by minting a token with `PREVIEW_TOKEN_SECRET` and fetching the URL from a shell.
+
 ### Stripe webhook `/api/stripe/webhook`
 
 Source of truth for subscription state. Verifies the Stripe signature, then updates
@@ -199,6 +242,30 @@ model — see [ADR-0003](decisions/0003-access-control-over-code-hiding.md).
 (`createSignedUrl`, short expiry). No separate paid CDN for MVP. If serving volume
 later justifies it, swap the storage adapter for a dedicated CDN (Cloudflare R2, etc.)
 without touching the serving logic. See [ADR-0004](decisions/0004-mvp-on-free-tiers.md).
+
+### Advertiser media uploads
+
+Separate from the runtime bucket above: `"image"`-typed config fields (background,
+before/after, quiz options, reveal image, and Shoppable Video's `videoUrl`) let an
+advertiser **upload** a file instead of pasting an external URL — added after
+discovering that externally hosted media routinely breaks via hotlink protection
+(a host redirecting a cross-origin request to a URL that 404s). See
+[ADR-0010](decisions/0010-advertiser-media-uploads.md).
+
+- **Bucket:** `creative-media`, public-read (unlike `creatives`), created in
+  `supabase/schema.sql`. Public because the URL is baked into `<AdParameters>` and
+  must keep resolving for the creative's lifetime — a short-TTL signed URL is the
+  wrong shape for this, unlike the runtime JS bucket above.
+- **Upload path:** straight from the browser to Storage
+  (`lib/supabase/client.ts`'s anon-key client, the user's own session), **not**
+  proxied through a Vercel serverless function — those cap request bodies around
+  ~4.5MB, which video/gif files can exceed. RLS on `storage.objects` gates writes
+  to the uploader's own `{auth.uid()}/...` path prefix, mirroring the
+  `creatives_*_own` policy pattern.
+- **Downstream:** the resulting public URL is just a string written into the same
+  `config_json`/`<AdParameters>` field a pasted URL would occupy — `lib/vast/builder.ts`
+  and the runtime's `adInteractMediaLayer` (`runtime/lib/vpaid-base.js`) need no
+  awareness of where the URL came from.
 
 ## Runtime placement summary
 

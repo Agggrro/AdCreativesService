@@ -34,7 +34,14 @@ single standard. See [ADR-0002](decisions/0002-multi-format-creative-delivery.md
   apiFramework="SIMID">` alongside the base `<MediaFiles>` video. Player renders the
   video and loads the SIMID doc in a sandboxed iframe.
 - **VPAID:** `<MediaFile apiFramework="VPAID" type="application/javascript">`
-  pointing at the VPAID JS unit.
+  pointing at the VPAID JS unit, emitted **before** the optional base-video
+  `<MediaFile>` fallback. VAST doesn't mandate an order, but Fluid Player decides
+  whether an ad is VPAID by testing `mediaFileList[0].apiFramework` only — with the
+  video first it silently plays the fallback and never loads the unit. Keep VPAID
+  first; capability-based players are unaffected either way.
+- **Declared `type` must match the actual file.** `baseVideoMediaFile()` sniffs the
+  MIME type from the URL's extension rather than assuming `video/mp4` — a webm
+  declared as mp4 is a spec violation a strict player is entitled to reject.
 
 The adapter layer hides these differences from the endpoint. Each adapter is
 responsible for spec-conformant output — validate with the **`vast-spec-reviewer`**
@@ -58,6 +65,34 @@ reaches the runtime unit too. `VastBuildContext.rawConfig` carries this through.
 **Try before saving:** the dashboard configurator can run a template's *current,
 unsaved* form values through a real (ephemeral) VAST tag in three player
 backends — see the "Live preview" section of [architecture.md](architecture.md).
+
+## Media fields: image, gif, or a short video
+
+Every `type: "image"` config field (background, before/after, option thumbnails,
+reveal image) accepts any of those interchangeably — the advertiser pastes one URL,
+the runtime decides how to render it. Static raster/vector formats and animated GIF
+render as a CSS `background-image` (GIF animates natively there); a URL that looks
+like a video file (`.webm`, `.mp4`, `.m4v`, `.mov`, `.ogv`) gets a real `<video>`
+element instead (autoplay, loop, muted, `object-fit: cover`) since a background-image
+cannot play one. One shared helper (`adInteractMediaLayer` in
+[`runtime/lib/vpaid-base.js`](../runtime/lib/vpaid-base.js)) makes this decision once
+for every template rather than each one re-implementing a type sniff. The
+configurator's field stays a plain URL input — there is no separate "is this a
+video" toggle to keep in sync.
+
+## Mandatory close control
+
+Every VPAID creative gets a close ("×") control, built once into the shared base
+rather than per template — see [ADR-0009](decisions/0009-mandatory-close-control.md).
+It is disabled behind a ring that fills over a fixed delay (default 5s, not yet a
+creative setting) and, once live, tears the creative down like a user-initiated skip.
+This is also why a creative has **no fixed watch duration** anymore: the internal
+`durationSeconds` (VAST `<Duration>`, quartile timer pacing) is still injected with a
+default via `lib/vast/builder.ts`, but it is no longer a configurator field — nothing
+auto-completes or auto-removes the creative on a timer; only the viewer's own close
+click does. SIMID does not get this yet (it runs in a sandboxed iframe over a
+different, postMessage-based runtime, not the VPAID base) — a known gap, not a design
+decision.
 
 ## The protection reality (do not oversell)
 

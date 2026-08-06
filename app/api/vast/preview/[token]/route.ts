@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { getRequestOrigin } from "@/lib/site";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { buildPreviewServing } from "@/lib/vast/preview-context";
 import { verifyPreviewToken } from "@/lib/vast/preview-token";
@@ -19,6 +20,13 @@ import { buildInlineVast, emptyVast, getAdapter, parseCreativeConfig } from "@/l
 // surfaces as a generic VAST_LOAD_TIMEOUT (code 1005) with no CORS error
 // logged. Safe to reflect any origin here: the token in the URL is already
 // the sole access control, and this response carries no cookie-based session.
+//
+// Deliberately NOT sent: Access-Control-Allow-Private-Network. IMA cannot reach
+// a `localhost` tag from its public-origin bridge no matter what this endpoint
+// answers — Chrome gates that on the *requesting* context, so the header only
+// ever opted a privately-addressed instance (a dev's own machine) out of a
+// protection it wants. The loopback case is solved client-side instead, by
+// handing IMA the document via `adsResponse` (components/players/ImaPlayer.tsx).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -46,6 +54,7 @@ export async function OPTIONS(request: Request): Promise<Response> {
     headers: {
       ...corsHeaders(request),
       "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     },
   });
 }
@@ -73,7 +82,13 @@ export async function GET(
     if (!interactiveUrl) return vastResponse(emptyVast(), request);
 
     const config = parseCreativeConfig(payload.cfg);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? new URL(request.url).origin;
+    // Request origin, not the canonical NEXT_PUBLIC_SITE_URL: this document is
+    // fetched by a player on the page that minted it, and the tracking beacons
+    // below inherit this origin. Pinning them to the env var emits http:// URLs
+    // inside a document served over https under `npm run dev:https`, which the
+    // browser then blocks as mixed content. (The real /api/vast path keeps the
+    // canonical URL — it is fetched by third-party players, not same-origin.)
+    const siteUrl = getRequestOrigin(request);
 
     const ctx = { serving, config, rawConfig: payload.cfg, interactiveUrl, siteUrl };
 

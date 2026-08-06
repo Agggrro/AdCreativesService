@@ -53,8 +53,9 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 
 - [x] **Interactive runtime assets** — Shop Now overlay authored for both standards
       ([`runtime/shoppable/simid/index.html`](../runtime/shoppable/simid/index.html),
-      [`runtime/shoppable/vpaid/unit.js`](../runtime/shoppable/vpaid/unit.js));
-      reference impl, still needs upload to Storage + player validation.
+      [`runtime/templates/shoppable/vpaid.js`](../runtime/templates/shoppable/vpaid.js) built
+      via `npm run build:runtime` into `runtime/dist/shoppable/vpaid/unit.js` — see
+      [runtime/README.md](../runtime/README.md)); reference impl, still needs player validation.
 - [x] **Seed data** — published Shoppable Video template
       ([`supabase/seed.sql`](../supabase/seed.sql)).
 - [ ] **Upload assets** to the private `creatives` bucket (see runtime/README.md).
