@@ -110,6 +110,21 @@ We provide **access control, not secrecy of client code**. Layers: dynamic VAST
 kill-switch, short-TTL signed URLs, domain/referer allow-lists, server-side config
 injection, obfuscation. We never claim creative JS is unrecoverable.
 
+**SIMID's signed URL is one hop indirect.** Supabase Storage forces `.html`
+objects to `text/plain` with `Content-Security-Policy: sandbox` (no
+`allow-scripts`) — a platform-level anti-XSS-hosting policy that can't be
+turned off per bucket, and that silently breaks the SIMID postMessage
+handshake if the player loads that URL directly. `GET /api/creative/simid/[token]`
+(`app/api/creative/simid/[token]/route.ts`) exists to work around it: an
+HMAC-signed, 120s-TTL token (`lib/vast/interactive-token.ts`) authorizes
+exactly one Storage object path, matched against `^[a-z0-9_-]+/simid/index\.html$`
+as defense in depth against the token ever being minted for something outside
+`runtime/*/simid/index.html`. The route downloads that object service-role and
+re-serves it as `text/html` with a CSP that allows the (first-party, static)
+inline script/style but keeps `default-src 'none'`. This document is never
+advertiser-controlled today; if that ever changes, this route's CSP needs
+re-review before it does.
+
 ## RLS scope
 
 RLS protects the authenticated dashboard path only. The serving path deliberately

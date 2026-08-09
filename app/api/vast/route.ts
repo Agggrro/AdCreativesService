@@ -51,14 +51,15 @@ export async function GET(request: Request): Promise<Response> {
       return vastResponse(emptyVast());
     }
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? url.origin;
+
     // Sign the interactive asset URL; missing/unsignable => fail closed.
-    const interactiveUrl = await resolveInteractiveUrl(supabase, serving);
+    const interactiveUrl = await resolveInteractiveUrl(supabase, serving, siteUrl);
     if (!interactiveUrl) {
       return vastResponse(emptyVast());
     }
 
     const config = parseCreativeConfig(serving.config_json);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? url.origin;
 
     const vast = generateVast({
       serving,

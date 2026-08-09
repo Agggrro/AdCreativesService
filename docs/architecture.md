@@ -259,6 +259,21 @@ model — see [ADR-0003](decisions/0003-access-control-over-code-hiding.md).
 later justifies it, swap the storage adapter for a dedicated CDN (Cloudflare R2, etc.)
 without touching the serving logic. See [ADR-0004](decisions/0004-mvp-on-free-tiers.md).
 
+**SIMID is the one exception to "direct signed URL":** Supabase Storage always
+serves `.html` objects as `text/plain` with a script-blocking
+`Content-Security-Policy: sandbox` — a deliberate, non-configurable
+anti-XSS-hosting policy on Supabase's side, not a bucket misconfiguration.
+Loaded as a player's iframe `src`, that silently kills the SIMID postMessage
+handshake: the video plays (it's a plain `<MediaFile>`, unaffected) but the
+interactive overlay's script never runs, so it never renders. `resolveInteractiveUrl()`
+(`lib/storage.ts`) special-cases `format === "simid"`: instead of a Storage
+signed URL, it mints a short-TTL HMAC token (`lib/vast/interactive-token.ts`,
+same access-control shape as the live-preview token) and points the player at
+`GET /api/creative/simid/[token]`, which downloads the object server-side
+(service role) and re-serves the same bytes as `text/html` with a permissive-
+but-scoped CSP. VPAID (`.js`, executed via `<script src>`, which browsers don't
+gate on Content-Type the same way) is unaffected and keeps the direct signed URL.
+
 ### Advertiser media uploads
 
 Separate from the runtime bucket above: `"image"`-typed config fields (background,
@@ -290,4 +305,5 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | Dashboard / auth pages | Node (Vercel) | Rich, low QPS |
 | `GET /api/vast` | Node + CDN cache (`s-maxage=60`) | Full supabase-js/storage support; CDN cache absorbs QPS/latency. Edge is a documented future optimization. |
 | `POST /api/stripe/webhook` | Node | Needs raw body for signature verification |
+| `GET /api/creative/simid/[token]` | Node | Service-role Storage download; must be Node for supabase-js storage support, same as `/api/vast` |
 | Creative runtime assets | Supabase Storage (free tier, CDN) | Static-ish, signed URLs, geo-distributed |

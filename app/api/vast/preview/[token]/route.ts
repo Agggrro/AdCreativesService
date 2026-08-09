@@ -78,10 +78,6 @@ export async function GET(
       rk: payload.rk,
     });
 
-    const interactiveUrl = await resolveInteractiveUrl(serviceClient, serving);
-    if (!interactiveUrl) return vastResponse(emptyVast(), request);
-
-    const config = parseCreativeConfig(payload.cfg);
     // Request origin, not the canonical NEXT_PUBLIC_SITE_URL: this document is
     // fetched by a player on the page that minted it, and the tracking beacons
     // below inherit this origin. Pinning them to the env var emits http:// URLs
@@ -89,6 +85,11 @@ export async function GET(
     // browser then blocks as mixed content. (The real /api/vast path keeps the
     // canonical URL — it is fetched by third-party players, not same-origin.)
     const siteUrl = getRequestOrigin(request);
+
+    const interactiveUrl = await resolveInteractiveUrl(serviceClient, serving, siteUrl);
+    if (!interactiveUrl) return vastResponse(emptyVast(), request);
+
+    const config = parseCreativeConfig(payload.cfg);
 
     const ctx = { serving, config, rawConfig: payload.cfg, interactiveUrl, siteUrl };
 

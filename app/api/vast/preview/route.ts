@@ -112,14 +112,6 @@ export async function POST(request: Request): Promise<Response> {
     cfg: config,
     rk: template.runtime_keys,
   });
-  const scriptUrl = await resolveInteractiveUrl(serviceClient, serving);
-  if (!scriptUrl) {
-    return Response.json(
-      { error: "interactive asset not available for this template/format" },
-      { status: 422 },
-    );
-  }
-
   // The preview tag is fetched by a player running on the very page that minted
   // it, so its origin must be that page's — not the canonical NEXT_PUBLIC_SITE_URL.
   // Those differ in local development (the env var is pinned to http://localhost:3000),
@@ -127,6 +119,14 @@ export async function POST(request: Request): Promise<Response> {
   // the page is https, so an http tag URL makes Google IMA's request a
   // mixed-content/private-network failure that surfaces only as code 1005.
   const siteUrl = getRequestOrigin(request);
+
+  const scriptUrl = await resolveInteractiveUrl(serviceClient, serving, siteUrl);
+  if (!scriptUrl) {
+    return Response.json(
+      { error: "interactive asset not available for this template/format" },
+      { status: 422 },
+    );
+  }
 
   return Response.json({
     previewTagUrl: `${siteUrl}/api/vast/preview/${minted.token}`,
