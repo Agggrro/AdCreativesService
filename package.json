@@ -12,7 +12,8 @@
     "build:runtime": "node runtime/build.mjs",
     "runtime:push": "node --env-file=.env.local scripts/runtime-push.mjs",
     "db:schema": "node --env-file=.env.local scripts/db-apply.mjs supabase/schema.sql",
-    "db:seed": "node --env-file=.env.local scripts/db-apply.mjs supabase/seed.sql"
+    "db:seed": "node --env-file=.env.local scripts/db-apply.mjs supabase/seed.sql",
+    "deploy:status": "node --env-file=.env.local scripts/deploy-status.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
