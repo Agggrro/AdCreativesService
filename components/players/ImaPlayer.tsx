@@ -59,7 +59,14 @@ export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps
           if (cancelled) return;
         }
 
-        google.ima.settings.setVpaidMode(google.ima.ImaSdkSettings.VpaidMode.INSECURE);
+        // VPAID-only: our units draw directly into the DOM slot rather than
+        // running sandboxed (ADR-0003). Scoped to the VPAID format specifically —
+        // under investigation for whether this setting also perturbs IMA's SIMID
+        // handshake, which never fires SIMID:Player:init for this ad despite
+        // sending it ongoing SIMID:Media:* notifications.
+        if (mint.sandbox.format === "vpaid") {
+          google.ima.settings.setVpaidMode(google.ima.ImaSdkSettings.VpaidMode.INSECURE);
+        }
 
         const adDisplayContainer = new google.ima.AdDisplayContainer(container, video);
         adDisplayContainer.initialize();
