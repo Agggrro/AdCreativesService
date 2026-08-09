@@ -2,19 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <script>
-      // Catches any postMessage the player fires before the rest of this
-      // document has parsed. Real IMA sends createSession/SIMID:Player:init
-      // the instant it creates this iframe — not on our `load` event — so a
-      // listener registered later (even at the top of <body>) loses that
-      // one-shot handshake outright: an undelivered postMessage is dropped,
-      // never buffered. This has to be the first thing the parser executes.
-      window.__simidQueue = [];
-      window.__simidQueueListener = function (event) {
-        window.__simidQueue.push(event);
-      };
-      window.addEventListener("message", window.__simidQueueListener);
-    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AdInteract — Shoppable (SIMID)</title>
     <style>
@@ -56,46 +43,27 @@
         border-radius: 4px;
         object-fit: cover;
       }
-      /* TEMPORARY diagnostic — remove once the real-IMA handshake is root-caused. */
-      #debug {
-        position: absolute;
-        top: 4px;
-        left: 4px;
-        max-width: calc(100% - 8px);
-        font: 10px/1.3 monospace;
-        color: #0f0;
-        background: rgba(0, 0, 0, 0.55);
-        padding: 3px 5px;
-        white-space: pre-wrap;
-        pointer-events: none;
-      }
     </style>
   </head>
   <body>
     <div id="stage">
       <button id="shop" hidden>Shop Now</button>
-      <div id="debug"></div>
     </div>
 
     <script>
       /**
-       * AdInteract — Shoppable Video, SIMID 1.1 creative.
+       * AdInteract — Shoppable Video, SIMID 1.1/1.2 creative.
        * Establishes the SIMID session with the player, reads config from the
        * VAST <AdParameters> (init.creativeData.adParameters), and shows a
        * "Shop Now" overlay that fires SIMID:Creative:clickThru. Config is
-       * server-injected, never baked in (ADR-0003). The message listener is
-       * registered in <head> (see above), not here, so nothing sent before
-       * this point in parsing is lost. Reference implementation — validate
-       * against your target SIMID player.
+       * server-injected, never baked in (ADR-0003). Reference implementation —
+       * validate against your target SIMID player.
+       *
+       * Per SIMID 1.2 §8.4.1, session initialization is delegated to the
+       * creative: WE generate sessionId and post createSession first; the
+       * player only resolves it, never sends it to us.
        */
       (function () {
-        // SIMID 1.2 §8.4.1: session initialization is delegated to the
-        // creative — WE generate the id and post the first `createSession`
-        // message; the player only resolves it. (Not the other way around —
-        // a player that never receives createSession never proceeds to
-        // Player:init/startCreative, but keeps playing the base media file
-        // regardless, which is exactly the "video plays, overlay never
-        // appears" symptom this used to produce.)
         var sessionId =
           window.crypto && crypto.randomUUID
             ? crypto.randomUUID()
@@ -103,37 +71,7 @@
         var messageId = 1;
         var params = {};
 
-        // TEMPORARY diagnostic — logs message types in/out on-page, since
-        // catching the right nested iframe in DevTools mid-ad-break is fiddly.
-        // Remove this whole block once the real-IMA handshake is root-caused.
-        var debugEl = document.getElementById("debug");
-        var debugLines = [];
-        var repeatCounts = {};
-        function dbg(s, coalesceKey) {
-          if (coalesceKey) {
-            repeatCounts[coalesceKey] = (repeatCounts[coalesceKey] || 0) + 1;
-            var line = coalesceKey + " x" + repeatCounts[coalesceKey];
-            var idx = debugLines.findIndex(function (l) {
-              return l.indexOf(coalesceKey + " x") === 0;
-            });
-            if (idx >= 0) {
-              debugLines[idx] = line;
-              debugEl.textContent = debugLines.join("\n");
-              return;
-            }
-            s = line;
-          }
-          debugLines.push(s);
-          if (debugLines.length > 20) debugLines.shift();
-          debugEl.textContent = debugLines.join("\n");
-        }
-        dbg("loaded " + new Date().toISOString().slice(11, 19));
-        window.addEventListener("error", function (e) {
-          dbg("JS ERROR: " + e.message);
-        });
-
         function post(type, args) {
-          dbg("-> " + type);
           window.parent.postMessage(
             JSON.stringify({
               sessionId: sessionId,
@@ -180,25 +118,14 @@
           resolve(msg, {});
         }
 
-        function handleMessage(event) {
+        window.addEventListener("message", function (event) {
           var data;
           try {
             data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
           } catch (e) {
-            dbg("<- unparsable from " + event.origin + ": " + String(event.data).slice(0, 40));
             return;
           }
-          if (!data || !data.type) {
-            return; // browser-extension / unrelated postMessage noise, not ours
-          }
-          if (data.type.indexOf("SIMID:") !== 0 && data.type !== "createSession" && data.type !== "resolve") {
-            return; // not a SIMID message — ignore rather than log noise
-          }
-          if (data.type === "SIMID:Media:timeupdate") {
-            dbg(null, "<- SIMID:Media:timeupdate");
-          } else {
-            dbg("<- " + data.type + " (" + event.origin + ")");
-          }
+          if (!data || !data.type) return;
 
           switch (data.type) {
             case "SIMID:Player:init":
@@ -213,21 +140,8 @@
               if (data.type.indexOf("SIMID:Player:") === 0) resolve(data, {});
               break;
           }
-        }
+        });
 
-        // Drain anything the <head> queue already caught, then stop queueing
-        // and listen live. Must remove the queueing listener (not just null
-        // out the array) or it keeps firing on every later message and
-        // throws trying to .push() onto null.
-        dbg("draining queue: " + window.__simidQueue.length + " msg(s)");
-        window.removeEventListener("message", window.__simidQueueListener);
-        window.__simidQueue.forEach(handleMessage);
-        window.__simidQueue = null;
-        window.__simidQueueListener = null;
-        window.addEventListener("message", handleMessage);
-
-        // SIMID 1.2 §8.4.1: WE post createSession first — the player only
-        // resolves it, it does not send it to us.
         post("createSession", {});
       })();
     </script>
