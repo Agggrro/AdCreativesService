@@ -89,7 +89,17 @@
        * against your target SIMID player.
        */
       (function () {
-        var sessionId = "";
+        // SIMID 1.2 §8.4.1: session initialization is delegated to the
+        // creative — WE generate the id and post the first `createSession`
+        // message; the player only resolves it. (Not the other way around —
+        // a player that never receives createSession never proceeds to
+        // Player:init/startCreative, but keeps playing the base media file
+        // regardless, which is exactly the "video plays, overlay never
+        // appears" symptom this used to produce.)
+        var sessionId =
+          window.crypto && crypto.randomUUID
+            ? crypto.randomUUID()
+            : "simid-" + Date.now() + "-" + Math.random().toString(16).slice(2);
         var messageId = 1;
         var params = {};
 
@@ -191,10 +201,6 @@
           }
 
           switch (data.type) {
-            case "createSession":
-              sessionId = data.sessionId || sessionId;
-              resolve(data, {});
-              break;
             case "SIMID:Player:init":
               handleInit(data);
               break;
@@ -219,6 +225,10 @@
         window.__simidQueue = null;
         window.__simidQueueListener = null;
         window.addEventListener("message", handleMessage);
+
+        // SIMID 1.2 §8.4.1: WE post createSession first — the player only
+        // resolves it, it does not send it to us.
+        post("createSession", {});
       })();
     </script>
   </body>
