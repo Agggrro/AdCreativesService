@@ -11,6 +11,7 @@ import {
   readdirSync,
   existsSync,
   statSync,
+  rmSync,
 } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +19,13 @@ import { fileURLToPath } from "node:url";
 const root = dirname(fileURLToPath(import.meta.url));
 const vpaidBase = readFileSync(join(root, "lib", "vpaid-base.js"), "utf8");
 const templatesDir = join(root, "templates");
+
+// Start from empty, because dist/ is gitignored and nothing else ever prunes
+// it: when shoppable's key moved to vpaid/unit.js, the old dist/shoppable/
+// vpaid.js sat there for a month and would have been pushed to the bucket as a
+// phantom object by `npm run runtime:push`, which uploads whatever it finds.
+const distDir = join(root, "dist");
+rmSync(distDir, { recursive: true, force: true });
 
 // Output path relative to dist/<name>/, keyed by template dir name. Every
 // template's built unit lands at `dist/<name>/vpaid.js` to match its
@@ -40,7 +48,7 @@ for (const name of readdirSync(templatesDir)) {
   // render defines `var TEMPLATE`; base references it in getVPAIDAd.
   const out = `${render}\n${vpaidBase}`;
   const outRelative = OUTPUT_RELATIVE_PATH[name] || "vpaid.js";
-  const outPath = join(root, "dist", name, outRelative);
+  const outPath = join(distDir, name, outRelative);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, out);
   console.log(`built ${name}/${outRelative}`);

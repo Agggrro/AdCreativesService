@@ -38,10 +38,24 @@ These keys match `templates.runtime_keys` in [`../supabase/seed.sql`](../supabas
 
 1. Create a **private** bucket named `creatives` in Supabase Storage (private so the
    files are only reachable via signed URLs — `lib/storage.ts` signs them).
-2. Run `npm run build:runtime`, then upload the `dist/**` files above to the matching
-   keys (Supabase dashboard or CLI).
+2. Run `npm run build:runtime`, then `npm run runtime:push` to upload every built unit
+   to the keys above. The push derives its bucket keys from the `dist/` layout, so the
+   table above and the upload cannot drift apart; `npm run runtime:push quiz` pushes a
+   single template. `build:runtime` wipes `dist/` first, so a unit whose key moves
+   (as `shoppable`'s once did) cannot leave a phantom object behind to be uploaded.
 3. Apply [`../supabase/schema.sql`](../supabase/schema.sql) then
-   [`../supabase/seed.sql`](../supabase/seed.sql).
+   [`../supabase/seed.sql`](../supabase/seed.sql) — `npm run db:schema` and
+   `npm run db:seed`. Both files are idempotent full-applies, so re-running the seed
+   *is* how a template change ships; there is no migrations directory.
+
+Both commands read `.env.local`. `runtime:push` needs `SUPABASE_SERVICE_ROLE_KEY`
+(already required by the app); the `db:*` commands need `DATABASE_URL`, which nothing
+else uses — see [`.env.example`](../.env.example).
+
+**Order matters when shipping a template change.** Push the runtime first (harmless on
+its own — no saved creative references a capability it does not have yet), then deploy
+the app, then apply the seed. Seeding before the deploy leaves the live configurator
+rendering a schema its code does not understand.
 
 ## How config reaches the unit
 

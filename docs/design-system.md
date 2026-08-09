@@ -79,12 +79,17 @@ now carries informational states.
 
 | State | Rail / dot (`--color-*`) | Text (`-fg`) | Tint background (`-bg`) | Meaning |
 | --- | --- | --- | --- | --- |
-| live / active | `live` `#1B7A52` | `#12603F` | `#E4F0EA` | Serving, entitled |
+| live / active | `live` `#1B7A52` | `#12603F` | `#E4F0EA` | Serving, entitled — and, in a configurator matrix, fully configured |
 | trial / info | `info` `#2C5FA8` | `#244F8C` | `#E8EEF8` | Trialing, renewing soon, informational |
 | dead / past due | `dead` `#B02537` | `#93202F` | `#FAE8EA` | Lapsed, failing, fail-closed |
-| idle / draft | `idle` `#C4BFB7` | `#6E6862` | `#EAE8E4` | Not published, no activity |
+| idle / draft | `idle` `#C4BFB7` | `#6E6862` | `#EAE8E4` | Not published, no activity, nothing filled in yet |
 
 Semantic colour is **not** the accent and never decorates. It only encodes state.
+
+`idle`'s text on its own tint (`#6E6862` on `#EAE8E4`) measures **4.49:1** — just under AA
+for small text. Idle is the one pair where text and tint may not be combined at the `chip`
+size; put an idle state word on `surface` or `surface-sunken` instead. Fix the token
+rather than working around it if a case ever genuinely needs the pairing.
 
 ### Neutrals — warm, chosen, not inherited
 
@@ -254,6 +259,46 @@ is swapped by a segmented control is the pattern that rule was always compatible
   all, so the placeholder-imagery rule below still applies wherever a `public/demo/` SVG
   would otherwise be the only option (e.g. a future static thumbnail).
 
+### Configurator sections and the outcome matrix
+
+A template's `config_schema` can group its fields ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)),
+and a group renders one of two ways.
+
+**Section** (the default) — a `<fieldset>` whose legend is the `h2` role (15/22, 600),
+separated by `border-t border-hairline`, per §5. Deliberately not `label-instr`: that role
+belongs to the field labels *inside* the section, and reusing it flattens the two levels
+into one. **Every section takes the rule, including the first** — the configurator always
+renders the creative-name field and the delivery-format control above the schema-driven
+groups, so there is never a section with nothing over it. The legend needs
+`float-left w-full`, or the fieldset's border-notch algorithm cuts a gap in the rule
+around the heading.
+
+**Matrix** — for a group whose blocks are variants of one thing, such as the quiz's eight
+answer-path exits. Rendering 24 inputs flat is the wall this exists to avoid.
+
+- It carries the **data-table row treatment** (above) — 44px rows, a 3px semantic rail,
+  `padding-left` cut to 13px — not a card grid and not an ad-hoc accordion. The markup is
+  a disclosure list rather than a real `<table>`, which is the right choice for expandable
+  rows; take the treatment, not the element.
+- The rail carries a **real** state — configured (`live`) or empty (`idle`) — never a
+  decorative one. Not `dead`: an unfinished row is incomplete, not an alarm.
+- The row's label is machine text (the answer path, `A → A → B`) in mono, so it is
+  identical in both locales and needs no dictionary entry (§8).
+- **One block open at a time**, marked with `bg-surface-sunken` so the row merges into the
+  panel it opens. **Accent budget spent: zero**; the page's single warm element stays the
+  submit button. Not `bg-fill`: `idle-fg` on `fill` measures **4.49:1**, just under the
+  4.5:1 small-text threshold, and "open but still empty" is the row a user looks at most.
+  That pairing is off-limits for a state word anywhere until `--color-idle-fg` is darkened
+  and re-measured.
+- The container must not be `overflow-hidden`, or the 2px-offset focus ring on a row is
+  clipped away (§3) — which is also why it cannot use `Panel`. Round the first and last
+  row instead.
+- A chevron may accompany the row, `aria-hidden`, because the row's accessible name is
+  the path itself — an icon is never the whole action (§9).
+- A completion counter (`ЗАПОЛНЕНО N / 8`) sits below in `label-instr`, because closed
+  rows submit through hidden inputs and so cannot use native `required`; the form
+  validates them itself rather than letting a server redirect discard the whole draft.
+
 ### Inputs
 
 32px high, 1px `line` border, radius 3px, **mono 13px**. Placeholders are `fg-muted`
@@ -348,7 +393,12 @@ never two stacked captions.
   reason to put one inside a styling release. The consequence is small and stated: a
   different browser starts at the default locale.
 - **Not everything visible is UI copy.** Template names and descriptions come from the
-  `templates` table and stay as authored. So does the sample content inside a demo
+  `templates` table and stay as authored — and so do a template's **`config_schema` field
+  labels, help text, and select-option labels**, which are authored per template in the
+  same row. They are the one place a Russian user sees English inside the dashboard chrome;
+  a section *heading* is not, because groups are a closed set the product owns and they go
+  through `configurator.groups`. Route a field label through i18n the day templates become
+  user-authored rather than seeded. So does the sample content inside a demo
   creative — it is derived from the template's own `config_schema` defaults plus
   placeholder images (`public/demo/` on the catalog, seeded photographic placeholders on
   the landing hero — §6), which is stand-in advertiser material, not

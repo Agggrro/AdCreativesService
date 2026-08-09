@@ -88,9 +88,16 @@
   never accepts or looks up a `creative_id` — it cannot become a side-channel onto
   another user's saved creative.
 - **Input validation even though the caller is authenticated:** POSTed field
-  values are run through `parseConfigSchema` + `coerceFieldValue` (the same
-  functions `createCreative` uses) before being embedded in the token, and the
-  serialized token payload is size-capped.
+  values are run through `parseConfigSchema` + `buildConfigFromValues` — the very
+  same function `createCreative` uses, not a parallel implementation — before being
+  embedded in the token, and the serialized token payload is size-capped (5120
+  bytes of config under a 6144-byte payload cap, so an oversized config gets a 413
+  rather than the uncaught throw the signer would otherwise raise).
+- **Fields switched off by `showWhen` are pruned server-side**, regardless of what
+  the client posts. The panel sends the whole form state, including values for
+  fields the user has since hidden, so this is what keeps the preview honest about
+  what Save would write — and keeps a switched-off branch off the serving path
+  ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)).
 - **No new escaping obligation:** `<AdParameters>` is still wrapped in `cdata()`
   over the whole JSON string, same as the real endpoint.
 - **Data minimization:** the token carries only what `resolveInteractiveUrl`/

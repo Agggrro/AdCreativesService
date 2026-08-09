@@ -2,9 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { parseConfigSchema, coerceFieldValue } from "@/lib/config-schema";
+import { parseConfigSchema, buildConfigFromValues } from "@/lib/config-schema";
 import type { CreativeError } from "@/lib/creative-errors";
-import type { Json } from "@/types/database.types";
 
 export async function createCreative(formData: FormData): Promise<void> {
   const supabase = await createServerSupabase();
@@ -39,15 +38,10 @@ export async function createCreative(formData: FormData): Promise<void> {
   if (!template) fail("template_not_found");
 
   const { fields } = parseConfigSchema(template!.config_schema);
-  const config_json: Record<string, Json> = {};
-  for (const field of fields) {
-    const value = coerceFieldValue(field, String(formData.get(field.name) ?? ""));
-    if (value === undefined) {
-      if (field.required) fail("field_required", field.label);
-      continue;
-    }
-    config_json[field.name] = value;
-  }
+  const { config: config_json, missingField } = buildConfigFromValues(fields, (name) =>
+    String(formData.get(name) ?? ""),
+  );
+  if (missingField) fail("field_required", missingField);
 
   // Optional label. Empty stays NULL so the list falls back to the template
   // name rather than showing a blank cell; capped to the column's check.
@@ -119,15 +113,10 @@ export async function updateCreative(formData: FormData): Promise<void> {
   if (!template) fail("template_not_found");
 
   const { fields } = parseConfigSchema(template!.config_schema);
-  const config_json: Record<string, Json> = {};
-  for (const field of fields) {
-    const value = coerceFieldValue(field, String(formData.get(field.name) ?? ""));
-    if (value === undefined) {
-      if (field.required) fail("field_required", field.label);
-      continue;
-    }
-    config_json[field.name] = value;
-  }
+  const { config: config_json, missingField } = buildConfigFromValues(fields, (name) =>
+    String(formData.get(name) ?? ""),
+  );
+  if (missingField) fail("field_required", missingField);
 
   const rawName = String(formData.get("name") ?? "").trim();
   if (rawName.length > 200) fail("name_too_long");

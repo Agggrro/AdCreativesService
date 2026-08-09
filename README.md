@@ -15,6 +15,20 @@ it lapses, the dynamic VAST stops serving the interactive payload.
 Next.js (App Router, TypeScript) · Tailwind CSS · Lucide React · Supabase (Postgres,
 Auth, RLS) · Stripe · Vercel.
 
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Next.js dev server |
+| `npm run lint` / `npm run typecheck` / `npm run build` | The pre-push gates |
+| `npm run build:runtime` | Build the VPAID units into `runtime/dist/` (wipes it first) |
+| `npm run runtime:push [prefix]` | Upload the built units to the `creatives` Storage bucket |
+| `npm run db:schema` / `npm run db:seed` | Apply `supabase/schema.sql` / `supabase/seed.sql` |
+
+The last three read `.env.local`. See [runtime/README.md](runtime/README.md) for the
+order to run them in when shipping a template change, and [.env.example](.env.example)
+for the variables they need.
+
 ## Start here
 
 - **[CLAUDE.md](CLAUDE.md)** — how we work, the non-negotiable AdTech rules, quality gates.

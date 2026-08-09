@@ -155,6 +155,25 @@ const ru = {
       errWrongType: "Неподдерживаемый формат файла.",
       errUploadFailed: "Не удалось загрузить файл. Попробуйте ещё раз.",
     },
+    // Section headings for a template's `config_schema` groups (ADR-0011).
+    // Field *labels* are English-only DB data; a heading is prominent enough to
+    // deserve the dictionary. Read through `groupLabel`, which falls back to the
+    // raw group id so a new schema never renders an empty heading.
+    groups: {
+      quizFlow: "Структура",
+      quizStep1: "Вопрос 1",
+      quizStep2: "Вопрос 2",
+      quizStep3: "Вопрос 3",
+      quizResult: "Результат",
+      quizOutcomes: "Исход по каждому пути",
+      quizTag: "Переход по клику",
+    },
+    outcomes: {
+      complete: "Готов",
+      empty: "Пусто",
+      filled: "Заполнено",
+      errIncomplete: "Заполните все обязательные поля этого исхода.",
+    },
   },
   preview: {
     sameTag:
@@ -356,6 +375,21 @@ const en: Dict = {
       errWrongType: "Unsupported file type.",
       errUploadFailed: "Could not upload the file. Try again.",
     },
+    groups: {
+      quizFlow: "Structure",
+      quizStep1: "Question 1",
+      quizStep2: "Question 2",
+      quizStep3: "Question 3",
+      quizResult: "Result",
+      quizOutcomes: "Result per answer path",
+      quizTag: "Click-through",
+    },
+    outcomes: {
+      complete: "Ready",
+      empty: "Empty",
+      filled: "Filled",
+      errIncomplete: "Fill in every required field in this outcome.",
+    },
   },
   preview: {
     sameTag: "The same VAST tag in three players — what a real DSP would load.",
@@ -427,6 +461,16 @@ export function isLocale(value: unknown): value is Locale {
 export function statusLabel(dict: Dict, status: string): string {
   const labels = dict.status as Record<string, string | undefined>;
   return labels[status] ?? status;
+}
+
+/**
+ * Heading for a `config_schema` group id (ADR-0011). Group ids come from the
+ * database, so an unknown one degrades to the raw id rather than rendering a
+ * headless section — the same contract `statusLabel` has for statuses.
+ */
+export function groupLabel(dict: Dict, id: string): string {
+  const labels = dict.configurator.groups as Record<string, string | undefined>;
+  return labels[id] ?? id;
 }
 
 /** Which semantic vocabulary a status belongs to (docs/design-system.md §3). */

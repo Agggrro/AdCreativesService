@@ -249,7 +249,7 @@ AdInteractVpaid.prototype.skipAd = function () {
 
 /**
  * The close control every creative gets, mandatory, built once here rather
- * than per template (ADR-0009). A tidy "×" in the corner, disabled behind a
+ * than per template (ADR-0009). A tidy drawn cross in the corner, disabled behind a
  * ring that fills over `closeDelaySeconds` (default 5, not yet a creative
  * setting — read from AdParameters so a future setting needs no runtime
  * change). Clicking it once live tears down the creative like a user-
@@ -313,11 +313,43 @@ AdInteractVpaid.prototype._mountCloseControl = function () {
   btn.setAttribute("aria-label", "Close");
   btn.disabled = true;
   btn.style.cssText =
-    "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;" +
+    "position:absolute;inset:0;" +
     "border:0;border-radius:50%;background:transparent;padding:0;margin:0;" +
     "cursor:default;opacity:.5;transition:opacity .25s ease;" +
-    "font:400 15px/1 Arial,sans-serif;color:#fff;-webkit-tap-highlight-color:transparent;";
-  btn.textContent = "×";
+    "color:#fff;-webkit-tap-highlight-color:transparent;";
+
+  // The cross is drawn, not typed. A text "×" was centred by flexbox, but
+  // flexbox centres the *line box* while the glyph's ink sits off-centre
+  // inside it (and differs per font — Arial is absent on the Android/Linux
+  // players this runs in, so the fallback shifts it further). Worse, glyph
+  // rasterisation snaps to the pixel grid while the SVG ring does not, and the
+  // 26px control routinely lands on a half pixel, which pushed the cross up
+  // and left of the ring it sits in. Drawing it into an SVG that shares the
+  // ring's box and viewBox puts both in one coordinate system, so the cross is
+  // centred by geometry on every device and can no longer drift.
+  var mark = document.createElementNS(svgNS, "svg");
+  mark.setAttribute("width", SIZE);
+  mark.setAttribute("height", SIZE);
+  mark.setAttribute("viewBox", "0 0 " + SIZE + " " + SIZE);
+  mark.setAttribute("aria-hidden", "true");
+  mark.setAttribute("focusable", "false");
+  mark.style.cssText = "position:absolute;inset:0;pointer-events:none;";
+  var ARM = 3; // half-length of each stroke, from the centre
+  var cross = document.createElementNS(svgNS, "path");
+  cross.setAttribute(
+    "d",
+    "M" + (SIZE / 2 - ARM) + " " + (SIZE / 2 - ARM) +
+      "L" + (SIZE / 2 + ARM) + " " + (SIZE / 2 + ARM) +
+      "M" + (SIZE / 2 + ARM) + " " + (SIZE / 2 - ARM) +
+      "L" + (SIZE / 2 - ARM) + " " + (SIZE / 2 + ARM),
+  );
+  cross.setAttribute("fill", "none");
+  cross.setAttribute("stroke", "currentColor");
+  cross.setAttribute("stroke-width", "1.5");
+  cross.setAttribute("stroke-linecap", "round");
+  mark.appendChild(cross);
+  btn.appendChild(mark);
+
   btn.addEventListener("click", function () {
     if (btn.disabled) return;
     self._closeCreative();

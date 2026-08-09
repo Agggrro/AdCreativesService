@@ -44,7 +44,7 @@ export default async function NewCreativePage({
     );
   }
 
-  const { fields } = parseConfigSchema(template.config_schema);
+  const { fields, groups } = parseConfigSchema(template.config_schema);
   const message = creativeErrorMessage(dict, sp.error, sp.field);
 
   return (
@@ -63,6 +63,7 @@ export default async function NewCreativePage({
       <ConfiguratorForm
         template={template}
         fields={fields}
+        groups={groups}
         action={createCreative}
         submitLabel={dict.dashboard.createCreative}
       />

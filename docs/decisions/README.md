@@ -25,6 +25,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0008](0008-catalog-first-information-architecture.md) | Catalog-first information architecture: three sections, public catalog, honest metrics | Accepted |
 | [0009](0009-mandatory-close-control.md) | Mandatory close control, no fixed watch duration | Accepted |
 | [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted |
+| [0011](0011-conditional-grouped-config-schemas.md) | Conditional, grouped config schemas — and per-path click-through | Accepted |
 
 ## Template
 

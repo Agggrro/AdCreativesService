@@ -51,17 +51,32 @@ export default async function EditCreativePage({
     );
   }
 
-  const { fields } = parseConfigSchema(template.config_schema);
+  const { fields, groups } = parseConfigSchema(template.config_schema);
   const message = creativeErrorMessage(dict, sp.error, sp.field);
 
   // Every field starts from its saved value; a field added to the schema
   // since this creative was built (never saved, so absent from config_json)
   // falls back to "" like a fresh form, not to the schema default.
+  //
+  // `select` is the one exception, and it is not cosmetic: a controlled <select>
+  // whose value matches no <option> renders *blank*, and a required one then
+  // blocks submit outright — so a creative saved before the field existed could
+  // never be edited again until the user noticed an empty dropdown. It starts at
+  // the schema default instead, which is what makes adding a required select to
+  // a template a no-migration change.
   const savedConfig = (creative.config_json ?? {}) as Record<string, unknown>;
   const initialFieldValues: Record<string, string> = {};
   for (const field of fields) {
     const v = savedConfig[field.name];
-    initialFieldValues[field.name] = v === undefined || v === null ? "" : String(v);
+    if (v !== undefined && v !== null) {
+      initialFieldValues[field.name] = String(v);
+    } else if (field.type === "select") {
+      initialFieldValues[field.name] = String(
+        field.default ?? field.options?.[0]?.value ?? "",
+      );
+    } else {
+      initialFieldValues[field.name] = "";
+    }
   }
 
   return (
@@ -80,6 +95,7 @@ export default async function EditCreativePage({
       <ConfiguratorForm
         template={template}
         fields={fields}
+        groups={groups}
         action={updateCreative}
         submitLabel={dict.dashboard.saveChanges}
         cancelHref={`/dashboard/creatives/${creative.id}`}

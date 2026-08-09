@@ -1,5 +1,9 @@
 import type { Json } from "@/types/database.types";
-import { parseConfigSchema, type ConfigField } from "@/lib/config-schema";
+import {
+  isFieldVisible,
+  parseConfigSchema,
+  type ConfigField,
+} from "@/lib/config-schema";
 import { isPreviewUnitKey } from "@/lib/preview-units";
 
 /**
@@ -35,8 +39,11 @@ const DEMO_CLICK_THROUGH = "https://example.com/offer";
  * fast.
  */
 const OVERRIDES: Record<string, string> = {
-  "quiz.option1Label": "Option A",
-  "quiz.option2Label": "Option B",
+  // A select resolves to its first option, which for the quiz is a single
+  // question — the shape the template had before it could branch. Two steps
+  // shows the mechanic that makes it worth picking; three reads as a survey in
+  // a demo well, where the visitor is scanning rather than answering.
+  "quiz.stepCount": "2",
   "shoppable.videoUrl":
     "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
 };
@@ -114,6 +121,12 @@ function demoValue(
  * Sample config for a template's demo. Resolution order per field: an explicit
  * override, then the schema default, then a fallback chosen by field *type* —
  * so a template added tomorrow gets a working demo with no code change here.
+ *
+ * Conditional fields are resolved in schema order and skipped when inactive
+ * (ADR-0011), exactly as the configurator and the save path do — so the demo is
+ * always a configuration a user could really have saved. Without that, the
+ * landing page would carry every one of the quiz's 42 branching-exit fields,
+ * populated with their own labels, for a demo that never reads them.
  */
 export function demoConfig(
   configSchema: Json,
@@ -122,8 +135,16 @@ export function demoConfig(
 ): Record<string, unknown> {
   const { fields } = parseConfigSchema(configSchema);
   const config: Record<string, unknown> = {};
+  // A separate string map, because visibility compares raw values while the
+  // config keeps the typed ones — and the values are *generated* during this
+  // walk rather than read from an existing map, which is why this cannot reuse
+  // the two-pass `visibleFieldNames`.
+  const resolved: Record<string, string> = {};
   for (const field of fields) {
-    config[field.name] = demoValue(field, unitKey, imageStyle);
+    if (!isFieldVisible(field, (n) => resolved[n] ?? "")) continue;
+    const value = demoValue(field, unitKey, imageStyle);
+    config[field.name] = value;
+    resolved[field.name] = String(value);
   }
   return config;
 }

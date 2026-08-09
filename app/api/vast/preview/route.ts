@@ -2,18 +2,23 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getRequestOrigin } from "@/lib/site";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveInteractiveUrl } from "@/lib/storage";
-import { parseConfigSchema, coerceFieldValue } from "@/lib/config-schema";
+import { parseConfigSchema, buildConfigFromValues } from "@/lib/config-schema";
 import { buildPreviewServing } from "@/lib/vast/preview-context";
 import { signPreviewToken } from "@/lib/vast/preview-token";
-import type { Json } from "@/types/database.types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Leaves headroom under signPreviewToken's internal hard cap (4KB, including
-// the rest of the token payload) so an oversized config gets this clear 413
-// rather than an unrelated throw from inside the signer.
-const MAX_PREVIEW_CONFIG_BYTES = 3072;
+// Leaves headroom under signPreviewToken's internal hard cap (including the
+// rest of the token payload) so an oversized config gets this clear 413 rather
+// than an unrelated throw from inside the signer.
+//
+// 5KB, not 3KB: a three-step branching quiz with six uploaded images is ~3.3KB
+// on its own (a Storage public URL is ~158 chars, and there are 24 per-path
+// exit fields), so the old ceiling rejected a creative the configurator is
+// perfectly willing to build. See ADR-0011 for the ~5.6KB architectural limit
+// this sits under.
+const MAX_PREVIEW_CONFIG_BYTES = 5120;
 
 /**
  * Mint a short-TTL preview for a template using the CALLER'S CURRENT, unsaved
@@ -69,26 +74,20 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // Same validation/coercion/required-field rejection createCreative already
-  // applies — preview shows exactly what Save would produce, no second
-  // implementation to maintain. Required fields must be enforced here (not
-  // just at render time) since a missing videoUrl on a SIMID template would
-  // otherwise mint fine and only surface as a spec-invalid <MediaFile> later.
+  // Literally the same build createCreative runs — preview shows exactly what
+  // Save would produce, and there is no second implementation to keep in step.
+  // Required fields must be enforced here (not just at render time) since a
+  // missing videoUrl on a SIMID template would otherwise mint fine and only
+  // surface as a spec-invalid <MediaFile> later. Inactive fields are pruned
+  // here too: the panel posts the whole form state, including values for
+  // fields the user has since switched off, and preview must not show a
+  // configuration Save would refuse to write.
   const { fields } = parseConfigSchema(template.config_schema);
-  const config: Record<string, Json> = {};
-  for (const field of fields) {
-    const raw = String(fieldsInput[field.name] ?? "");
-    const value = coerceFieldValue(field, raw);
-    if (value === undefined) {
-      if (field.required) {
-        return Response.json(
-          { error: `${field.label} is required` },
-          { status: 400 },
-        );
-      }
-      continue;
-    }
-    config[field.name] = value;
+  const { config, missingField } = buildConfigFromValues(fields, (name) =>
+    String(fieldsInput[name] ?? ""),
+  );
+  if (missingField) {
+    return Response.json({ error: `${missingField} is required` }, { status: 400 });
   }
 
   const payloadSize = Buffer.byteLength(JSON.stringify(config), "utf8");

@@ -9,7 +9,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "build:runtime": "node runtime/build.mjs"
+    "build:runtime": "node runtime/build.mjs",
+    "runtime:push": "node --env-file=.env.local scripts/runtime-push.mjs",
+    "db:schema": "node --env-file=.env.local scripts/db-apply.mjs supabase/schema.sql",
+    "db:seed": "node --env-file=.env.local scripts/db-apply.mjs supabase/seed.sql"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
@@ -28,6 +31,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "pg": "^8.23.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

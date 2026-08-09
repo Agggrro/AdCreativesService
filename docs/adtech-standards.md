@@ -62,9 +62,41 @@ are re-applied on top so their defaults/coercion still win, but every other
 per-template field (e.g. Scratch & Reveal's `coverText`/`revealThreshold`) now
 reaches the runtime unit too. `VastBuildContext.rawConfig` carries this through.
 
+Since [ADR-0011](decisions/0011-conditional-grouped-config-schemas.md), `config_json`
+holds only the fields that were **active** when the creative was saved, so a template
+with conditional fields ships a different `<AdParameters>` payload depending on how it
+was configured. That is deliberate: a switched-off branch must not ride along on every
+ad request.
+
 **Try before saving:** the dashboard configurator can run a template's *current,
 unsaved* form values through a real (ephemeral) VAST tag in three player
 backends — see the "Live preview" section of [architecture.md](architecture.md).
+
+## Per-path click-through: what the standards actually guarantee
+
+Quick Setup Quiz can give each answer path its own destination, but **VAST has exactly
+one `<VideoClicks><ClickThrough>` per creative**. The resolved per-path URL is therefore
+handed to VPAID's `AdClickThru(url, "", true)`, while the VAST document keeps a single
+universal `clickThroughUrl` that stays **required in both result modes**.
+
+This is not redundancy. VPAID 2.0 says a player receiving `AdClickThru` with
+`playerHandles = true` should navigate to the supplied URL; VAST says a player may prefer
+the document-level `<ClickThrough>`. **Players genuinely disagree, and Google IMA is known
+to favour the VAST-level URL when one is present.** So, stated plainly rather than
+assumed:
+
+- **Per-path click-through is best-effort and player-dependent.** Do not describe it in
+  the UI or to advertisers as guaranteed.
+- A player that ignores the VPAID-supplied URL falls back to the advertiser's universal
+  destination — degraded, never dead. Dropping `<VideoClicks>` in branching mode would
+  force honouring players onto the per-path URL but leave every other player with no
+  destination at all, and some will not render a clickable region without it.
+- **The Sandbox harness reads `AdClickThru`'s argument directly, so branching always
+  looks correct there** — including on inventory where it would collapse. Verify in
+  Google IMA and Fluid before believing it.
+
+The result *screen* carries no such caveat: its heading and button label are drawn by our
+own code inside the ad slot, so those are exact on every player.
 
 ## Media fields: image, gif, or a short video
 
@@ -86,11 +118,27 @@ Every VPAID creative gets a close ("×") control, built once into the shared bas
 rather than per template — see [ADR-0009](decisions/0009-mandatory-close-control.md).
 It is disabled behind a ring that fills over a fixed delay (default 5s, not yet a
 creative setting) and, once live, tears the creative down like a user-initiated skip.
+
+The "×" is **drawn as an SVG path inside the ring's own `viewBox`, never typed as a
+text glyph** — do not "simplify" it back to `textContent`. A glyph is centred by its
+line box rather than its ink, its metrics change with whatever font the player's device
+actually has (Arial is absent on the Android/Linux devices most of this inventory
+renders on), and glyph rasterisation snaps to the pixel grid while the SVG ring does
+not — the 26px control routinely lands on a half pixel. Together those pushed the cross
+visibly up and left of the ring. Sharing one coordinate system with the ring makes the
+mark centred by geometry on every device, font stack, and DPR.
 This is also why a creative has **no fixed watch duration** anymore: the internal
 `durationSeconds` (VAST `<Duration>`, quartile timer pacing) is still injected with a
 default via `lib/vast/builder.ts`, but it is no longer a configurator field — nothing
 auto-completes or auto-removes the creative on a timer; only the viewer's own close
-click does. SIMID does not get this yet (it runs in a sandboxed iframe over a
+click does.
+
+A consequence worth naming, now that a quiz can run three questions: **`complete` means
+"was on screen for the injected duration", not "finished the interaction".** A viewer
+still on question two when the 30s quartile timer expires fires `complete` anyway. This
+was always true of every template; multi-step just makes the gap visible. Do not defer
+`complete` until the mechanic ends — that would make the metric incomparable across
+creatives and would break players that gate their own teardown on it. SIMID does not get this yet (it runs in a sandboxed iframe over a
 different, postMessage-based runtime, not the VPAID base) — a known gap, not a design
 decision.
 

@@ -142,8 +142,10 @@ surface**, not a variant of the public serving path above:
 
 1. `POST /api/vast/preview` — requires a signed-in dashboard user (no subscription
    check: preview is a try-before-you-configure surface, open to any account). Takes
-   `{ templateId, format, fields }`, validates them the same way
-   `createCreative`/`updateCreative` do, and mints a **stateless, HMAC-signed, 120s-TTL token**
+   `{ templateId, format, fields }`, validates them through the very same
+   `buildConfigFromValues` that `createCreative`/`updateCreative` use — one function,
+   not three copies of a loop that must be kept in step — and mints a
+   **stateless, HMAC-signed, 120s-TTL token**
    (`lib/vast/preview-token.ts`) encoding the template/format/config — no DB row is
    read or written. A stateless token was chosen over a server-side cache because the
    stack has no Redis/KV and Vercel functions don't share memory across invocations
@@ -155,6 +157,20 @@ surface**, not a variant of the public serving path above:
    which gates on `should_serve`) against a synthetic `CreativeServing`-shaped context
    built from the token (`lib/vast/preview-context.ts`). Response is
    `Cache-Control: no-store` — never cached, unlike the real endpoint.
+
+Because the panel POSTs the whole form state, that shared build is also what prunes
+fields a `showWhen` has switched off ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)) —
+preview would otherwise show a configuration Save would refuse to write.
+
+**Size ceiling.** The token is a base64url **URL path segment**, so its payload bounds the
+request line. The config is capped at 5120 bytes and the payload at 6144, in that order so
+an oversized config gets a clean 413 instead of the uncaught throw the signer raises past
+its own cap. ~6KB of payload is ~8.2KB of URL, and the binding limit is the 8KB request
+line most CDN front-ends allow — not Vercel's larger URL+headers budget — which puts the
+architectural ceiling at roughly **5.6KB of config**. A template that needs more wants a
+short opaque id backed by a row (ADR-0006's rejected alternative), not a bigger token; a
+query string would not help, since it is the same request-line bytes. Production serving
+has no such cap — `/api/vast` reads `config_json` from the database.
 
 Both routes are additive: the real `/api/vast?creative_id=` path, its entitlement gate,
 and its 60s cache are untouched. The only shared code is `buildInlineVast()` itself,

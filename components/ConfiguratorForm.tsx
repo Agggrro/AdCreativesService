@@ -1,19 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import type { ConfigField } from "@/lib/config-schema";
+import {
+  visibleFieldNames,
+  type ConfigField,
+  type ConfigGroup,
+} from "@/lib/config-schema";
+import { groupLabel } from "@/lib/i18n/dictionaries";
 import { MediaUploadField } from "@/components/MediaUploadField";
 import { PreviewPanel } from "@/components/PreviewPanel";
+import { FieldSection } from "@/components/configurator/FieldSection";
+import {
+  OutcomeMatrix,
+  isBlockComplete,
+  toOutcomeBlocks,
+} from "@/components/configurator/OutcomeMatrix";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { buttonClass } from "@/components/ui/Button";
-import { inputClass } from "@/components/ui/Field";
+import { inputClass, Notice } from "@/components/ui/Field";
 
 type ConfiguratorTemplate = {
   id: string;
   name: string;
   supported_standards: string[];
 };
+
+/** A run of consecutive fields sharing a `group`; ungrouped fields form their own run. */
+type FieldRun = { key: string; group?: string; fields: ConfigField[] };
+
+function toRuns(fields: ConfigField[]): FieldRun[] {
+  const runs: FieldRun[] = [];
+  for (const field of fields) {
+    const last = runs[runs.length - 1];
+    if (last && field.group !== undefined && last.group === field.group) {
+      last.fields.push(field);
+    } else {
+      runs.push({
+        key: `${field.group ?? ""}#${runs.length}`,
+        group: field.group,
+        fields: [field],
+      });
+    }
+  }
+  return runs;
+}
 
 function defaultValues(fields: ConfigField[]): Record<string, string> {
   const init: Record<string, string> = {};
@@ -42,6 +73,7 @@ function defaultValues(fields: ConfigField[]): Record<string, string> {
 export function ConfiguratorForm({
   template,
   fields,
+  groups = [],
   action,
   submitLabel,
   cancelHref = "/dashboard",
@@ -52,6 +84,8 @@ export function ConfiguratorForm({
 }: {
   template: ConfiguratorTemplate;
   fields: ConfigField[];
+  /** Group presentation from the schema; an unlisted group renders as a section. */
+  groups?: ConfigGroup[];
   action: (formData: FormData) => void;
   submitLabel: string;
   cancelHref?: string;
@@ -69,14 +103,88 @@ export function ConfiguratorForm({
   const [values, setValues] = useState<Record<string, string>>(
     () => initialFieldValues ?? defaultValues(fields),
   );
+  const [openOutcome, setOpenOutcome] = useState<string | null>(null);
+  // Set on a blocked submit and cleared as soon as the gap closes. Storing the
+  // *fact* that a submit failed would leave a cold-red alarm sitting under a
+  // matrix whose rails have all since turned green.
+  const [flaggedGap, setFlaggedGap] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   function setValue(name: string, v: string) {
     setValues((prev) => ({ ...prev, [name]: v }));
   }
 
+  const kinds = useMemo(
+    () => new Map(groups.map((g) => [g.id, g.kind ?? "section"])),
+    [groups],
+  );
+
+  // The same walk buildConfigFromValues runs on the server, so a field this form
+  // hides is exactly a field the action prunes — one function, not two rules
+  // that drift. Values are never cleared on hide: `values` is the draft, and
+  // visibility is only a projection of it, so toggling a step off and back on
+  // returns what the user typed.
+  const visible = useMemo(
+    () => visibleFieldNames(fields, (name) => values[name] ?? ""),
+    [fields, values],
+  );
+
+  const runs = useMemo(
+    () =>
+      toRuns(fields)
+        .map((run) => ({
+          ...run,
+          fields: run.fields.filter((f) => visible.has(f.name)),
+        }))
+        .filter((run) => run.fields.length > 0),
+    [fields, visible],
+  );
+
+  /** The first incomplete block in any matrix group, or null when all are filled. */
+  const firstGap = useMemo(() => {
+    for (const run of runs) {
+      if (!run.group || kinds.get(run.group) !== "matrix") continue;
+      const gap = toOutcomeBlocks(run.fields).find(
+        (b) => !isBlockComplete(b, values),
+      );
+      if (gap) return gap;
+    }
+    return null;
+  }, [runs, kinds, values]);
+
+  /**
+   * A closed outcome row submits through hidden inputs, which browsers exempt
+   * from constraint validation — so `required` cannot reach them and the server
+   * would be the first to notice a half-filled exit. Its `fail()` redirects,
+   * which throws away everything else the user typed. Catching it here costs one
+   * check and saves the whole form.
+   */
+  function guardOutcomes(e: React.FormEvent<HTMLFormElement>) {
+    if (!firstGap) return;
+    e.preventDefault();
+    setFlaggedGap(true);
+    setOpenOutcome(firstGap.id);
+    const empty = firstGap.fields.find(
+      (f) => f.required && (values[f.name] ?? "").trim() === "",
+    );
+    // The row has to be open before its input exists to focus.
+    if (empty) {
+      requestAnimationFrame(() => {
+        formRef.current
+          ?.querySelector<HTMLElement>(`[name="${CSS.escape(empty.name)}"]`)
+          ?.focus();
+      });
+    }
+  }
+
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
-      <form action={action} className="flex flex-col gap-5">
+      <form
+        ref={formRef}
+        action={action}
+        onSubmit={guardOutcomes}
+        className="flex flex-col gap-5"
+      >
         <input type="hidden" name="template_id" value={template.id} />
         {creativeId && <input type="hidden" name="creative_id" value={creativeId} />}
 
@@ -127,20 +235,54 @@ export function ConfiguratorForm({
           </div>
         </fieldset>
 
-        {fields.map((field) => (
-          <Field
-            key={field.name}
-            field={field}
-            requiredLabel={dict.configurator.required}
-            value={values[field.name] ?? ""}
-            onChange={(v) => setValue(field.name, v)}
-          />
-        ))}
+        {runs.map((run) => {
+          const renderField = (field: ConfigField) => (
+            <Field
+              key={field.name}
+              field={field}
+              requiredLabel={dict.configurator.required}
+              value={values[field.name] ?? ""}
+              onChange={(v) => setValue(field.name, v)}
+            />
+          );
+
+          if (!run.group) {
+            return (
+              <div key={run.key} className="flex flex-col gap-5">
+                {run.fields.map(renderField)}
+              </div>
+            );
+          }
+
+          return (
+            <FieldSection key={run.key} heading={groupLabel(dict, run.group)}>
+              {kinds.get(run.group) === "matrix" ? (
+                <OutcomeMatrix
+                  blocks={toOutcomeBlocks(run.fields)}
+                  values={values}
+                  openId={openOutcome}
+                  onToggle={(id) =>
+                    setOpenOutcome((cur) => (cur === id ? null : id))
+                  }
+                  renderField={renderField}
+                />
+              ) : (
+                run.fields.map(renderField)
+              )}
+            </FieldSection>
+          );
+        })}
 
         {fields.length === 0 && (
           <p className="text-[13px] text-fg-muted">
             {dict.configurator.noFields}
           </p>
+        )}
+
+        {flaggedGap && firstGap && (
+          <Notice tone="dead" live>
+            {dict.configurator.outcomes.errIncomplete}
+          </Notice>
         )}
 
         <div className="flex items-center gap-3">

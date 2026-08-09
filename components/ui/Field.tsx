@@ -53,18 +53,30 @@ export function Panel({
   );
 }
 
-/** Inline notice: cold semantics only — an alarm is never warm. */
+/**
+ * Inline notice: cold semantics only — an alarm is never warm.
+ *
+ * `live` marks a notice that appears *in place*, without a navigation, so a
+ * screen reader has nothing else to announce it — set it whenever the notice is
+ * raised by client-side validation. Server-rendered notices leave it off: the
+ * navigation already moves focus, and `role="alert"` would double up.
+ */
 export function Notice({
   tone,
+  live,
   children,
 }: {
   tone: "info" | "dead";
+  live?: boolean;
   children: React.ReactNode;
 }) {
   const styles =
     tone === "dead" ? "bg-dead-bg text-dead-fg" : "bg-info-bg text-info-fg";
   return (
-    <p className={`rounded-ctl px-3 py-2 text-[13px] leading-5 ${styles}`}>
+    <p
+      role={live ? "alert" : undefined}
+      className={`rounded-ctl px-3 py-2 text-[13px] leading-5 ${styles}`}
+    >
       {children}
     </p>
   );

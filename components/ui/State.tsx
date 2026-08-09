@@ -26,6 +26,23 @@ export const RAIL: Record<Tone, string> = {
 };
 
 /**
+ * State as dot + mono uppercase word — the one shape every status in the product
+ * uses (docs/design-system.md §6). State is encoded in form as well as colour,
+ * so it still reads for someone who cannot separate the two hues.
+ *
+ * This is the single implementation the badges below are built from; a fourth
+ * hand-rolled copy is how the dot quietly ships at a different size.
+ */
+export function StateWord({ tone, label }: { tone: Tone; label: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 ${chipType} ${TEXT[tone]}`}>
+      <span className={`size-1.5 shrink-0 rounded-full ${DOT[tone]}`} />
+      {label}
+    </span>
+  );
+}
+
+/**
  * Whether a creative's tag is actually alive, from the entitlement the serving
  * gate uses — not from `creatives.status`, which has no update path and would
  * paint every row the same (docs/design-system.md §6, ADR-0008).
@@ -39,13 +56,9 @@ export function ServingBadge({
   label: string;
   qualifier?: string;
 }) {
-  const tone: Tone = serving ? "live" : "dead";
   return (
     <span className="inline-flex items-center gap-2">
-      <span className={`inline-flex items-center gap-1.5 ${chipType} ${TEXT[tone]}`}>
-        <span className={`size-1.5 shrink-0 rounded-full ${DOT[tone]}`} />
-        {label}
-      </span>
+      <StateWord tone={serving ? "live" : "dead"} label={label} />
       {qualifier && (
         <span className="text-xs leading-4 text-fg-muted">{qualifier}</span>
       )}
@@ -53,16 +66,9 @@ export function ServingBadge({
   );
 }
 
-/**
- * Status as dot + mono uppercase word. State is encoded in form as well as
- * colour, so it reads at a glance in a long list.
- */
+/** A subscription/creative status word, resolved through the dictionary. */
 export function StateBadge({ status, dict }: { status: string; dict: Dict }) {
-  const tone = statusTone(status);
   return (
-    <span className={`inline-flex items-center gap-1.5 ${chipType} ${TEXT[tone]}`}>
-      <span className={`size-1.5 shrink-0 rounded-full ${DOT[tone]}`} />
-      {statusLabel(dict, status)}
-    </span>
+    <StateWord tone={statusTone(status)} label={statusLabel(dict, status)} />
   );
 }

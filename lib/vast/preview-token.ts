@@ -8,7 +8,19 @@ import type { PreviewServingInput } from "./preview-context";
  * convention (ADR-0003: short-lived, signed, per-request access).
  */
 const PREVIEW_TTL_SECONDS = 120;
-const MAX_PAYLOAD_BYTES = 4096;
+/**
+ * The token travels as a URL *path segment*, base64url-encoded, so this bounds
+ * the request line: 5600 bytes of payload is ~7.5KB of request line, just under
+ * the 8KB most CDN front-ends allow (nginx's default
+ * `large_client_header_buffers 4 8k`). That, not Vercel's larger URL+headers
+ * budget, is the binding limit — which puts the architectural ceiling for this
+ * mechanism at roughly 5.6KB. Past it the answer is a short opaque id backed by
+ * a row, not a bigger token (ADR-0006, ADR-0011).
+ *
+ * Callers must reject earlier than this with their own limit: exceeding it
+ * throws, and a throw on the mint path is a 500 where a 413 was intended.
+ */
+const MAX_PAYLOAD_BYTES = 5600;
 
 export interface PreviewTokenPayload extends PreviewServingInput {
   exp: number;

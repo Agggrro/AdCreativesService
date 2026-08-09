@@ -13,8 +13,10 @@ VAST endpoint we already built:
 1. **Scratch & Reveal** — cover layer the user rubs away to reveal an image; at a
    reveal threshold → CTA / click-through.
 2. **Dress/Undress Slider** — two images + a drag slider (before/after).
-3. **Quick Setup Quiz** — a question + 2–4 image options → honest "see results" CTA
-   (no fabricated match data).
+3. **Quick Setup Quiz** — one to three A/B questions with image options → honest
+   "see results" CTA (no fabricated match data). Since
+   [ADR-0011](../decisions/0011-conditional-grouped-config-schemas.md) the exit is
+   either shared by every path or configured per path (2/4/8 outcomes).
 4. **Age/Content Gate** — a real 18+ confirmation over a blurred background (a
    genuine gate, not a fake system dialog).
 
@@ -54,6 +56,11 @@ each template's `runtime_keys`.
 shoppable fields. Make the form **render from `config_schema.fields`** and make
 `createCreative` store fields generically. Field types: `text | url | number | image
 | select | range`. This unlocks every template with no per-template form code.
+
+Extended by [ADR-0011](../decisions/0011-conditional-grouped-config-schemas.md) with
+`showWhen` (conditional visibility, which also makes `required` conditional), plus
+`group`/`block` and a `groups` root key for presentation — still with no per-template
+form code, which was the point.
 
 ### Tiles
 The showcase (landing + dashboard) already renders template cards from the

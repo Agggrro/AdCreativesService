@@ -22,7 +22,7 @@ Catalog of available interactive ad templates (admin-curated, read-only to users
 | `supported_standards` | array, e.g. `{simid, vpaid}` — drives the format picker |
 | `runtime_keys` | per-standard pointer to the runtime build. Its first path segment is also the demo unit key used by `/api/preview-unit/<key>` |
 | `preview_url` | **Reserved, unused.** NULL in every row and rendered nowhere: the catalog shows a live demo rather than a thumbnail. Remove it or fill it — do not read it |
-| `config_schema` | JSON schema describing the fields a user must fill |
+| `config_schema` | JSON schema describing the fields a user must fill. Since [ADR-0011](decisions/0011-conditional-grouped-config-schemas.md) a field may also carry `group` / `block` (presentation) and `showWhen` (conditional visibility), and a `groups` root key declares how each section renders. Field **order is significant**: visibility resolves top-down, so a field's controllers must be declared before it |
 | `pricing_tier` | links to a Stripe price / plan |
 | `created_at`, `updated_at` | |
 
@@ -36,7 +36,7 @@ A user's configured instance of a template.
 | `template_id` | FK → templates |
 | `name` | optional user label; the UI falls back to the template name. Without it two creatives from one template differ only by uuid |
 | `selected_format` | `simid` \| `vpaid` \| … — user's choice; must be in template's `supported_standards` |
-| `config_json` | jsonb — validated against the template's `config_schema` |
+| `config_json` | jsonb — validated against the template's `config_schema`. Holds only the fields that were **active** at save time, so two creatives built from the same template can legitimately have different key sets, and a conditional field's absence is meaningful rather than a gap ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)). Nothing reading it may assume a fixed shape |
 | `status` | `draft` \| `active` \| `paused` \| `archived`. **Only `active` is reachable today** — it is hardcoded on insert and nothing updates it. The dashboard therefore shows a serving state derived from entitlement, not this column ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)); a per-creative kill switch needs one server action that does not exist yet |
 | `created_at`, `updated_at` | |
 
