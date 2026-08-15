@@ -38,7 +38,11 @@ export function CopyButton({
         title={label}
         className={buttonClass("secondary", "w-8 shrink-0 justify-center px-0")}
       >
-        {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
+        {copied ? (
+          <Check size={18} absoluteStrokeWidth aria-hidden />
+        ) : (
+          <Copy size={18} absoluteStrokeWidth aria-hidden />
+        )}
       </button>
     );
   }

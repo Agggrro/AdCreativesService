@@ -69,7 +69,11 @@ export function DeleteCreativeButton({
           compact ? "w-8 shrink-0 justify-center px-0" : "",
         )}
       >
-        <Trash2 size={14} aria-hidden />
+        <Trash2
+          size={compact ? 18 : 14}
+          absoluteStrokeWidth={compact}
+          aria-hidden
+        />
         {!compact && dict.dashboard.deleteCreative}
       </button>
 

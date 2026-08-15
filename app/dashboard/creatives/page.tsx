@@ -177,7 +177,7 @@ export default async function MyCreativesPage({
                             "w-8 shrink-0 justify-center px-0",
                           )}
                         >
-                          <Pencil size={14} aria-hidden />
+                          <Pencil size={18} absoluteStrokeWidth aria-hidden />
                         </Link>
                         <DeleteCreativeButton
                           creativeId={c.id}

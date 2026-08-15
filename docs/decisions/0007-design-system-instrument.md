@@ -95,6 +95,12 @@ lives. That risk is answered by the specific rules in
   icon-only *if* `aria-label` and `title` both carry the verb — rather than a second
   section asserting an exception the boundaries table didn't know about. Anywhere outside
   a table's action cell, icon-only is still off-limits.
+- The first shipped version of that carve-out used the standard 14px icon size — correct
+  next to a label, unreadable without one. A user screenshot of the live table showed
+  three indistinguishable specks instead of a copy/pencil/trash silhouette; the exception
+  now pins icon-only actions to 18px with `absoluteStrokeWidth` so the stroke doesn't
+  shrink along with the icon. Two review passes and a live screenshot were what it took to
+  get this one carve-out right — the gate does not replace looking at the actual product.
 - The mono-for-machine-data rule makes VAST tags, ids, and timecodes noticeably easier to
   read and diff, at the cost of a slightly denser, more technical feel on marketing
   surfaces. That trade is accepted: the dashboard is the product.
