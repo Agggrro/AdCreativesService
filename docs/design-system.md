@@ -252,6 +252,20 @@ choice sits nearest the reading direction's start. `Escape` and a backdrop click
 cancel. Confirming submits a server action — no client-side fetch/JSON round trip for a
 plain delete.
 
+**Every overlay is portalled to `<body>` (`createPortal`), without exception.** `position:
+fixed` removes an element from layout flow but leaves it in the DOM tree, so an overlay
+opened from inside a table cell stays that cell's descendant and keeps inheriting from it.
+The delete dialog shipped this way and inherited `white-space: nowrap` from its row's
+`<td>`: the body copy rendered as one 880px line inside a 384px card and spilled across
+the table. `break-words` cannot override `nowrap`, and no amount of width capping on the
+card helps, because the overflow is the text, not the box. Portalling is also what keeps
+`fixed` anchored to the viewport should any ancestor ever gain a `transform`, `filter`,
+or `contain` — each of which silently makes itself the containing block instead.
+
+Test an overlay **in the context it actually opens from**, never in isolation: rendered
+standalone this dialog computed `white-space: normal` and looked perfect, which is exactly
+how the bug survived a round of "verified locally".
+
 ### Segmented controls
 
 Language, delivery format, player backend, and the landing hero's template switcher all

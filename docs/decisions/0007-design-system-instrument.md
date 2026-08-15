@@ -112,6 +112,21 @@ lives. That risk is answered by the specific rules in
   exception kept getting *narrowed* instead of *questioned* — "technically renders
   correctly" and "reads as a button" are different claims, but so are "this one specific
   case is justified" and "icon-only is ever the right call in a product this dense."
+- The same unit of work produced the overlay-portalling rule in §6, and it is worth
+  recording *how* it was found, because the process failed twice before it worked. The
+  delete dialog's body copy overflowed its card on the live site. Two fixes were shipped
+  from reasoning alone (`min-w-0` for a flex `min-width: auto` that was never the cause;
+  `break-words`, which `nowrap` overrides), and when a local reproduction rendered the
+  dialog *outside a table* and computed `white-space: normal`, the clean result was
+  reported as proof the code was fine — and the cause pinned on a browser extension. The
+  user disproved that with a screenshot showing the extension paused and the bug present.
+  The actual cause was `white-space: nowrap` inherited from the row's `<td>` through a
+  `position: fixed` element that was still a DOM descendant of it, and it was found in
+  minutes once the reproduction included the `<td>`. Two lessons, both now in §6: overlays
+  are portalled, and a component is reproduced in the context it ships in. A third, for
+  this file: a local test that does not reproduce the reported symptom has not exonerated
+  the code, it has only failed to reproduce — and "works on my machine, must be your
+  browser" is that mistake wearing a conclusion's clothes.
 - The mono-for-machine-data rule makes VAST tags, ids, and timecodes noticeably easier to
   read and diff, at the cost of a slightly denser, more technical feel on marketing
   surfaces. That trade is accepted: the dashboard is the product.

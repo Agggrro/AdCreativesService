@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useFormStatus } from "react-dom";
 import { Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui/Button";
@@ -69,7 +70,19 @@ export function DeleteCreativeButton({
         {dict.dashboard.deleteConfirmAction}
       </button>
 
-      {open && (
+      {/*
+        Portalled to <body>, and it has to be.
+        `position: fixed` takes the overlay out of layout flow but NOT out of
+        the DOM tree, so left in place it stays a descendant of the row's
+        `<td className="… whitespace-nowrap">` — and `white-space` is an
+        inherited property. The dialog's body copy inherited `nowrap`, rendered
+        as one 880px line inside a 384px card, and spilled across the table;
+        `break-words` cannot override `nowrap`. Rendering from <body> is what
+        actually detaches it, and it also keeps `fixed` positioned against the
+        viewport if an ancestor ever gains a transform/filter/contain.
+      */}
+      {open &&
+        createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-fg/40 p-4"
           onClick={() => setOpen(false)}
@@ -122,8 +135,9 @@ export function DeleteCreativeButton({
               </form>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </>
   );
 }
