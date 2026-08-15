@@ -17,6 +17,17 @@ import { all, attr, first, parseXml, type VNode } from "./xml-tree";
  * — a chain that needs a sixth is already broken in production, so stopping
  * here reproduces reality rather than being generous.
  */
+/**
+ * How many `<VASTAdTagURI>` redirects we will follow — **not** how many
+ * documents we fetch. The initial tag is the 0th document and is not a hop, so
+ * a chain of five wrappers reads six documents in total.
+ *
+ * Counting the initial document against this budget is an easy mistake and was
+ * made here once: it let only four redirects through, so a conformant five-
+ * wrapper chain was reported as exceeding the limit with a hard error, and the
+ * message claimed five hops after following four. Five is the VAST-recommended
+ * ceiling and what most players enforce.
+ */
 export const MAX_HOPS = 5;
 
 export interface ChainDocument {
@@ -152,7 +163,8 @@ export async function resolveChain(input: ChainInput): Promise<ChainResult> {
   let nextUrl: string | undefined = input.mode === "url" ? input.value.trim() : undefined;
   let pendingSource: string | undefined = input.mode === "xml" ? input.value : undefined;
 
-  for (let index = 0; index < MAX_HOPS; index += 1) {
+  // `<=`: index 0 is the tag itself, indices 1..MAX_HOPS are the redirects.
+  for (let index = 0; index <= MAX_HOPS; index += 1) {
     let source: string;
     let hop: Hop;
 
@@ -353,7 +365,9 @@ export async function resolveChain(input: ChainInput): Promise<ChainResult> {
 
     if (!followUp) break;
 
-    if (index === MAX_HOPS - 1) {
+    // We are on the MAX_HOPS-th redirect and it still points onward, so a
+    // further hop would exceed the budget.
+    if (index === MAX_HOPS) {
       findings.push(
         chainFinding(
           "VAST-wrapper-depth",

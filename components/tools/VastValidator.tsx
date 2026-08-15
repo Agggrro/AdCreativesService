@@ -73,6 +73,20 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
   const [events, setEvents] = useState<PlayerEvent[]>([]);
   const [resolvedAd, setResolvedAd] = useState<ResolvedAd | null>(null);
 
+  /**
+   * Which pixel mode the current report was built for.
+   *
+   * The document handed to the player is baked into the report at check time —
+   * dry-run neutralizes it, live does not — so moving the toggle afterwards
+   * cannot change what plays. Without this the control silently lied: a user who
+   * checked in live mode, then switched to "do not fire" and pressed play, still
+   * fired real pixels at a third party while the help text under the control
+   * promised the opposite. Comparing against this makes the staleness visible
+   * and blocks playback until the check is re-run.
+   */
+  const [pixelModeAtCheck, setPixelModeAtCheck] = useState<PixelMode | null>(null);
+  const playbackStale = report !== null && pixelModeAtCheck !== pixelMode;
+
   const appendEvent = useCallback((event: PlayerEvent) => {
     setEvents((current) => [...current, event]);
   }, []);
@@ -128,6 +142,7 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
         return;
       }
       setReport(data);
+      setPixelModeAtCheck(pixelMode);
       if (mode === "url") {
         const next = new URL(window.location.href);
         next.searchParams.set("tag", urlValue.trim());
@@ -324,12 +339,17 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
           <section className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-[15px] font-semibold leading-[22px]">{t.sectionPlayer}</h2>
-              {playable && (
+              {playable && !playbackStale && (
                 <Button variant="secondary" onClick={startPlayback}>
                   {runToken === 0 ? t.startPlayback : t.restartPlayback}
                 </Button>
               )}
             </div>
+
+            {/* The analysis above is still valid — only the document prepared
+                for the player is stale — so the report stays on screen and just
+                the play control goes away. */}
+            {playbackStale && <Notice tone="warn">{t.pixelModeChanged}</Notice>}
 
             {/* The one dark surface on the page (§7). Clipping lives on the
                 inner screen rectangle, not here — same shape as PreviewPanel,

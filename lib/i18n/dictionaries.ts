@@ -115,6 +115,11 @@ const ru = {
     edit: "Изменить",
     saveChanges: "Сохранить изменения",
     vastTag: "VAST-тег",
+    deleteCreative: "Удалить креатив",
+    deleteConfirmTitle: "Удалить креатив?",
+    deleteConfirmBody:
+      "Тег сразу перестаёт отдавать интерактивный payload. Действие необратимо.",
+    deleteConfirmAction: "Удалить",
     template: "Шаблон",
     description: "Описание",
     format: "Формат",
@@ -150,6 +155,8 @@ const ru = {
     errNameTooLong: "Название длиннее 200 символов — сократите его.",
     errSaveFailed:
       "Не удалось сохранить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
+    errDeleteFailed:
+      "Не удалось удалить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
     media: {
       uploadTab: "Загрузить",
       urlTab: "Ссылка",
@@ -358,6 +365,10 @@ const ru = {
       restartPlayback: "Запустить заново",
       playerUnavailable:
         "Показ невозможен: из тега не удалось получить документ, пригодный для плеера.",
+      pixelModeChanged:
+        "Режим трекинг-пикселей изменён после проверки. Документ для плеера готовится в момент проверки, поэтому запустите её заново — иначе показ пошёл бы по прежним настройкам.",
+      degradedNotice:
+        "Анализ неполный: часть правил завершилась с ошибкой и не отработала. Отсутствие находок по ним не означает, что нарушений нет.",
       dryRunNotice:
         "Пиксели подменены — наружу ничего не уходит. В этом режиме документ отдаётся плееру с нашего домена, поэтому ошибка CORS, которая проявилась бы в бою, здесь не возникнет.",
       liveNotice: "Тег проигрывается как есть: все пиксели срабатывают по-настоящему.",
@@ -465,6 +476,11 @@ const en: Dict = {
     edit: "Edit",
     saveChanges: "Save changes",
     vastTag: "VAST tag",
+    deleteCreative: "Delete creative",
+    deleteConfirmTitle: "Delete this creative?",
+    deleteConfirmBody:
+      "The tag stops serving the interactive payload immediately. This can't be undone.",
+    deleteConfirmAction: "Delete",
     template: "Template",
     description: "Description",
     format: "Format",
@@ -501,6 +517,8 @@ const en: Dict = {
     errNameTooLong: "The name is longer than 200 characters — shorten it.",
     errSaveFailed:
       "Could not save the creative. Try again; if it keeps failing, contact us.",
+    errDeleteFailed:
+      "Could not delete the creative. Try again; if it keeps failing, contact us.",
     media: {
       uploadTab: "Upload",
       urlTab: "URL",
@@ -698,6 +716,10 @@ const en: Dict = {
       restartPlayback: "Play again",
       playerUnavailable:
         "Playback is not possible: the tag yielded no document a player could use.",
+      pixelModeChanged:
+        "The tracking-pixel mode changed after the check. The document handed to the player is prepared at check time, so run the check again — otherwise playback would use the previous setting.",
+      degradedNotice:
+        "The analysis is incomplete: some rules threw and did not run. No finding from them does not mean there is no violation.",
       dryRunNotice:
         "Pixels are rewritten and nothing leaves. In this mode the document is served to the player from our own domain, so a CORS fault that would break the live run cannot appear here.",
       liveNotice: "The tag plays as authored: every pixel fires for real.",

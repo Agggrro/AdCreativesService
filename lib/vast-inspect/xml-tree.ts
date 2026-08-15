@@ -304,19 +304,3 @@ export function attr(node: VNode | undefined, name: string): string | undefined 
   return Object.hasOwn(node.attrs, name) ? node.attrs[name] : undefined;
 }
 
-/** Case-insensitive attribute lookup, for the attributes the wild gets wrong. */
-export function attrCI(node: VNode | undefined, name: string): string | undefined {
-  if (!node) return undefined;
-  const key = Object.keys(node.attrs).find((k) => k.toLowerCase() === name.toLowerCase());
-  return key === undefined ? undefined : node.attrs[key];
-}
-
-/** The first descendant matching a chain of names, e.g. path(root, "Ad", "InLine"). */
-export function firstPath(node: VNode | undefined, ...names: string[]): VNode | undefined {
-  let current = node;
-  for (const name of names) {
-    current = first(current, name);
-    if (!current) return undefined;
-  }
-  return current;
-}

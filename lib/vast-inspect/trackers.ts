@@ -32,45 +32,40 @@ export function collectTrackers(root: VNode, hop: number): TrackerHit[] {
     for (const node of descendants(root, element)) {
       const url = node.text.trim();
       if (!url) continue;
+
+      // A <Tracking> inside a <Verification> is a measurement beacon rather
+      // than a playback event, and the report's "who measures what" column
+      // depends on telling them apart. Resolved from the node's own ancestors
+      // in this single pass — an earlier version built the list first and then
+      // re-scanned all of it once per verification node.
+      const vendor = element === "Tracking" ? verificationVendor(node) : undefined;
+      const event = element === "Tracking" ? attr(node, "event")?.trim() : undefined;
+
       hits.push({
         hop,
-        kind,
+        kind: vendor === undefined ? kind : "verificationTracking",
         // Only <Tracking> carries an event; for everything else the element
         // name is the event, and duplicating it here would just be noise.
-        event: element === "Tracking" ? attr(node, "event")?.trim() : undefined,
+        event: vendor ? `${event ?? "?"} · ${vendor}` : event,
         url,
         path: node.path,
       });
     }
   }
 
-  // A Verification's TrackingEvents live inside <Verification> and are already
-  // caught by the Tracking sweep above; re-labelling them keeps the report's
-  // "who measures what" column honest.
-  for (const verification of descendants(root, "Verification")) {
-    const vendor = attr(verification, "vendor");
-    for (const node of descendants(verification, "Tracking")) {
-      const url = node.text.trim();
-      if (!url) continue;
-      const existing = hits.find((entry) => entry.path === node.path);
-      if (existing) {
-        existing.kind = "verificationTracking";
-        existing.event = vendor
-          ? `${attr(node, "event")?.trim() ?? "?"} · ${vendor}`
-          : attr(node, "event")?.trim();
-      }
-    }
-  }
-
   return hits;
 }
 
-/** Totals per kind, for the report summary. */
-export function summariseTrackers(hits: TrackerHit[]): Record<string, number> {
-  const totals: Record<string, number> = {};
-  for (const hit of hits) {
-    const key = hit.kind === "tracking" && hit.event ? `tracking:${hit.event}` : hit.kind;
-    totals[key] = (totals[key] ?? 0) + 1;
+/**
+ * The `vendor` of the enclosing <Verification>, or undefined when the node is
+ * not inside one. Returns an empty string for a Verification that declares no
+ * vendor, which is itself a finding elsewhere — so the caller can still tell
+ * "measurement beacon" from "playback event".
+ */
+function verificationVendor(node: VNode): string | undefined {
+  for (let current = node.parent; current; current = current.parent) {
+    if (current.name === "Verification") return attr(current, "vendor")?.trim() ?? "";
   }
-  return totals;
+  return undefined;
 }
+

@@ -3,6 +3,7 @@
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import { LOCALE_TAG } from "@/lib/i18n/dictionaries";
 import { Chip, chipType } from "@/components/ui/Chip";
+import { Notice } from "@/components/ui/Field";
 import { StateWord, type Tone } from "@/components/ui/State";
 import { CELL, HEAD, NUM_HEAD, railCell, railRow, ROW, TableFrame, TableHead } from "@/components/ui/Table";
 // Imported per-module rather than through @/lib/vast-inspect: the barrel reaches
@@ -444,9 +445,30 @@ function Recommendations({ report }: { report: InspectReport }) {
   );
 }
 
+/**
+ * Rules that threw while analysing.
+ *
+ * Shown rather than swallowed: for a validator, an unreported crash is the worst
+ * outcome available — the check silently stops running, the report still looks
+ * complete, and "no violation" becomes indistinguishable from "never examined".
+ */
+function Degraded({ report }: { report: InspectReport }) {
+  const { dict } = useLocale();
+  const t = dict.tools.validator;
+  if (!report.degraded || report.degraded.length === 0) return null;
+
+  return (
+    <Notice tone="warn">
+      {t.degradedNotice}{" "}
+      <span className="data-instr">{[...new Set(report.degraded)].join(", ")}</span>
+    </Notice>
+  );
+}
+
 export function ValidatorReport({ report }: { report: InspectReport }) {
   return (
     <div className="flex flex-col gap-6">
+      <Degraded report={report} />
       <Summary report={report} />
       <Interactive report={report} />
       <Findings findings={report.findings} />

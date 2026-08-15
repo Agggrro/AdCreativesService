@@ -71,9 +71,12 @@ const EXPECTATIONS = [
     // VPAID is deprecated, never invalid — 4.3 did not remove it. A hard error
     // here would be a fabricated spec violation on a conformant tag.
     verdict: "warn",
+    // `maxErrors: 0` is the guard that matters, and it is deliberately not an
+    // `absent` entry naming the deleted rule id: an id-based assertion goes
+    // green the moment someone re-introduces the same mistake under a different
+    // name, which is exactly the regression it was supposed to pin.
     maxErrors: 0,
     rules: ["VPAID-deprecated", "VPAID-no-video-fallback", "VAST-universal-ad-id-unknown"],
-    absent: ["VPAID-removed-in-43"],
   },
   {
     file: "simid-omid-misplaced.xml",

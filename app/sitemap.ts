@@ -1,8 +1,19 @@
 import type { MetadataRoute } from "next";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 import { getSiteUrl } from "@/lib/site";
 import { templateSlug } from "@/lib/template-demo";
+import type { Database } from "@/types/database.types";
 
+/**
+ * Rebuilt at most hourly. The published-template list changes when someone
+ * publishes a template, which is rare, and a crawler should not be running a
+ * database query per fetch.
+ *
+ * This only holds because nothing below reads a cookie: `createServerSupabase`
+ * awaits `cookies()`, and any use of that API opts the route into dynamic
+ * rendering, which would silently make this declaration a no-op. A sitemap has
+ * no session to read anyway — it is the same list for every visitor.
+ */
 export const revalidate = 3600;
 
 /**
@@ -18,9 +29,10 @@ export const revalidate = 3600;
  * "in development" page in the index is a weak quality signal for the whole
  * domain. It goes in when the generator ships.
  *
- * Catalog entries are read with the anon client, the same read a visitor gets.
- * A failure returns the static pages rather than throwing — a sitemap is a hint,
- * and half of one is worth more than a 500.
+ * Catalog entries are read with a plain anon client — the same rows RLS grants
+ * a signed-out visitor through `templates_select_published`, and no service-role
+ * key anywhere near a public route. A failure returns the static pages rather
+ * than throwing: a sitemap is a hint, and half of one beats a 500.
  *
  * The catalog slug is derived from `templates.type`, not from a `slug` column:
  * there isn't one, by the decision recorded in `supabase/schema.sql` next to the
@@ -45,7 +57,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const supabase = await createServerSupabase();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anonKey) return staticPages;
+
+    const supabase = createClient<Database>(url, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
     const { data: templates } = await supabase
       .from("templates")
       .select("type, updated_at")

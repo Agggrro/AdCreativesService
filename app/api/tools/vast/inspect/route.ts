@@ -70,9 +70,15 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(report, {
       headers: { "Cache-Control": "no-store" },
     });
-  } catch {
+  } catch (cause) {
     // A crash in the engine is our defect, not the user's tag being invalid;
     // saying so plainly is better than dressing it up as a validation result.
+    //
+    // Logged, because the platform records an uncaught throw and nothing at all
+    // for a caught one: swallowing it silently would turn a rule crashing on a
+    // whole class of real tags into an unexplained trickle of 500s with no
+    // stack and no input shape. The caller still gets nothing but the status.
+    console.error("[tools/vast/inspect] engine failure", { mode, cause });
     return Response.json({ error: "inspection failed" }, { status: 500 });
   }
 }
