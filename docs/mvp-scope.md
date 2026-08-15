@@ -74,13 +74,21 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 
 - Additional templates (Branching Story, Lead-Gen) and additional formats.
 - Rich analytics dashboard, exports, reporting.
+- The **free tools section** (`/tools`) was not in the MVP and is not part of the
+  core loop above. It ships as an acquisition surface alongside it — see
+  [ADR-0013](decisions/0013-public-free-tools-section.md). The VAST validator is
+  built; the VAST generator is a placeholder route.
 - MRAID / in-app display product line.
 - Becoming our own OMID verification vendor (IAB Tech Lab partner
   registration, running an OM SDK service, MRC accreditation). OMID
   *pass-through* for SIMID and a self-built, non-accredited viewability
   module for VPAID are implemented — see [ADR-0012](decisions/0012-viewability-measurement.md).
 - Advanced protection hardening (rotating signed keys, granular domain allow-lists).
-- Rate limiting/anti-abuse beyond basic caching.
+- Rate limiting/anti-abuse beyond basic caching. **Now overdue rather than
+  merely deferred:** the free VAST validator is a public, unauthenticated
+  endpoint that performs outbound HTTP on request, which is a materially
+  different exposure from the cached read paths this line was written for. See
+  `docs/security.md`, "Outbound fetches to untrusted URLs".
 - Team/agency multi-seat, roles, white-label.
 - Grace periods / dunning UX for `past_due`.
 

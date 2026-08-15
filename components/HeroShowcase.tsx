@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { VpaidPreview } from "@/components/VpaidPreview";
+import { Segmented } from "@/components/ui/Segmented";
 import type { Dict } from "@/lib/i18n/dictionaries";
 
 export type ShowcaseTemplate = {
@@ -39,30 +40,14 @@ export function HeroShowcase({
 
   return (
     <div className="flex flex-col gap-3">
-      <div
-        role="group"
-        aria-label={dict.catalog.heroSwitcher}
-        className="inline-flex flex-wrap self-start rounded-ctl border border-line bg-surface"
-      >
-        {templates.map((t, i) => {
-          const current = t.id === active.id;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setActiveId(t.id)}
-              aria-pressed={current}
-              className={`border-r border-hairline px-3 py-1.5 font-mono text-[11px] font-medium uppercase leading-4 tracking-[0.06em] transition-colors last:border-r-0 ${
-                i === 0 ? "rounded-l-ctl" : ""
-              } ${i === templates.length - 1 ? "rounded-r-ctl" : ""} ${
-                current ? "bg-fill text-fg" : "text-fg-secondary hover:bg-fill"
-              }`}
-            >
-              {t.name}
-            </button>
-          );
-        })}
-      </div>
+      <Segmented
+        wrap
+        className="self-start"
+        label={dict.catalog.heroSwitcher}
+        value={active.id}
+        onChange={setActiveId}
+        options={templates.map((t) => ({ value: t.id, label: t.name }))}
+      />
 
       <VpaidPreview
         key={active.id}

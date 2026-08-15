@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A SIMID creative carrying the single quietest failure in the whole standard:
+  AdVerifications left inside <Extensions>, where VAST 4.0 put it, in a document
+  that declares 4.1. The XML is well-formed, no player complains, and every
+  verification vendor measures precisely nothing.
+
+  Also here: a SIMID document served over http, which the browser will block as
+  mixed content on any real publisher page.
+-->
+<VAST version="4.1">
+  <Ad id="simid-1">
+    <InLine>
+      <AdServingId>fixture-simid-omid</AdServingId>
+      <AdSystem>Fixture</AdSystem>
+      <AdTitle>Shoppable overlay</AdTitle>
+      <Impression><![CDATA[https://tracking.example.com/impression]]></Impression>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Creatives>
+        <Creative id="creative-simid">
+          <UniversalAdId idRegistry="Ad-ID">EXMP0002000</UniversalAdId>
+          <Linear>
+            <Duration>00:00:30</Duration>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360" bitrate="800"><![CDATA[https://cdn.example.com/base.mp4]]></MediaFile>
+              <InteractiveCreativeFile type="text/html" apiFramework="SIMID" variableDuration="yes"><![CDATA[http://cdn.example.com/simid/index.html]]></InteractiveCreativeFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+      <Extensions>
+        <Extension type="AdVerifications">
+          <AdVerifications>
+            <Verification vendor="example.com-omid">
+              <JavaScriptResource apiFramework="omid" browserOptional="true"><![CDATA[https://verify.example.com/omid.js]]></JavaScriptResource>
+            </Verification>
+          </AdVerifications>
+        </Extension>
+      </Extensions>
+    </InLine>
+  </Ad>
+</VAST>

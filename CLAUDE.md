@@ -81,6 +81,9 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
 ## Quality gates (when to call which agent/skill)
 
 - After writing/changing VAST/SIMID/VPAID output → **`vast-spec-reviewer`** subagent.
+- After changing the VAST **inspection** rules (`lib/vast-inspect/`) → `npm run check:vast`
+  against a running dev server. It pins the fixture corpus and the dry-run guarantee;
+  a false positive on a conformant tag is as much a defect as a missed violation.
 - After any Supabase migration, query, or RLS change → **`supabase-rls-auditor`** subagent.
 - After any Stripe/subscription/webhook change → **`billing-integrity-reviewer`** subagent.
 - Before **and** after any UI/UX work — new page, component, state, or user-visible

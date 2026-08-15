@@ -4,10 +4,7 @@ import { LOCALE_TAG, statusTone } from "@/lib/i18n/dictionaries";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { Notice, Panel } from "@/components/ui/Field";
 import { RAIL, StateBadge } from "@/components/ui/State";
-
-const CELL = "px-4 py-3 align-middle";
-const HEAD = "label-instr whitespace-nowrap px-4 py-2 text-left";
-const ROW = "border-b border-fill last:border-b-0";
+import { CELL, HEAD, ROW } from "@/components/ui/Table";
 
 /**
  * What the badge should say, rather than what Stripe last told us. A row can sit

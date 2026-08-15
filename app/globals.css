@@ -32,6 +32,10 @@
   --color-info: #2c5fa8;
   --color-info-fg: #244f8c;
   --color-info-bg: #e8eef8;
+  /* Violet, not amber: amber is warm, and warm means action in this system */
+  --color-warn: #6247c4;
+  --color-warn-fg: #4e3aa3;
+  --color-warn-bg: #edebfa;
   --color-dead: #b02537;
   --color-dead-fg: #93202f;
   --color-dead-bg: #fae8ea;
@@ -85,8 +89,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Every interactive element gets the same visible focus state */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+/*
+ * Every interactive element gets the same visible focus state.
+ *
+ * `summary` is in the list because a disclosure row is keyboard-focusable and
+ * is not a button — without it such a row silently falls back to the browser's
+ * own ring, which is the one thing a control may never do here.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }

@@ -16,6 +16,7 @@
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
 | UI language cookie (`adinteract_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
 | Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage (no app server in the path) | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
+| `POST /api/tools/vast/inspect`, `GET /api/tools/vast/hop` | The open internet, and **an arbitrary third-party host the caller names** | Public, unauthenticated, no rate limit. This is the only outbound-fetch boundary in the product — see "Outbound fetches to untrusted URLs" below |
 
 ## Secrets
 
@@ -104,6 +105,57 @@
   `buildInlineVast` need (template id, format, config, runtime key, a random
   preview id, expiry) — nothing tying it to the minting user.
 
+## Outbound fetches to untrusted URLs (`/api/tools/vast/*`)
+
+The VAST validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)) fetches
+a URL the caller chose. It is the **only** place in this codebase that does so —
+everything else talks to Supabase, Stripe, or ourselves — which makes
+[`lib/vast-inspect/fetch-tag.ts`](../lib/vast-inspect/fetch-tag.ts) the product's
+entire SSRF surface. Any future feature that fetches a user-supplied URL should
+go through it rather than reimplement these guards.
+
+- **Scheme allow-list.** `http:` and `https:` only. `file:`, `gopher:`, `data:`
+  and everything else are rejected before any work is scheduled.
+- **Address classification.** Every resolved address must be publicly routable.
+  Loopback, RFC1918, link-local (which is what makes `169.254.169.254` cloud
+  metadata unreachable), CGNAT, multicast, reserved, IPv6 unique-local and the
+  documentation ranges are all refused. IPv4-mapped and NAT64 IPv6 addresses are
+  unwrapped and judged on their embedded v4 address, so `::ffff:127.0.0.1` is
+  blocked for the right reason rather than by accident.
+- **The check governs the socket, not a pre-flight.** A naive validator resolves
+  the hostname, approves it, then hands the URL to `fetch()` — leaving a window
+  in which the second resolution returns `127.0.0.1`. That is DNS rebinding, and
+  it is why the guard is installed as the request's own `lookup` function: the
+  connection can only be made to an address that already passed. TLS still sees
+  the hostname, so certificate validation is unaffected. A host that answers with
+  one public and one private address is refused outright rather than having the
+  public one picked.
+- **Per-hop caps.** 5 s deadline, 512 KB (streamed, aborted at the cap), 5 HTTP
+  redirects, 5 wrapper hops. Every redirect target is fully re-validated — the
+  scheme may have changed and the host certainly has.
+- **Cycle detection.** A wrapper chain that revisits a URL is stopped and
+  reported rather than followed until the hop limit.
+- **Failing closed.** `/hop` answers an empty VAST for any problem — bad
+  signature, expired token, unreachable host, blocked address — with no
+  differentiation between them, matching `/api/vast`'s posture.
+
+`/hop` carries its target inside an HMAC-signed token rather than an open query
+parameter, so the route is not a general-purpose proxy. That signature is **not**
+the SSRF control: the fetcher re-validates every address regardless of how the
+URL arrived. It is what stops the route being useful to anyone but us.
+
+**Rate limiting is absent here, deliberately, and this is the surface that makes
+the standing gap real.** Access is open by product decision (ADR-0013). Nothing
+is persisted, so the exposure is compute and egress rather than data, and the
+per-request caps bound the cost of any single call — but not the number of calls.
+`/api/tools/vast/void` is a bare 204 with no state and is not a concern; `inspect`
+and `hop` both perform outbound work and are.
+
+**Nothing submitted is stored.** No table, no bucket, no log of tags. The
+inspection report lives in the caller's page and the state a hop needs travels in
+its signed token. `/void` records nothing on purpose: logging would mean holding
+fragments of other companies' ad tags.
+
 ## Creative payload protection (see ADR-0003)
 
 We provide **access control, not secrecy of client code**. Layers: dynamic VAST
@@ -153,4 +205,6 @@ RLS for GETs is correct here, not a gap. The same class of exception as
 - [ ] Webhook verifies signature against raw body.
 - [ ] VAST path validates input and fails closed.
 - [ ] RLS policies cover new tables/columns (or explicit, documented exception).
+- [ ] Any new outbound fetch of a user-supplied URL goes through
+      `lib/vast-inspect/fetch-tag.ts` — not a bare `fetch()`.
 - [ ] `/security-review` run and findings addressed.

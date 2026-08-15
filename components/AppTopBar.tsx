@@ -1,7 +1,7 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getDict } from "@/lib/i18n/server";
 import { signOut } from "@/app/auth/actions";
-import { mainNav } from "@/lib/nav";
+import { mainNav, publicNav } from "@/lib/nav";
 import { TopBar } from "@/components/TopBar";
 import { Button, LinkButton } from "@/components/ui/Button";
 
@@ -11,8 +11,9 @@ import { Button, LinkButton } from "@/components/ui/Button";
  * layout — sharing this component is what keeps the section underline correct
  * on a public page and a private one alike.
  *
- * `nav` is hidden from signed-out visitors: two of the three sections would
- * bounce them to the login screen.
+ * A signed-out visitor gets the shorter `publicNav`: the sections behind a
+ * login are dropped rather than the whole strip hidden, so the catalog and the
+ * free tools stay reachable by the people they exist for (ADR-0013).
  */
 export async function AppTopBar() {
   const supabase = await createServerSupabase();
@@ -25,7 +26,7 @@ export async function AppTopBar() {
     <TopBar
       dict={dict}
       brandHref="/"
-      nav={user ? mainNav(dict) : []}
+      nav={user ? mainNav(dict) : publicNav(dict)}
       right={
         user ? (
           <>

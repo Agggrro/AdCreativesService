@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A deliberately correct VAST 4.2 InLine. The catalogue must report zero errors
+  and zero warnings here; anything else is a false positive, and a validator
+  that cries wolf on a good tag is worse than no validator.
+
+  The InLine child order follows the VAST 4.2 XSD, which is base type first:
+  Inline_type extends AdDefinitionBase_type, and an xs:extension appends the
+  derived sequence after the base's. Hence Error and Pricing before AdTitle,
+  which looks wrong and is not — IAB's own Inline_Simple.xml sample is authored
+  in exactly this order.
+
+    AdSystem → Error → Impression → Pricing → ViewableImpression →
+    AdServingId → AdTitle → AdVerifications → Advertiser → Category → Creatives
+-->
+<VAST version="4.2">
+  <Ad id="ad-1">
+    <InLine>
+      <AdSystem version="1.0">AdInteract Fixtures</AdSystem>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Impression id="imp-1"><![CDATA[https://tracking.example.com/impression?id=1&cb=[CACHEBUSTING]]]></Impression>
+      <Pricing model="cpm" currency="USD"><![CDATA[4.50]]></Pricing>
+      <ViewableImpression id="vi-1">
+        <Viewable><![CDATA[https://tracking.example.com/viewable]]></Viewable>
+        <NotViewable><![CDATA[https://tracking.example.com/not-viewable]]></NotViewable>
+        <ViewUndetermined><![CDATA[https://tracking.example.com/view-undetermined]]></ViewUndetermined>
+      </ViewableImpression>
+      <AdServingId>a1b2c3d4-0000-4000-8000-000000000001</AdServingId>
+      <AdTitle>Clean linear preroll</AdTitle>
+      <AdVerifications>
+        <Verification vendor="example.com-omid">
+          <JavaScriptResource apiFramework="omid" browserOptional="true"><![CDATA[https://verify.example.com/omid.js]]></JavaScriptResource>
+          <TrackingEvents>
+            <Tracking event="verificationNotExecuted"><![CDATA[https://verify.example.com/not-executed]]></Tracking>
+          </TrackingEvents>
+          <VerificationParameters><![CDATA[{"key":"value","other":"a&b"}]]></VerificationParameters>
+        </Verification>
+      </AdVerifications>
+      <Advertiser>Example Brand</Advertiser>
+      <Category authority="https://www.iabtechlab.com/categoryexcinge">232</Category>
+      <Creatives>
+        <Creative id="creative-1" adId="ad-1" sequence="1">
+          <UniversalAdId idRegistry="Ad-ID">EXMP0001000</UniversalAdId>
+          <Linear skipoffset="00:00:05">
+            <Duration>00:00:30</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracking.example.com/start]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://tracking.example.com/q1]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://tracking.example.com/q2]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://tracking.example.com/q3]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://tracking.example.com/complete]]></Tracking>
+              <Tracking event="progress" offset="00:00:10"><![CDATA[https://tracking.example.com/p10]]></Tracking>
+            </TrackingEvents>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360" bitrate="800" scalable="true" maintainAspectRatio="true"><![CDATA[https://cdn.example.com/creative-640.mp4]]></MediaFile>
+              <MediaFile delivery="progressive" type="video/webm" width="1280" height="720" bitrate="1600" scalable="true" maintainAspectRatio="true"><![CDATA[https://cdn.example.com/creative-720.webm]]></MediaFile>
+              <Mezzanine delivery="progressive" type="video/mp4" width="1920" height="1080"><![CDATA[https://cdn.example.com/master.mp4]]></Mezzanine>
+              <ClosedCaptionFiles>
+                <ClosedCaptionFile type="text/vtt" language="en"><![CDATA[https://cdn.example.com/captions-en.vtt]]></ClosedCaptionFile>
+              </ClosedCaptionFiles>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickThrough id="ct-1"><![CDATA[https://www.example.com/landing]]></ClickThrough>
+              <ClickTracking id="clt-1"><![CDATA[https://tracking.example.com/click]]></ClickTracking>
+            </VideoClicks>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

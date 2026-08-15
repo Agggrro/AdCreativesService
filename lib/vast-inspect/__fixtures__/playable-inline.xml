@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A tag that actually plays, so the dry-run guarantee can be proved rather than
+  argued: the media file is reachable, so a real player reaches impression and
+  every quartile, and each of those pixels must arrive at /api/tools/vast/void
+  instead of at tracking.example.com.
+
+  The media file is Google's own IMA sample, the same origin the SDK is loaded
+  from — no new dependency, and reachable wherever the SDK itself is.
+-->
+<VAST version="4.2">
+  <Ad id="playable-1">
+    <InLine>
+      <AdSystem>AdInteract Fixtures</AdSystem>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://tracking.example.com/impression]]></Impression>
+      <AdServingId>fixture-playable</AdServingId>
+      <AdTitle>Playable linear preroll</AdTitle>
+      <Advertiser>Example Brand</Advertiser>
+      <Creatives>
+        <Creative id="creative-playable">
+          <UniversalAdId idRegistry="Ad-ID">EXMP0003000</UniversalAdId>
+          <Linear>
+            <Duration>00:00:10</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracking.example.com/start]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://tracking.example.com/q1]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://tracking.example.com/q2]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://tracking.example.com/q3]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://tracking.example.com/complete]]></Tracking>
+            </TrackingEvents>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360" bitrate="600"><![CDATA[https://storage.googleapis.com/interactive-media-ads/media/android.mp4]]></MediaFile>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://www.example.com/landing]]></ClickThrough>
+              <ClickTracking><![CDATA[https://tracking.example.com/click]]></ClickTracking>
+            </VideoClicks>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

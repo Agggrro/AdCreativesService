@@ -9,11 +9,7 @@ import { LinkButton } from "@/components/ui/Button";
 import { Notice, Panel } from "@/components/ui/Field";
 import { RAIL, ServingBadge } from "@/components/ui/State";
 import { Chip } from "@/components/ui/Chip";
-
-const CELL = "px-4 py-3 align-middle";
-const HEAD = "label-instr whitespace-nowrap px-4 py-2 text-left";
-const NUM_HEAD = `${HEAD} text-right`;
-const ROW = "border-b border-fill last:border-b-0";
+import { CELL, HEAD, NUM_HEAD, ROW } from "@/components/ui/Table";
 
 export default async function MyCreativesPage() {
   const supabase = await createServerSupabase();

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Correct in every respect except the order of its InLine children.
+
+  The VAST 4.2 XSD models InLine with xs:sequence, base type first: AdSystem,
+  Error, Extensions, Impression, Pricing, ViewableImpression, then AdServingId,
+  AdTitle, AdVerifications, Advertiser, Category, Creatives. Here AdServingId
+  and AdTitle come before Impression and Pricing, which a strict parser rejects
+  outright while a lenient one accepts — so the tag breaks on some players and
+  works on others.
+
+  Everything else is valid, which also proves the ordering rule does not drag
+  other findings along with it.
+-->
+<VAST version="4.2">
+  <Ad id="ordering-1">
+    <InLine>
+      <AdSystem>Fixture</AdSystem>
+      <AdServingId>fixture-ordering</AdServingId>
+      <AdTitle>Out of order</AdTitle>
+      <Advertiser>Example Brand</Advertiser>
+      <Impression><![CDATA[https://tracking.example.com/impression]]></Impression>
+      <Pricing model="cpm" currency="USD"><![CDATA[3.00]]></Pricing>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <ViewableImpression>
+        <Viewable><![CDATA[https://tracking.example.com/viewable]]></Viewable>
+      </ViewableImpression>
+      <Creatives>
+        <Creative id="creative-1">
+          <UniversalAdId idRegistry="Ad-ID">EXMP0004000</UniversalAdId>
+          <Linear>
+            <Duration>00:00:15</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracking.example.com/start]]></Tracking>
+            </TrackingEvents>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360" bitrate="800"><![CDATA[https://cdn.example.com/creative.mp4]]></MediaFile>
+              <Mezzanine delivery="progressive" type="video/mp4" width="1920" height="1080"><![CDATA[https://cdn.example.com/master.mp4]]></Mezzanine>
+              <ClosedCaptionFiles>
+                <ClosedCaptionFile type="text/vtt" language="en"><![CDATA[https://cdn.example.com/c.vtt]]></ClosedCaptionFile>
+              </ClosedCaptionFiles>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://www.example.com/landing]]></ClickThrough>
+            </VideoClicks>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

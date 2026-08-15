@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n/dictionaries";
 import { useLocale } from "@/components/i18n/LocaleProvider";
+import { Segmented } from "@/components/ui/Segmented";
 import { setLocale } from "@/app/actions/locale";
 
 /**
@@ -25,29 +26,11 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <div
-      role="group"
-      aria-label={dict.nav.language}
-      className="inline-flex rounded-ctl border border-line bg-surface"
-    >
-      {LOCALES.map((code) => {
-        const current = code === locale;
-        return (
-          <button
-            key={code}
-            type="button"
-            onClick={() => choose(code)}
-            aria-pressed={current}
-            className={`border-r border-hairline px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.06em] transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 ${
-              current
-                ? "bg-fill font-medium text-fg"
-                : "text-fg-secondary hover:bg-fill"
-            }`}
-          >
-            {code}
-          </button>
-        );
-      })}
-    </div>
+    <Segmented
+      label={dict.nav.language}
+      value={locale}
+      onChange={choose}
+      options={LOCALES.map((code) => ({ value: code, label: code }))}
+    />
   );
 }

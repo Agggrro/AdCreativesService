@@ -49,6 +49,7 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 | `/dashboard/creatives`, `/dashboard/creatives/[id]` | session | The user's creatives, their VAST tags, and delivery counts |
 | `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
 | `/dashboard/subscriptions` | session | All billing; Stripe checkout returns here |
+| `/tools`, `/tools/vast-validator`, `/tools/vast-generator` | public | Free tools ([ADR-0013](decisions/0013-public-free-tools-section.md)). No session, no database read; the generator is a placeholder |
 
 The public catalog reads `templates` as `anon` — `templates_select_published` already
 allows it — and its demo runs a built unit straight from `/api/preview-unit/<key>`, with
@@ -309,4 +310,5 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | `GET /api/vast` | Node + CDN cache (`s-maxage=60`) | Full supabase-js/storage support; CDN cache absorbs QPS/latency. Edge is a documented future optimization. |
 | `POST /api/stripe/webhook` | Node | Needs raw body for signature verification |
 | `GET /api/creative/simid/[token]` | Node | Service-role Storage download; must be Node for supabase-js storage support, same as `/api/vast` |
+| `/api/tools/vast/*` | Node | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). Node is required, not incidental: the SSRF guard installs its own `lookup` on the socket via `node:http`/`node:dns`, which has no edge equivalent. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |
 | Creative runtime assets | Supabase Storage (free tier, CDN) | Static-ish, signed URLs, geo-distributed |

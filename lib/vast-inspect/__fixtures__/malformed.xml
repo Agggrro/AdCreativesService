@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A truncated response: <InLine> is never closed. This is what a real ad server
+  produces when it times out mid-write, and it must be reported as IAB 100 with
+  a line number rather than analysed as if half a document were a whole one.
+-->
+<VAST version="4.2">
+  <Ad id="truncated">
+    <InLine>
+      <AdSystem>Fixture</AdSystem>
+      <AdTitle>Cut short</AdTitle>
+</VAST>

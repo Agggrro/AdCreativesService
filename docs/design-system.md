@@ -81,10 +81,25 @@ now carries informational states.
 | --- | --- | --- | --- | --- |
 | live / active | `live` `#1B7A52` | `#12603F` | `#E4F0EA` | Serving, entitled — and, in a configurator matrix, fully configured |
 | trial / info | `info` `#2C5FA8` | `#244F8C` | `#E8EEF8` | Trialing, renewing soon, informational |
+| warn / at risk | `warn` `#6247C4` | `#4E3AA3` | `#EDEBFA` | Valid but fragile: deprecated, ambiguous, or broken in part of the market |
 | dead / past due | `dead` `#B02537` | `#93202F` | `#FAE8EA` | Lapsed, failing, fail-closed |
 | idle / draft | `idle` `#C4BFB7` | `#6E6862` | `#EAE8E4` | Not published, no activity, nothing filled in yet |
 
 Semantic colour is **not** the accent and never decorates. It only encodes state.
+
+`warn` is violet rather than the amber a warning usually wears, and that is forced rather
+than stylistic: amber is warm, warm means action, and a warning that reads as a button is
+worse than no warning. Violet is cold, sits clearly apart from `info` blue and `dead` red,
+and cannot be mistaken for Sienna. It measures **8.54:1** for text on `surface`, **7.27:1**
+on its own tint, and **6.53:1** for the rail — the same band as `info` (8.16 / 7.00 / 6.35)
+and `dead` (8.44 / 7.15 / 6.63), so the family stays even and the pairing `idle` cannot do
+is available here.
+
+The three-step severity it exists for is the VAST validator's (§6): a violation of the
+declared spec is `dead`, something legal but known to break in part of the market is
+`warn`, and an opportunity is `info`. Collapsing the middle step would hide the difference
+between "this will bite you" and "you could do better", which is the distinction the
+report is read for.
 
 `idle`'s text on its own tint (`#6E6862` on `#EAE8E4`) measures **4.49:1** — just under AA
 for small text. Idle is the one pair where text and tint may not be combined at the `chip`
@@ -259,6 +274,34 @@ is swapped by a segmented control is the pattern that rule was always compatible
   all, so the placeholder-imagery rule below still applies wherever a `public/demo/` SVG
   would otherwise be the only option (e.g. a future static thumbnail).
 
+### Free tools — the public utility surface
+
+`/tools` and the tools under it are public, unauthenticated pages that exist to be found
+by someone with a broken ad tag ([ADR-0013](decisions/0013-public-free-tools-section.md)).
+They are held to the same system as the dashboard, with three points worth stating because
+the temptation to relax them is highest on a marketing-adjacent surface.
+
+- **The tools index is a table, not a tile grid.** The catalog earns the one grid because
+  a template carries no state (above); a tool does — it is either available or not yet —
+  so it takes the data-table treatment with a real rail (`live` / `idle`).
+- **One well, same as anywhere.** The validator plays a real ad, so it gets the serving
+  well (§7) and the page gets no second dark surface.
+- **Accent budget is one**, spent on the single primary that starts a run. A tool page is
+  a workbench: everything else on it is secondary or a link.
+
+The validator's report is a stack of hairline-separated sections, each a table with a
+state rail where the rows carry state and none where they do not. The findings table rails
+on severity (`dead` / `warn` / `info`, §3); the wrapper-chain table rails on HTTP outcome,
+dropping to transparent when the status is unknown, because an unreachable hop has nothing
+to encode; the feature matrix does **not** rail, because "this tag does not use Mezzanine"
+is an absence, not a state — a rail on every row would be exactly the decorative rail this
+system forbids. The interactive-standards table, the run timeline, the parser-versus-player
+comparison and the recommendations list all rail too, each on a state of its own. That list
+is illustrative, not exhaustive: the general rule above decides every case.
+
+The pasted-XML input is the one place the mono rule is load-bearing rather than aesthetic:
+it holds a VAST document, and a proportional face makes indentation unreadable.
+
 ### Configurator sections and the outcome matrix
 
 A template's `config_schema` can group its fields ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)),
@@ -432,6 +475,15 @@ never two stacked captions.
   [architecture.md](architecture.md) and [security.md](security.md)).
 - Every user-visible string goes through the i18n layer with both locales supplied. A
   hardcoded human-readable string in a component is a defect.
+- **A domain dataset may carry its own bilingual payload instead**, provided a type makes
+  both locales mandatory. The VAST validator's rule and feature catalogue
+  (`lib/vast-inspect/`) is the case this exists for: roughly eighty rules, each keyed to an
+  IAB spec clause, each with a message and a fix. They are data about the specification,
+  not interface language, and folding 240 strings into `dictionaries.ts` would bury the UI
+  copy that file exists to police. The enforcement is the same one the dictionary relies
+  on — `Msg` is `{ ru: string; en: string }`, so the compiler refuses a half-translated
+  entry exactly as `Dict` refuses a missing key. UI chrome around such a dataset — headings,
+  buttons, column labels, empty states — still goes through the dictionary.
 - Copy rules: sentence case; a control names what happens ("Copy tag" → "Tag copied",
   never "Successfully copied!"); errors say what went wrong and what to do; no
   exclamation marks; no "please", "simply", "just".

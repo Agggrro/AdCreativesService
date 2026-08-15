@@ -8,6 +8,7 @@ import { ImaPlayer } from "@/components/players/ImaPlayer";
 import { FluidPlayer } from "@/components/players/FluidPlayer";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { buttonClass } from "@/components/ui/Button";
+import { Segmented } from "@/components/ui/Segmented";
 
 type PlayerKey = "sandbox" | "ima" | "fluid";
 
@@ -88,23 +89,13 @@ export function PreviewPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
-        <div className="inline-flex w-full rounded-ctl border border-line bg-surface">
-          {PLAYERS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setTab(p.key)}
-              aria-pressed={tab === p.key}
-              className={`flex-1 border-r border-hairline px-2 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 ${
-                tab === p.key
-                  ? "bg-fill font-medium text-fg"
-                  : "text-fg-secondary hover:bg-fill"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          fill
+          label={dict.preview.player}
+          value={tab}
+          onChange={setTab}
+          options={PLAYERS.map((p) => ({ value: p.key, label: p.label }))}
+        />
         <p className="text-[11px] leading-4 text-fg-muted">
           {dict.preview.sameTag}
         </p>

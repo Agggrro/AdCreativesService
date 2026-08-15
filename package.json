@@ -13,11 +13,13 @@
     "runtime:push": "node --env-file=.env.local scripts/runtime-push.mjs",
     "db:schema": "node --env-file=.env.local scripts/db-apply.mjs supabase/schema.sql",
     "db:seed": "node --env-file=.env.local scripts/db-apply.mjs supabase/seed.sql",
-    "deploy:status": "node --env-file=.env.local scripts/deploy-status.mjs"
+    "deploy:status": "node --env-file=.env.local scripts/deploy-status.mjs",
+    "check:vast": "node scripts/check-vast-fixtures.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
+    "fast-xml-parser": "^5.10.1",
     "fluid-player": "^3.59.0",
     "lucide-react": "^1.22.0",
     "next": "16.2.9",

@@ -1,18 +1,21 @@
 import { statusLabel, statusTone, type Dict } from "@/lib/i18n/dictionaries";
 import { chipType } from "@/components/ui/Chip";
 
-export type Tone = "live" | "info" | "dead" | "idle";
+export type Tone = "live" | "info" | "warn" | "dead" | "idle";
 
 const DOT: Record<Tone, string> = {
   live: "bg-live",
   info: "bg-info",
+  warn: "bg-warn",
   dead: "bg-dead",
   idle: "bg-idle",
 };
 
-const TEXT: Record<Tone, string> = {
+/** Foreground for a state word or a tinted notice. */
+export const TEXT: Record<Tone, string> = {
   live: "text-live-fg",
   info: "text-info-fg",
+  warn: "text-warn-fg",
   dead: "text-dead-fg",
   idle: "text-idle-fg",
 };
@@ -21,8 +24,20 @@ const TEXT: Record<Tone, string> = {
 export const RAIL: Record<Tone, string> = {
   live: "border-l-live",
   info: "border-l-info",
+  warn: "border-l-warn",
   dead: "border-l-dead",
   idle: "border-l-idle",
+};
+
+/** Tint background, for the few places a state needs a fill rather than a rail. */
+export const TINT: Record<Tone, string> = {
+  live: "bg-live-bg",
+  info: "bg-info-bg",
+  warn: "bg-warn-bg",
+  dead: "bg-dead-bg",
+  // idle-fg on idle-bg measures 4.49:1 — under AA for small text, so this pair
+  // is deliberately absent rather than quietly wrong (docs/design-system.md §3).
+  idle: "bg-surface-sunken",
 };
 
 /**

@@ -28,6 +28,12 @@ code on every change (see the [`doc-sync`](../.claude/skills/doc-sync/SKILL.md) 
 
 ## Status
 
-This is **design-phase** documentation. No production code exists yet. The schema,
-API contracts, and types described here are the agreed target; implementation follows
-once the MVP scope is locked.
+The MVP is **implemented and deployed**; these documents describe shipped
+behaviour, not a target. Where a document still describes something as planned it
+says so in place — [`mvp-scope.md`](mvp-scope.md) carries the authoritative
+in/out list and implementation status.
+
+(This section previously read "design-phase documentation, no production code
+exists yet", which had been untrue for some time. It is recorded here rather than
+quietly deleted because it is the exact kind of drift rule 4 above exists to
+catch.)

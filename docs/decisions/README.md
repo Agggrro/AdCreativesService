@@ -27,6 +27,8 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted |
 | [0011](0011-conditional-grouped-config-schemas.md) | Conditional, grouped config schemas — and per-path click-through | Accepted |
 | [0012](0012-viewability-measurement.md) | Viewability measurement — OMID pass-through for SIMID, a custom module for VPAID | Accepted |
+| [0013](0013-public-free-tools-section.md) | A public free-tools section, and a nav for signed-out visitors | Accepted |
+| [0014](0014-vast-inspection-engine.md) | The VAST inspection engine — prose-derived rules, and dry-run by substitution | Accepted |
 
 ## Template
 

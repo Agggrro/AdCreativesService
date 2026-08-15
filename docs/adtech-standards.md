@@ -55,6 +55,62 @@ subagent.
 [`runtime/shoppable/`](../runtime); per-creative config reaches them via
 `<AdParameters>` at serve time (never baked in — ADR-0003).
 
+## Reading VAST — the inspection engine
+
+Everything above is about *emitting* VAST. [`lib/vast-inspect/`](../lib/vast-inspect)
+does the opposite, for the public validator
+([ADR-0014](decisions/0014-vast-inspection-engine.md)).
+
+It validates against the **prose** of the specifications, not against an XSD.
+There is no published XSD for VAST 4.3 at all, and XSD cannot express most of what
+actually breaks a player: an `http` tracker on an `https` page, a `MediaFile`
+declaring `video/mp4` for a `.webm` URL, an `AdVerifications` block left inside
+`<Extensions>` where VAST 4.0 put it. Rules are gated on the version the document
+declares, so a `skipoffset` in a 2.0 document is reported as unsupported rather
+than as fine.
+
+Version attribution is taken from the IAB XSDs and the specification prose, not
+from secondary sources — several widely-repeated claims are wrong, and a
+validator that repeats them invents violations. **VPAID is deprecated from VAST
+4.1 and has never been removed**: 4.3's own change list only adds SIMID support
+and error code 902, and 4.3 still documents what to include "if VPAID support is
+indicated in the request". `InteractiveCreativeFile` is a **4.0** element, not
+4.1; 4.1 added its `variableDuration` attribute. `Pricing` is 3.0. The
+`interactiveStart` tracking event — the one a SIMID creative fires — arrived in
+the 4.2 XSD.
+
+The catalogue is pinned by a fixture corpus — `npm run check:vast`, against a
+running dev server. It asserts that the clean fixture produces zero errors and
+zero warnings, that each broken fixture reports the specific rules it was built
+to trip, that named false positives stay absent, and that dry-run lets no
+third-party tracker through while live mode passes the document byte-identical.
+Run it after any change to the rules.
+
+Coverage spans VAST 2.0–4.3, SIMID 1.2 and OMID, in ten groups: document, ad,
+inline, linear, wrapper, tracking, interactive, verification, modern/CTV, and
+delivery hygiene.
+
+**Child order is checked for `InLine` and `Wrapper` only**, and the restriction is
+deliberate. The schema models its containers with `xs:sequence`, so order is
+normative — and because `Inline_type` extends `AdDefinitionBase_type`, the correct
+order is base-then-derived, putting `<Error>` and `<Pricing>` *before* `<AdTitle>`.
+That looks wrong and is not: IAB's own published sample is authored that way. But
+the same schema orders `ClosedCaptionFiles` before `MediaFile`, and `Linear`
+before `UniversalAdId`, which contradicts both the 4.3 prose and IAB's sample —
+so `MediaFiles`, `Creative` and `Linear` are left unchecked rather than warned on
+wrongly. Re-deriving any of them means checking the schema *and* real tags. Findings carry a severity, an XPath, a spec citation, both
+locales of the message and its fix, and the IAB error code a player would report.
+The interactive and verification groups mirror the invariants
+[`.claude/agents/vast-spec-reviewer.md`](../.claude/agents/vast-spec-reviewer.md)
+checks on our own output, which makes our generator checkable by our own
+validator — a fixture in the corpus exists for exactly that.
+
+The engine also reports what the tag *is*, not only what is wrong with it: which
+VAST version's features it uses and which ones its declared version puts out of
+reach, and a dedicated VPAID/SIMID/OMID panel. That panel is the part of the
+report the rest of the market treats as a footnote, and it is the part that
+matches what this product actually builds.
+
 `<AdParameters>` carries the creative's **full `config_json`**, not just the fixed
 subset (`videoUrl`, `clickThroughUrl`, `durationSeconds`, `productName`,
 `productImageUrl`) that `CreativeConfig` types explicitly — those explicit fields

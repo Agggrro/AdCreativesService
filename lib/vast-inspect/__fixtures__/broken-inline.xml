@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Every defect the catalogue is expected to name, in one document:
+    · no AdServingId, though 4.1 requires it
+    · no AdTitle
+    · no Impression
+    · Duration in seconds instead of HH:MM:SS
+    · MediaFile missing width/height, declaring mp4 for a .webm URL
+    · skipoffset in a format no player parses
+    · an http tracker on an https page
+    · a Tracking event that does not exist
+    · a duplicate-free Error element with no [ERRORCODE] macro
+    · a template macro the ad server never substituted
+    · a URL broken across lines
+-->
+<VAST version="4.1">
+  <Ad id="broken-1">
+    <InLine>
+      <AdSystem>Fixture</AdSystem>
+      <Creatives>
+        <Creative>
+          <Linear skipoffset="5 seconds">
+            <Duration>30</Duration>
+            <TrackingEvents>
+              <Tracking event="start">http://tracking.example.com/start</Tracking>
+              <Tracking event="halfway">https://tracking.example.com/halfway</Tracking>
+              <Tracking>https://tracking.example.com/no-event</Tracking>
+              <Tracking event="progress">https://tracking.example.com/progress-no-offset</Tracking>
+            </TrackingEvents>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4"><![CDATA[https://cdn.example.com/creative.webm]]></MediaFile>
+              <MediaFile delivery="carrier-pigeon" type="video/mp4" width="640" height="360"><![CDATA[https://cdn.example.com/spaced url.mp4]]></MediaFile>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickThrough>https://www.example.com/landing?src=[PARTNER_ID]</ClickThrough>
+            </VideoClicks>
+          </Linear>
+        </Creative>
+      </Creatives>
+      <Error>https://tracking.example.com/error</Error>
+    </InLine>
+  </Ad>
+</VAST>

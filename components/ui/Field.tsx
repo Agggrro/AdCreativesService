@@ -1,3 +1,5 @@
+import { TEXT, TINT } from "@/components/ui/State";
+
 /**
  * Instrument form control: 32px high, 3px radius, mono 13px — inputs hold URLs,
  * macros, and timecodes, where every character matters (docs/design-system.md §4).
@@ -56,6 +58,10 @@ export function Panel({
 /**
  * Inline notice: cold semantics only — an alarm is never warm.
  *
+ * Tint and foreground come from `ui/State.tsx` rather than being written out
+ * here, so a notice and a state word can never disagree about what a tone
+ * looks like.
+ *
  * `live` marks a notice that appears *in place*, without a navigation, so a
  * screen reader has nothing else to announce it — set it whenever the notice is
  * raised by client-side validation. Server-rendered notices leave it off: the
@@ -66,12 +72,11 @@ export function Notice({
   live,
   children,
 }: {
-  tone: "info" | "dead";
+  tone: "info" | "warn" | "dead";
   live?: boolean;
   children: React.ReactNode;
 }) {
-  const styles =
-    tone === "dead" ? "bg-dead-bg text-dead-fg" : "bg-info-bg text-info-fg";
+  const styles = `${TINT[tone]} ${TEXT[tone]}`;
   return (
     <p
       role={live ? "alert" : undefined}
