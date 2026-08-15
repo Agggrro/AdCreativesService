@@ -57,6 +57,9 @@
 
   /* Radius 3px on controls and panels; nothing else is rounded */
   --radius-ctl: 3px;
+
+  /* The one shadow in the system, for a floating overlay only (§2) */
+  --shadow-overlay: 0 8px 24px rgba(27, 26, 24, 0.16);
 }
 
 html {

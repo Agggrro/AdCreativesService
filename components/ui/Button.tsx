@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const VARIANTS: Record<ButtonVariant, string> = {
   // One primary per screen — it is the accent budget (docs/design-system.md §3)
@@ -8,6 +8,9 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary:
     "border border-line bg-surface text-fg hover:bg-ground disabled:text-fg-disabled",
   ghost: "text-fg-secondary hover:bg-fill",
+  // The confirm action inside a destructive dialog only — never a list action
+  // (docs/design-system.md §6, "Destructive confirmation").
+  danger: "bg-dead text-white hover:bg-dead-fg",
 };
 
 /**

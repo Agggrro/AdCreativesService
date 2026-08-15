@@ -87,6 +87,14 @@ lives. That risk is answered by the specific rules in
   every screen and therefore spent one of two slots before a page rendered anything. The
   budget now scopes to the content area, with the persistent top-bar chrome exempt. The
   gate paid for itself on its first use.
+- A later `design-system-reviewer` run (creatives-table copy/edit/delete fix, 2026-08-15)
+  caught the same class of self-contradiction again: §9's "no icon-only actions" rule was
+  left standing while a new §6 section quietly described an icon-only delete trigger. The
+  fix is a narrow, explicit carve-out in §9 itself — a data table's per-row action cell,
+  where a repeated text label would force the table into horizontal scroll, may go
+  icon-only *if* `aria-label` and `title` both carry the verb — rather than a second
+  section asserting an exception the boundaries table didn't know about. Anywhere outside
+  a table's action cell, icon-only is still off-limits.
 - The mono-for-machine-data rule makes VAST tags, ids, and timecodes noticeably easier to
   read and diff, at the cost of a slightly denser, more technical feel on marketing
   surfaces. That trade is accepted: the dashboard is the product.

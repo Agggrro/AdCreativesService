@@ -117,8 +117,13 @@ const ru = {
     vastTag: "VAST-тег",
     deleteCreative: "Удалить креатив",
     deleteConfirmTitle: "Удалить креатив?",
+    // Says what is actually destroyed, and how fast. The earlier wording
+    // promised "сразу", which the 60s CDN cache plus 30s stale-while-revalidate
+    // on /api/vast cannot deliver, and never mentioned that the whole delivery
+    // history goes with the creative — the thing a media buyer would most want
+    // to be told before pressing an irreversible button.
     deleteConfirmBody:
-      "Тег сразу перестаёт отдавать интерактивный payload. Действие необратимо.",
+      "Вместе с креативом безвозвратно удаляются вся статистика показов и загруженные файлы. Тег перестанет отдавать интерактивный payload в течение минуты.",
     deleteConfirmAction: "Удалить",
     template: "Шаблон",
     description: "Описание",
@@ -479,7 +484,7 @@ const en: Dict = {
     deleteCreative: "Delete creative",
     deleteConfirmTitle: "Delete this creative?",
     deleteConfirmBody:
-      "The tag stops serving the interactive payload immediately. This can't be undone.",
+      "All delivery statistics and uploaded files are destroyed along with the creative, permanently. The tag stops serving the interactive payload within about a minute.",
     deleteConfirmAction: "Delete",
     template: "Template",
     description: "Description",

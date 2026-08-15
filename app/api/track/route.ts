@@ -1,14 +1,12 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifyTrackToken } from "@/lib/track-token";
 import type { CreativeEventType } from "@/types/database.types";
+import { UUID_RE } from "@/lib/uuid";
 
 // Public tracking beacon hit by the player for VAST events. Fire-and-forget:
 // always 204, never blocks or leaks. Node runtime for the service-role insert.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Map VAST/runtime event names to the creative_event_type enum.
 //

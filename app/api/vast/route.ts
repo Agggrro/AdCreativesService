@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { generateVast, emptyVast, parseCreativeConfig } from "@/lib/vast";
+import { UUID_RE } from "@/lib/uuid";
 
 // Public, unauthenticated ad-serving endpoint. Node runtime keeps full
 // supabase-js/storage support; the ~60s CDN cache (Cache-Control below) absorbs
@@ -8,9 +9,6 @@ import { generateVast, emptyVast, parseCreativeConfig } from "@/lib/vast";
 // See docs/architecture.md.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Every response is a 200 with a VAST body — players expect that even when empty. */
 function vastResponse(body: string): Response {

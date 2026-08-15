@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { parseConfigSchema, buildConfigFromValues } from "@/lib/config-schema";
 import type { CreativeError } from "@/lib/creative-errors";
+import {
+  CREATIVE_MEDIA_BUCKET,
+  isOwnMediaUrl,
+  mediaObjectPath,
+} from "@/lib/creative-media";
+import { UUID_RE } from "@/lib/uuid";
 
 export async function createCreative(formData: FormData): Promise<void> {
   const supabase = await createServerSupabase();
@@ -138,4 +144,109 @@ export async function updateCreative(formData: FormData): Promise<void> {
   }
 
   redirect(`/dashboard/creatives/${creativeId}`);
+}
+
+/**
+ * Every `creative-media` object referenced anywhere in a creative's config.
+ *
+ * `config_json` has no fixed shape (ADR-0011: templates author their own
+ * schema, and the quiz nests per-path exits), so this recurses rather than
+ * reading known field names — a media URL can sit at any depth.
+ */
+function ownedMediaPaths(config: unknown, userId: string): string[] {
+  const paths = new Set<string>();
+
+  const walk = (value: unknown) => {
+    if (typeof value === "string") {
+      if (!isOwnMediaUrl(value)) return;
+      const path = mediaObjectPath(value);
+      // Only ever remove objects under the caller's own prefix. Without this a
+      // hand-edited config pointing at someone else's public URL would delete
+      // their file — the bucket's delete policy is keyed on the path prefix,
+      // and this keeps us from ever asking it to do the wrong thing.
+      if (path && path.startsWith(`${userId}/`)) paths.add(path);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.values(value as Record<string, unknown>).forEach(walk);
+    }
+  };
+
+  walk(config);
+  return [...paths];
+}
+
+/**
+ * Deletes a creative and the media it uploaded.
+ *
+ * Hard delete, not an archive: the row goes, and `creative_events` goes with it
+ * through the FK cascade. That is a real loss of the buyer's delivery history,
+ * so the confirmation dialog says so in as many words — see
+ * `dashboard.deleteConfirmBody`. The schema does carry an `archived` status
+ * that `should_serve` already gates on, which would kill the tag while keeping
+ * the funnel; offering that instead is a product decision, not one this action
+ * can make on its own.
+ *
+ * Storage is cleaned up **before** the row is deleted, because `config_json` is
+ * the only record of which objects belonged to this creative. Delete the row
+ * first and those files are unattributable forever — and the bucket is
+ * public-read, so they would stay fetchable at a URL that has been published in
+ * every VAST tag ever served. ADR-0010 deferred delete-time cleanup explicitly
+ * "because there is no `deleteCreative` action yet"; this is that action, so the
+ * deferral no longer applies.
+ */
+export async function deleteCreative(formData: FormData): Promise<void> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const creativeId = String(formData.get("creative_id") ?? "");
+  // Shape-check before any DB call, the house rule in docs/security.md.
+  if (!UUID_RE.test(creativeId)) redirect("/dashboard/creatives");
+
+  // Read the config first — RLS scopes this to the caller's own row, so a
+  // foreign id simply finds nothing and we delete no files.
+  const { data: existing } = await supabase
+    .from("creatives")
+    .select("config_json")
+    .eq("id", creativeId)
+    .maybeSingle();
+  const mediaPaths = existing ? ownedMediaPaths(existing.config_json, user.id) : [];
+
+  // RLS (`creatives_delete_own`) scopes this to the caller's own row; an id
+  // that matches nobody's row (someone else's creative) deletes zero rows
+  // rather than erroring. `.select()` is what makes that visible: without it
+  // the action has no signal that it did anything, so if the policy were ever
+  // dropped every delete would silently no-op while the UI reported success.
+  // Telling the user "nothing was deleted" leaks nothing — under RLS, "belongs
+  // to someone else" and "does not exist" are the same zero rows.
+  const { data: deleted, error } = await supabase
+    .from("creatives")
+    .delete()
+    .eq("id", creativeId)
+    .select("id");
+  if (error || !deleted || deleted.length === 0) {
+    console.error("deleteCreative affected no rows", { creativeId, error });
+    redirect("/dashboard/creatives?error=delete_failed");
+  }
+
+  // Best-effort, and deliberately after the row is gone: a storage failure must
+  // not resurrect a creative the user has already been told is deleted. The
+  // orphan is recoverable by hand; a half-deleted creative is not.
+  if (mediaPaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(CREATIVE_MEDIA_BUCKET)
+      .remove(mediaPaths);
+    if (storageError) {
+      console.error("deleteCreative left orphaned media", { creativeId, mediaPaths, storageError });
+    }
+  }
+
+  redirect("/dashboard/creatives");
 }

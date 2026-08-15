@@ -42,8 +42,10 @@ Three consequences follow, and they override any local styling preference:
   tiles, anything using a `gap-px` hairline container: round the first and last child
   instead of clipping the parent. It is the single most repeated way focus disappears.
 - **No shadows.** Depth is expressed by a 1px hairline and a change of surface. The one
-  exception is a floating overlay (dropdown menu, popover, modal), which may use a
-  single subtle shadow token.
+  exception is a floating overlay (dropdown menu, popover, modal), which may use the
+  single `shadow-overlay` token (`--shadow-overlay` in `app/globals.css`) and nothing
+  else. A modal's backdrop is `bg-fg/40` — the existing `fg` token at 40% opacity, not a
+  new colour.
 - **Row height 44px** in data tables (12px vertical padding on 13px/20px text).
 
 ## 3. Colour
@@ -228,6 +230,7 @@ length. Everything else is a table.
 | primary | `accent` fill, white text | **One per screen** |
 | secondary | `surface` fill, `line` border | The default action button |
 | ghost | transparent, `fill` on hover | Tertiary/cancel |
+| danger | `dead` fill, white text | The confirm action inside a destructive confirmation dialog only — never a default list action, and never the trigger that opens the dialog |
 | disabled | `fill` background, `fg-disabled` text | Avoid; prefer an enabled control that explains itself |
 
 Height 32px, radius 3px, 13px/500 label, 120ms transitions.
@@ -236,6 +239,21 @@ Height 32px, radius 3px, 13px/500 label, 120ms transitions.
 (`buttonClass()` in client components), `ui/Chip.tsx` for the chip role, `ui/State.tsx`
 for state words and rails. A hand-rolled control that lands at 24px, or a fifth copy of
 the chip that quietly ships at weight 400, is how a system starts drifting.
+
+### Destructive confirmation
+
+An action that cannot be undone (deleting a creative) never fires from a single click.
+The trigger is a plain `secondary` icon button — never coloured, since §3 forbids a
+status colour used as decoration. Where it sits in a table's action cell, it may be
+icon-only under §9's narrow exception (`aria-label` + `title` carrying the verb);
+outside a table it keeps a visible label like any other button. It opens a centred
+dialog: `bg-fg/40` backdrop,
+`shadow-overlay` panel, a sans h2 naming the action, the affected item's own name (sans,
+not mono — it is a label the user wrote, not a machine value), a one-line consequence in
+`fg-muted`, then `ghost` **Cancel** and `danger` **confirm**, in that order so the safe
+choice sits nearest the reading direction's start. `Escape` and a backdrop click both
+cancel. Confirming submits a server action — no client-side fetch/JSON round trip for a
+plain delete.
 
 ### Segmented controls
 
@@ -500,7 +518,7 @@ never two stacked captions.
 | ✕ | Derived-ratio metrics (CTR, VTR, fill rate) without the counts they come from, or at all where the underlying event is not ingested. |
 | ✕ | Raw Tailwind palette colours (`gray-200`, `green-100`, `blue-600`, …). Tokens only. |
 | ✕ | Rounded pills as a default shape. 3px radius; `50%` only for the status dot. |
-| ✕ | Icon-only actions. Verbs label actions; an icon accompanies a word. |
+| ✕ | Icon-only actions. Verbs label actions; an icon accompanies a word. **Narrow exception:** a data table's per-row action cell, where several actions repeat down every row and a text label on each would force the table to scroll horizontally or re-litigate its column widths on every render. There, a widely-recognised icon (copy, pencil, trash) may stand alone *only* with both `aria-label` and `title` carrying the verb — the creatives table's copy/edit/delete cell is the instance this covers. Nowhere else: a primary action, a form control, or anything outside a table's action cell still needs a visible word. |
 | ✕ | Flags for language, or a second theme. |
 | ✓ | Density as respect: 44px rows, spacing in multiples of 4. |
 | ✓ | State encoded in form as well as colour. |

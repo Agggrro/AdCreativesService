@@ -6,7 +6,8 @@ export type CreativeError =
   | "template_not_found"
   | "field_required"
   | "name_too_long"
-  | "save_failed";
+  | "save_failed"
+  | "delete_failed";
 
 /** Error code → copy, in the reader's language (§8). Shared by the create and edit pages. */
 export function creativeErrorMessage(
@@ -26,7 +27,11 @@ export function creativeErrorMessage(
       return c.errNameTooLong;
     case "save_failed":
       return c.errSaveFailed;
+    case "delete_failed":
+      return c.errDeleteFailed;
     default:
-      return code ? c.errSaveFailed : null;
+      // An unrecognised code says nothing useful, and guessing "could not save"
+      // is wrong on a page that never saves anything. Say nothing.
+      return null;
   }
 }

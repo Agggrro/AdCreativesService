@@ -96,10 +96,22 @@ not a replacement for it (some advertisers already have decent hosting).
   CDN/proxy layer) if abuse is actually observed — not speculatively now.
 - No garbage collection beyond same-field replace (uploading a new file into a
   field that already held one of our own URLs best-effort deletes the old object).
-  Abandoned mid-configuration uploads and delete-triggered cleanup are deferred —
-  there is no `deleteCreative` action yet, and free-tier storage headroom makes a
-  slow trickle of orphaned small files a non-issue at this stage. Revisit if usage
-  data says otherwise.
+  Abandoned mid-configuration uploads are still deferred: free-tier storage
+  headroom makes a slow trickle of orphaned small files a non-issue at this
+  stage. Revisit if usage data says otherwise.
+
+  **Delete-time cleanup is no longer deferred.** This deferral originally rested
+  on there being no `deleteCreative` action; one now exists
+  (`app/dashboard/creatives/actions.ts`), and the premise does not survive it.
+  The reason it could not simply stay deferred: `config_json` is the only record
+  of which objects belong to a creative, so deleting the row first makes those
+  files unattributable *forever* — not garbage a later job could collect — and
+  the bucket is public-read, so they would remain fetchable at a URL already
+  published in every VAST tag ever served. The action therefore reads the config,
+  collects the media paths under the caller's own `{auth.uid()}/` prefix, deletes
+  the row, then best-effort removes the objects on the session client. Storage
+  failure is logged, not surfaced: an orphan is recoverable by hand, a
+  half-deleted creative is not.
 - Two Storage buckets now exist with deliberately different trust models
   (`creatives`: private/signed/code; `creative-media`: public/RLS-gated-write/
   advertiser assets) — see `docs/data-model.md`'s "Storage buckets" section. Keep

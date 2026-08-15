@@ -37,7 +37,7 @@ A user's configured instance of a template.
 | `name` | optional user label; the UI falls back to the template name. Without it two creatives from one template differ only by uuid |
 | `selected_format` | `simid` \| `vpaid` \| … — user's choice; must be in template's `supported_standards` |
 | `config_json` | jsonb — validated against the template's `config_schema`. Holds only the fields that were **active** at save time, so two creatives built from the same template can legitimately have different key sets, and a conditional field's absence is meaningful rather than a gap ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)). Nothing reading it may assume a fixed shape |
-| `status` | `draft` \| `active` \| `paused` \| `archived`. **Only `active` is reachable today** — it is hardcoded on insert and nothing updates it. The dashboard therefore shows a serving state derived from entitlement, not this column ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)); a per-creative kill switch needs one server action that does not exist yet |
+| `status` | `draft` \| `active` \| `paused` \| `archived`. **Only `active` is reachable today** — it is hardcoded on insert and nothing updates it. The dashboard therefore shows a serving state derived from entitlement, not this column ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)). A per-creative kill switch still has no server action: what shipped instead is a **hard delete** (`deleteCreative`), which takes the row, its `creative_events`, and its uploaded media with it. Both `should_serve` expressions already gate on `status = 'active'`, so setting `archived` would silence a tag identically while keeping its history — the non-destructive option remains one `UPDATE` away and is worth revisiting |
 | `created_at`, `updated_at` | |
 
 ### `subscriptions`
@@ -56,12 +56,16 @@ Source-of-truth mirror of Stripe state. See [billing.md](billing.md).
 | `created_at`, `updated_at` | |
 
 ### `creative_events` (analytics)
-Ingested ad events — the core value for media buyers. Append-only.
+Ingested ad events — the core value for media buyers. Append-only, but **not
+permanent**: the FK to `creatives` is `on delete cascade`, so deleting a creative
+destroys its entire delivery history with it. There is no export and no soft
+delete, which is why the confirmation dialog names the loss explicitly rather
+than saying only that the action cannot be undone.
 
 | Field | Notes |
 | --- | --- |
 | `id` | bigint PK |
-| `creative_id` | FK |
+| `creative_id` | FK, `on delete cascade` — see above |
 | `event_type` | enum allows `impression` \| `start` \| `q25` \| `q50` \| `q75` \| `complete` \| `interaction` \| `click` \| `viewable`; **`interaction`/`click` are never produced. `viewable` is VPAID-only** — self-reported, non-OMID-accredited (ADR-0012); a SIMID creative never writes it, since its viewability is measured by the advertiser's own OMID vendor, which we don't ingest |
 | `meta` | jsonb — intended for device / geo bucket / interaction detail. Nothing writes it today; every row is `{}` |
 | `occurred_at` | ts |
