@@ -102,11 +102,16 @@ lives. That risk is answered by the specific rules in
   specks — and a DevTools inspection this time, which found the SVG rendering exactly as
   specified (18×18, correct path data, a 2px effective stroke): the markup was never
   wrong, the icons genuinely are that hard to place without a word next to them. The
-  carve-out was narrowed a second time in response, to the one case it can actually
-  justify — copy, where the value beside the icon already carries the meaning — and edit
-  and delete both went back to visible labels. Three iterations to learn that "technically
-  renders correctly" and "reads as a button" are different claims, and only a screenshot
-  of the real thing distinguishes them.
+  carve-out was narrowed a second time, to copy alone, on the theory that the tag text
+  beside it already carried the meaning. It didn't survive contact with the user either —
+  asked directly why copy still wasn't fixed, because from the row it looks exactly as
+  unlabelled as edit and delete did. The carve-out is retracted entirely: all three actions
+  are visible-label buttons, §9 is back to its original unqualified rule, and the column
+  budget that icon-only was solving for is handled by narrower number/status columns and a
+  dropped tag-text preview (§6) instead. Four iterations, three of them because the
+  exception kept getting *narrowed* instead of *questioned* — "technically renders
+  correctly" and "reads as a button" are different claims, but so are "this one specific
+  case is justified" and "icon-only is ever the right call in a product this dense."
 - The mono-for-machine-data rule makes VAST tags, ids, and timecodes noticeably easier to
   read and diff, at the cost of a slightly denser, more technical feel on marketing
   surfaces. That trade is accepted: the dashboard is the product.

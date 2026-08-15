@@ -88,7 +88,7 @@ export default async function MyCreativesPage({
               <col className="w-[80px]" />
               <col className="w-[88px]" />
               <col className="w-[132px]" />
-              <col className="w-[180px]" />
+              <col className="w-[190px]" />
               <col className="w-[260px]" />
             </colgroup>
             <thead>
@@ -155,24 +155,27 @@ export default async function MyCreativesPage({
                         </span>
                       )}
                     </td>
-                    <td className={CELL}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          title={tag}
-                          className="data-instr min-w-0 flex-1 truncate text-[13px] text-fg-secondary"
-                        >
-                          {tag}
-                        </span>
-                        <CopyButton value={tag} compact />
+                    <td className={`${CELL} whitespace-nowrap`}>
+                      {/* No truncated tag preview here: at any column width
+                          that still leaves room for the rest of the row, a
+                          truncated "https://…/api/vast?creative_id=" shows
+                          only the part every row shares and cuts off before
+                          the id that actually tells rows apart — it read as
+                          a URL and nothing more. Full value is a hover away
+                          on this wrapper, and in full on the creative's own
+                          page (the row's name links there). */}
+                      <div title={tag} className="inline-flex">
+                        <CopyButton value={tag} />
                       </div>
                     </td>
                     <td className={`${CELL} whitespace-nowrap`}>
-                      {/* Edit and Delete keep visible words: a screenshot of
-                          the shipped icon-only version showed both reduced to
-                          indistinguishable specks in practice, and Delete in
-                          particular can't be a guess. Copy stays icon-only —
-                          it sits right next to the tag text it acts on, so
-                          the affordance reads from context even at 18px. */}
+                      {/* Edit and Delete keep visible words, same as Copy: a
+                          screenshot of the icon-only version this table
+                          shipped with showed all three reduced to
+                          indistinguishable specks in practice, even at a
+                          correctly-rendered 18px — confirmed via DevTools,
+                          not just eyeballed. No action in this row goes
+                          icon-only anymore. */}
                       <div className="flex justify-end gap-2">
                         <Link
                           href={`/dashboard/creatives/${c.id}/edit`}

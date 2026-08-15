@@ -42,12 +42,9 @@ function ConfirmSubmitButton({
 export function DeleteCreativeButton({
   creativeId,
   creativeName,
-  compact = false,
 }: {
   creativeId: string;
   creativeName: string;
-  /** Icon-only trigger, for tight table cells — see CopyButton's `compact`. */
-  compact?: boolean;
 }) {
   const dict = useDict();
   const [open, setOpen] = useState(false);
@@ -62,22 +59,14 @@ export function DeleteCreativeButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={dict.dashboard.deleteCreative}
         title={dict.dashboard.deleteCreative}
-        className={buttonClass(
-          "secondary",
-          compact ? "w-8 shrink-0 justify-center px-0" : "",
-        )}
+        className={buttonClass("secondary")}
       >
-        <Trash2
-          size={compact ? 18 : 14}
-          absoluteStrokeWidth={compact}
-          aria-hidden
-        />
+        <Trash2 size={14} aria-hidden />
         {/* Short verb on the button itself — "Delete creative" is redundant
-            on a row that's already a creative, and costs width the table
-            doesn't have. The fuller phrase stays on aria-label/title. */}
-        {!compact && dict.dashboard.deleteConfirmAction}
+            on a row that's already a creative. The fuller phrase stays on
+            the tooltip. */}
+        {dict.dashboard.deleteConfirmAction}
       </button>
 
       {open && (

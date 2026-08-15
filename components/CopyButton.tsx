@@ -5,15 +5,7 @@ import { Check, Copy } from "lucide-react";
 import { buttonClass } from "@/components/ui/Button";
 import { useDict } from "@/components/i18n/LocaleProvider";
 
-export function CopyButton({
-  value,
-  compact = false,
-}: {
-  value: string;
-  /** Icon-only, fixed 32x32 — for tight table cells where a label would push
-   * the column wide. Label goes to `aria-label`/`title` instead. */
-  compact?: boolean;
-}) {
+export function CopyButton({ value }: { value: string }) {
   const dict = useDict();
   const [copied, setCopied] = useState(false);
 
@@ -25,26 +17,6 @@ export function CopyButton({
     } catch {
       // clipboard unavailable; ignore
     }
-  }
-
-  const label = copied ? dict.common.tagCopied : dict.common.copyTag;
-
-  if (compact) {
-    return (
-      <button
-        type="button"
-        onClick={copy}
-        aria-label={label}
-        title={label}
-        className={buttonClass("secondary", "w-8 shrink-0 justify-center px-0")}
-      >
-        {copied ? (
-          <Check size={18} absoluteStrokeWidth aria-hidden />
-        ) : (
-          <Copy size={18} absoluteStrokeWidth aria-hidden />
-        )}
-      </button>
-    );
   }
 
   return (
