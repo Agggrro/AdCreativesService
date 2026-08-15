@@ -82,7 +82,14 @@ export function DeleteCreativeButton({
             aria-modal="true"
             aria-labelledby="delete-creative-title"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-ctl border border-hairline bg-surface p-6 shadow-overlay"
+            // `min-w-0`: this card is a flex item of the centering backdrop
+            // above, and a flex item's default `min-width: auto` lets its
+            // content's own intrinsic width win over `max-w-sm` — which is
+            // exactly what let the body paragraph push the card wide and
+            // spill unwrapped past its own edge. `min-w-0` puts `max-w-sm`
+            // back in charge of the card's width, the way it would work if
+            // this weren't a flex child at all.
+            className="w-full min-w-0 max-w-sm rounded-ctl border border-hairline bg-surface p-6 shadow-overlay"
           >
             <h2
               id="delete-creative-title"
@@ -93,7 +100,7 @@ export function DeleteCreativeButton({
             <p className="mt-2 truncate text-[13px] font-medium leading-5">
               {creativeName}
             </p>
-            <p className="mt-2 text-[13px] leading-5 text-fg-muted">
+            <p className="mt-2 break-words text-[13px] leading-5 text-fg-muted">
               {dict.dashboard.deleteConfirmBody}
             </p>
             <div className="mt-6 flex justify-end gap-3">
