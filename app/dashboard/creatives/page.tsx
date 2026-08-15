@@ -83,13 +83,13 @@ export default async function MyCreativesPage({
           <table className="w-full table-fixed border-collapse text-[13px]">
             <colgroup>
               <col />
+              <col className="w-[76px]" />
               <col className="w-[92px]" />
-              <col className="w-[104px]" />
+              <col className="w-[80px]" />
               <col className="w-[88px]" />
-              <col className="w-[96px]" />
-              <col className="w-[144px]" />
-              <col className="w-[210px]" />
-              <col className="w-[104px]" />
+              <col className="w-[132px]" />
+              <col className="w-[180px]" />
+              <col className="w-[260px]" />
             </colgroup>
             <thead>
               <tr className="border-b border-hairline">
@@ -167,22 +167,23 @@ export default async function MyCreativesPage({
                       </div>
                     </td>
                     <td className={`${CELL} whitespace-nowrap`}>
+                      {/* Edit and Delete keep visible words: a screenshot of
+                          the shipped icon-only version showed both reduced to
+                          indistinguishable specks in practice, and Delete in
+                          particular can't be a guess. Copy stays icon-only —
+                          it sits right next to the tag text it acts on, so
+                          the affordance reads from context even at 18px. */}
                       <div className="flex justify-end gap-2">
                         <Link
                           href={`/dashboard/creatives/${c.id}/edit`}
-                          aria-label={dict.dashboard.edit}
-                          title={dict.dashboard.edit}
-                          className={buttonClass(
-                            "secondary",
-                            "w-8 shrink-0 justify-center px-0",
-                          )}
+                          className={buttonClass("secondary")}
                         >
-                          <Pencil size={18} absoluteStrokeWidth aria-hidden />
+                          <Pencil size={14} aria-hidden />
+                          {dict.dashboard.edit}
                         </Link>
                         <DeleteCreativeButton
                           creativeId={c.id}
                           creativeName={label}
-                          compact
                         />
                       </div>
                     </td>

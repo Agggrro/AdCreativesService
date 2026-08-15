@@ -243,11 +243,11 @@ the chip that quietly ships at weight 400, is how a system starts drifting.
 ### Destructive confirmation
 
 An action that cannot be undone (deleting a creative) never fires from a single click.
-The trigger is a plain `secondary` icon button — never coloured, since §3 forbids a
-status colour used as decoration. Where it sits in a table's action cell, it may be
-icon-only under §9's narrow exception (`aria-label` + `title` carrying the verb);
-outside a table it keeps a visible label like any other button. It opens a centred
-dialog: `bg-fg/40` backdrop,
+The trigger is a plain `secondary` button, labelled — never coloured, since §3 forbids a
+status colour used as decoration, and never icon-only: §9's icon-only carve-out is for an
+action that reads from context (copy, next to the value it copies), and delete does not
+qualify — a wrong guess there is destructive, so the word stays on the button. It opens a
+centred dialog: `bg-fg/40` backdrop,
 `shadow-overlay` panel, a sans h2 naming the action, the affected item's own name (sans,
 not mono — it is a label the user wrote, not a machine value), a one-line consequence in
 `fg-muted`, then `ghost` **Cancel** and `danger` **confirm**, in that order so the safe
@@ -518,7 +518,7 @@ never two stacked captions.
 | ✕ | Derived-ratio metrics (CTR, VTR, fill rate) without the counts they come from, or at all where the underlying event is not ingested. |
 | ✕ | Raw Tailwind palette colours (`gray-200`, `green-100`, `blue-600`, …). Tokens only. |
 | ✕ | Rounded pills as a default shape. 3px radius; `50%` only for the status dot. |
-| ✕ | Icon-only actions. Verbs label actions; an icon accompanies a word. **Narrow exception:** a data table's per-row action cell, where several actions repeat down every row and a text label on each would force the table to scroll horizontally or re-litigate its column widths on every render. There, a widely-recognised icon (copy, pencil, trash) may stand alone *only* with both `aria-label` and `title` carrying the verb, **and rendered at 18px with `absoluteStrokeWidth`** — not the usual 14px inline-with-text size, which read as an indistinct speck once it had no adjacent label to lean on (caught from a live screenshot, not a review). The creatives table's copy/edit/delete cell is the instance this covers. Nowhere else: a primary action, a form control, or anything outside a table's action cell still needs a visible word. |
+| ✕ | Icon-only actions. Verbs label actions; an icon accompanies a word. **Exception, and it is narrower than it first looks:** only an action whose meaning is already carried by what it sits next to — a copy icon beside the value it copies is not really unlabelled, the value *is* the label — may drop its own word, and even then only inside a data table's per-row action cell, at 18px with `absoluteStrokeWidth` (the standard 14px inline-with-text size reads as an indistinct speck with nothing beside it to lean on — confirmed from a live screenshot, twice, not from a review). It is not a space-saving device: the creatives table shipped a copy/edit/delete cell fully icon-only first, and edit and delete both came back to visible words after the same screenshot showed a user unable to tell them apart — a wrong guess on those is either the wrong screen or a destroyed creative, and no icon earns that trust merely by being recognisable in the abstract. Copy is the one action in the product this currently covers. |
 | ✕ | Flags for language, or a second theme. |
 | ✓ | Density as respect: 44px rows, spacing in multiples of 4. |
 | ✓ | State encoded in form as well as colour. |

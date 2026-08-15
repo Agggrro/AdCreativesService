@@ -97,10 +97,16 @@ lives. That risk is answered by the specific rules in
   a table's action cell, icon-only is still off-limits.
 - The first shipped version of that carve-out used the standard 14px icon size — correct
   next to a label, unreadable without one. A user screenshot of the live table showed
-  three indistinguishable specks instead of a copy/pencil/trash silhouette; the exception
-  now pins icon-only actions to 18px with `absoluteStrokeWidth` so the stroke doesn't
-  shrink along with the icon. Two review passes and a live screenshot were what it took to
-  get this one carve-out right — the gate does not replace looking at the actual product.
+  three indistinguishable specks instead of a copy/pencil/trash silhouette, so it went to
+  18px with `absoluteStrokeWidth`. A second screenshot, after that fix, showed the same
+  specks — and a DevTools inspection this time, which found the SVG rendering exactly as
+  specified (18×18, correct path data, a 2px effective stroke): the markup was never
+  wrong, the icons genuinely are that hard to place without a word next to them. The
+  carve-out was narrowed a second time in response, to the one case it can actually
+  justify — copy, where the value beside the icon already carries the meaning — and edit
+  and delete both went back to visible labels. Three iterations to learn that "technically
+  renders correctly" and "reads as a button" are different claims, and only a screenshot
+  of the real thing distinguishes them.
 - The mono-for-machine-data rule makes VAST tags, ids, and timecodes noticeably easier to
   read and diff, at the cost of a slightly denser, more technical feel on marketing
   surfaces. That trade is accepted: the dashboard is the product.

@@ -74,7 +74,10 @@ export function DeleteCreativeButton({
           absoluteStrokeWidth={compact}
           aria-hidden
         />
-        {!compact && dict.dashboard.deleteCreative}
+        {/* Short verb on the button itself — "Delete creative" is redundant
+            on a row that's already a creative, and costs width the table
+            doesn't have. The fuller phrase stays on aria-label/title. */}
+        {!compact && dict.dashboard.deleteConfirmAction}
       </button>
 
       {open && (
