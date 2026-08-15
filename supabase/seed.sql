@@ -18,11 +18,16 @@ insert into public.templates (
     'commerce',
     array['simid', 'vpaid'],
     '{"simid":"shoppable/simid/index.html","vpaid":"shoppable/vpaid/unit.js"}'::jsonb,
-    '{"fields":[
+    '{"groups":[
+       {"id":"viewability"}
+     ],"fields":[
        {"name":"videoUrl","label":"Video URL","type":"image","required":true},
        {"name":"clickThroughUrl","label":"Click-through URL","type":"url"},
        {"name":"productName","label":"Product name","type":"text"},
-       {"name":"productImageUrl","label":"Product image URL","type":"image"}
+       {"name":"productImageUrl","label":"Product image URL","type":"image"},
+       {"name":"verificationVendor","label":"Verification vendor","type":"text","group":"viewability","help":"Your OMID verification vendor''s name/key (e.g. as given in their integration docs). SIMID only — pass-through, we are not the vendor.","showWhen":[{"field":"selected_format","equals":["simid"]}]},
+       {"name":"verificationScriptUrl","label":"Verification script URL","type":"url","group":"viewability","help":"The vendor''s OMID JavaScriptResource URL (https only).","showWhen":[{"field":"selected_format","equals":["simid"]}]},
+       {"name":"verificationParameters","label":"Verification parameters","type":"textarea","group":"viewability","help":"Opaque string the vendor gave you, passed through unchanged as VerificationParameters.","showWhen":[{"field":"selected_format","equals":["simid"]}]}
      ]}'::jsonb,
     'standard',
     true

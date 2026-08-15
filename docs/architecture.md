@@ -123,6 +123,9 @@ FormatAdapter:
   buildMediaNodes(creative, ctx): VastFragment   // e.g. InteractiveCreativeFile (SIMID)
                                                   //      or MediaFile apiFramework=VPAID
   runtimeUrl(creative, ctx): SignedUrl
+  adVerificationsInner?(creative, ctx): VastFragment  // OMID <Verification> pass-through,
+                                                       // SIMID only — ADR-0012. Optional;
+                                                       // VPAID doesn't implement it.
 ```
 
 The VAST builder selects the adapter from the user's chosen format on the creative.

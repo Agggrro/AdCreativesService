@@ -21,8 +21,26 @@ Review focus:
      VPAID unit; legacy treatment as designed.
    - Each adapter emits only its own concern; the endpoint stays format-agnostic.
 3. **Tracking & measurement.** Quartile events (start/25/50/75/complete), impression,
-   click tracking present and wired to `creative_events` intent. Room left for OMID
-   `<Verification>` nodes (post-MVP, but don't preclude).
+   click tracking present and wired to `creative_events` intent.
+   - **`<AdVerifications>` (OMID pass-through, SIMID only — ADR-0012).** Placed as a
+     sibling of `<Creatives>`, between `<Impression>` and `<Creatives>` (VAST
+     4.1+ `InLine` child order) — never nested inside `<MediaFiles>`. Each
+     `<Verification vendor="...">` carries a `<JavaScriptResource
+     apiFramework="omid" browserOptional="true">` (the advertiser-supplied
+     vendor URL, `https://` only) and, when present, a
+     `<VerificationParameters>` CDATA block passed through opaque/unvalidated.
+     The whole `<AdVerifications>` block must be omitted entirely (not emitted
+     empty) when no vendor URL is configured — check `lib/vast/verification.ts`
+     fails closed on a malformed URL rather than emitting a partial node.
+     VPAID's adapter must not implement this — its viewability is a separate,
+     non-VAST-level mechanism (see next point).
+   - **VPAID viewability (self-reported, non-OMID — ADR-0012).** Not a VAST
+     element at all: `runtime/lib/vpaid-base.js` fires a signed beacon
+     (`adParams.viewableTrackingUrl`, minted in `lib/vast/builder.ts` the same
+     way as the other tracking URLs) once its own `IntersectionObserver`
+     clears the MRC threshold. Verify the beacon URL is present in
+     `<AdParameters>` for VPAID output and that no `<AdVerifications>` node is
+     emitted for VPAID (that would misrepresent a self-built metric as OMID).
 4. **Fail-closed contract.** On any error/missing data/ambiguity the output must be
    empty/fallback VAST (`<VAST version="4.2"></VAST>` or configured fallback), never a
    partial or leaking payload. Verify the not-entitled path.

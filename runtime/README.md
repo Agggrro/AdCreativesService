@@ -8,14 +8,22 @@ serves via short-TTL signed URLs (ADR-0003 / ADR-0004).
 ## Layout
 
 - `lib/vpaid-base.js` — the shared VPAID 2.0 base (lifecycle, quartile/click
-  plumbing, the shared media-layer helper for image/gif/video URLs, and the
-  mandatory close control — ADR-0005 / ADR-0009). A template implements only
+  plumbing, the shared media-layer helper for image/gif/video URLs, the
+  mandatory close control — ADR-0005 / ADR-0009 — and a self-reported,
+  non-OMID-accredited viewability observer that fires once the slot has been
+  ≥50% on-screen for a continuous 2s — ADR-0012). A template implements only
   `onStart(slot, params, api)`.
 - `templates/<name>/vpaid.js` — one render module per template, defining `var
   TEMPLATE = { name, duration, onStart }`.
-- `build.mjs` concatenates each render module with the shared base into
-  `dist/<name>/vpaid.js` (or the path override in `build.mjs` for a template
-  whose storage key nests deeper, e.g. `shoppable` → `dist/shoppable/vpaid/unit.js`).
+- `build.mjs` concatenates each render module with the shared base, then
+  minifies the result with `terser` (mangle + compress, comments stripped —
+  deliberately no control-flow-flattening/self-defending obfuscation, which
+  adds per-init runtime cost that risks tripping a player's VPAID init
+  timeout) into `dist/<name>/vpaid.js` (or the path override in `build.mjs`
+  for a template whose storage key nests deeper, e.g. `shoppable` →
+  `dist/shoppable/vpaid/unit.js`). This raises the cost of casually copying
+  the served unit; it is not, and is not meant to be, secrecy — see
+  [ADR-0003](../docs/decisions/0003-access-control-over-code-hiding.md).
 - `shoppable/simid/index.html` — the one SIMID 1.1 reference document (Shoppable
   Video's alternate format; SIMID runs in a sandboxed iframe, not the VPAID
   pipeline, so it isn't built by `build.mjs` and doesn't get the base's media

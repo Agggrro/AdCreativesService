@@ -22,7 +22,7 @@ Catalog of available interactive ad templates (admin-curated, read-only to users
 | `supported_standards` | array, e.g. `{simid, vpaid}` — drives the format picker |
 | `runtime_keys` | per-standard pointer to the runtime build. Its first path segment is also the demo unit key used by `/api/preview-unit/<key>` |
 | `preview_url` | **Reserved, unused.** NULL in every row and rendered nowhere: the catalog shows a live demo rather than a thumbnail. Remove it or fill it — do not read it |
-| `config_schema` | JSON schema describing the fields a user must fill. Since [ADR-0011](decisions/0011-conditional-grouped-config-schemas.md) a field may also carry `group` / `block` (presentation) and `showWhen` (conditional visibility), and a `groups` root key declares how each section renders. Field **order is significant**: visibility resolves top-down, so a field's controllers must be declared before it |
+| `config_schema` | JSON schema describing the fields a user must fill. Since [ADR-0011](decisions/0011-conditional-grouped-config-schemas.md) a field may also carry `group` / `block` (presentation) and `showWhen` (conditional visibility), and a `groups` root key declares how each section renders. Field **order is significant**: visibility resolves top-down, so a field's controllers must be declared before it. Since [ADR-0012](decisions/0012-viewability-measurement.md), `showWhen` may also gate on the synthetic `"selected_format"` controller — the creative's chosen delivery format, not a schema field — used e.g. to show OMID vendor fields only when SIMID is selected |
 | `pricing_tier` | links to a Stripe price / plan |
 | `created_at`, `updated_at` | |
 
@@ -62,7 +62,7 @@ Ingested ad events — the core value for media buyers. Append-only.
 | --- | --- |
 | `id` | bigint PK |
 | `creative_id` | FK |
-| `event_type` | enum allows `impression` \| `start` \| `q25` \| `q50` \| `q75` \| `complete` \| `interaction` \| `click`; **only the first six are ever produced** |
+| `event_type` | enum allows `impression` \| `start` \| `q25` \| `q50` \| `q75` \| `complete` \| `interaction` \| `click` \| `viewable`; **`interaction`/`click` are never produced. `viewable` is VPAID-only** — self-reported, non-OMID-accredited (ADR-0012); a SIMID creative never writes it, since its viewability is measured by the advertiser's own OMID vendor, which we don't ingest |
 | `meta` | jsonb — intended for device / geo bucket / interaction detail. Nothing writes it today; every row is `{}` |
 | `occurred_at` | ts |
 

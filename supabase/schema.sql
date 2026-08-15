@@ -41,8 +41,17 @@ exception when duplicate_object then null; end $$;
 
 do $$ begin
   create type creative_event_type as enum
-    ('impression', 'start', 'q25', 'q50', 'q75', 'complete', 'interaction', 'click');
+    ('impression', 'start', 'q25', 'q50', 'q75', 'complete', 'interaction', 'click', 'viewable');
 exception when duplicate_object then null; end $$;
+
+-- The `create type` above only takes effect on a fresh database: once the
+-- type exists, `exception when duplicate_object` makes the whole statement a
+-- no-op, so editing its literal list does nothing against a live install.
+-- Growing an existing enum needs this separately-idempotent statement.
+-- `viewable` is VPAID-only (ADR-0012) — self-reported, non-OMID-accredited
+-- viewability. SIMID creatives never produce it; their viewability is
+-- measured by the advertiser's own OMID vendor, which we don't ingest.
+alter type creative_event_type add value if not exists 'viewable';
 
 -- Delivery format is intentionally TEXT (not an enum): per ADR-0002 we must be
 -- able to add new interactive standards without a migration. Validated against
@@ -539,7 +548,30 @@ grant execute on function public.get_creative_serving(uuid) to service_role;
 -- knowing before debugging an empty dashboard: running
 -- `alter table public.creative_events force row level security`, or applying
 -- this file as a role that neither owns the table nor has BYPASSRLS.
-create or replace function public.get_creative_overview()
+--
+-- This function's body references the literal 'viewable', added to
+-- creative_event_type by `alter type ... add value` above, in the SAME
+-- transaction as this CREATE FUNCTION. Postgres constant-folds a literal
+-- enum comparison at parse time (calling the type's input function), and a
+-- value added by ALTER TYPE ... ADD VALUE is not "safe" to read until the
+-- adding transaction commits — so validating that reference here would
+-- raise "unsafe use of new value of enum type". `check_function_bodies` is
+-- what triggers that parse-time validation for `language sql` function
+-- bodies at CREATE FUNCTION time; scoped off for just this one statement
+-- (not the whole transaction, so every other function here still gets its
+-- normal apply-time validation) and back on immediately after, this defers
+-- the check to first call — well after commit — without splitting the
+-- file's required atomic transaction (see the file header: a partial apply
+-- here is a security event).
+set local check_function_bodies = off;
+-- `create or replace function` cannot change an existing function's return
+-- type, and adding the `viewable` column to this RETURNS TABLE(...) is
+-- exactly that. Drop-then-create is safe here: nothing else in this schema
+-- (no view, no other function) depends on get_creative_overview(), and the
+-- privilege/comment statements below re-apply unconditionally regardless of
+-- whether the function was just created or replaced.
+drop function if exists public.get_creative_overview();
+create function public.get_creative_overview()
 returns table (
   creative_id  uuid,
   impressions  bigint,
@@ -548,6 +580,11 @@ returns table (
   q50          bigint,
   q75          bigint,
   completes    bigint,
+  -- VPAID-only (ADR-0012): a SIMID creative never produces this event, since
+  -- its viewability is measured by the advertiser's own OMID vendor, which we
+  -- don't ingest. Always 0 for SIMID rows — the dashboard must render that as
+  -- "not applicable to this format", never as a confident zero.
+  viewable     bigint,
   is_entitled  boolean,
   should_serve boolean
 )
@@ -564,6 +601,7 @@ as $$
     count(e.*) filter (where e.event_type = 'q50'),
     count(e.*) filter (where e.event_type = 'q75'),
     count(e.*) filter (where e.event_type = 'complete'),
+    count(e.*) filter (where e.event_type = 'viewable'),
     -- Both flags, from the one shared definition. `should_serve` matches the
     -- serving gate exactly; the dashboard renders entitlement today only because
     -- creatives.status has no update path, and the day a kill switch ships this
@@ -575,6 +613,7 @@ as $$
   where c.user_id = (select auth.uid())
   group by c.id;
 $$;
+set local check_function_bodies = on;
 
 comment on function public.get_creative_overview() is
   'Per-creative funnel counts + entitlement for the signed-in owner. The only read path into creative_events.';

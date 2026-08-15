@@ -12,7 +12,7 @@
 | **VPAID 2.0** | Legacy interactivity. Runs arbitrary JS in the player's context. Deprecated by IAB; dropped/limited by many DSPs/SSPs (incl. Google Ad Manager). | **Supported as a chosen format** for reach with legacy DSPs — never the only path, and flagged as legacy in the UI. |
 | **MRAID** | Rich-media API for **in-app display** ads inside app webviews. Not video, not VAST. | **Out of scope for v1.** Possible separate product line later. Do not conflate with the video pipeline. |
 | **Interactive-image creatives** | Static image(s) + an interactive layer (scratch, slider, quiz, gate) rendered by a VPAID unit / SIMID iframe. | **In scope, video-delivered.** Runs on in-stream/out-stream **video** inventory via VPAID/SIMID over VAST — NOT display/MRAID. VPAID-first (image-only); SIMID needs a base loop. See [ADR-0005](decisions/0005-interactive-image-creatives.md). |
-| **OMID / OM SDK** | Open Measurement for viewability/verification. Orthogonal to interactivity. | **Post-MVP** hook; design VAST to leave room for `<Verification>` nodes. |
+| **OMID / OM SDK** | Open Measurement for viewability/verification. Orthogonal to interactivity. | **Implemented for SIMID as a pass-through only** — the advertiser supplies a third-party vendor's script/parameters, we emit `<AdVerifications>`; we are not our own OMID vendor. VPAID instead gets a custom, self-reported, non-accredited viewability module (`runtime/lib/vpaid-base.js`). See [ADR-0012](decisions/0012-viewability-measurement.md). |
 
 ## Multi-format strategy (the product decision)
 
@@ -167,3 +167,10 @@ Full rationale: [ADR-0003](decisions/0003-access-control-over-code-hiding.md).
 - **Wrapper vs Inline VAST** — wrapper redirects to another VAST; inline carries the
   media. We serve inline for our own creatives.
 - **Quartile events** — start / 25% / 50% / 75% / complete tracking pings.
+- **`<AdVerifications>`** — VAST 4.1+ element carrying an OMID verification
+  vendor's script + parameters. We emit it for SIMID as a pass-through
+  (ADR-0012); we never populate it ourselves as a vendor.
+- **Viewable / `viewable` event** — VPAID-only, self-reported (not
+  OMID-accredited): the ad slot was ≥50% on-screen for a continuous 2s (the
+  MRC video threshold), fired by `runtime/lib/vpaid-base.js`'s
+  `IntersectionObserver`. See ADR-0012.

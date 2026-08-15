@@ -105,6 +105,11 @@ const ru = {
     openCreative: "Открыть",
     statsUnavailable:
       "Статистика сейчас недоступна, поэтому цифры и состояние отдачи скрыты — показывать неверные мы не будем. Обновите страницу через минуту; если не пройдёт, напишите нам.",
+    viewableNotApplicable:
+      "Измеряется вашим вендором верификации, а не нами",
+    viewableSelfReported:
+      "Собственная оценка, без аккредитации OMID",
+    viewabilityHeading: "Измерение просмотра",
     createCreative: "Создать креатив",
     edit: "Изменить",
     saveChanges: "Сохранить изменения",
@@ -167,6 +172,7 @@ const ru = {
       quizResult: "Результат",
       quizOutcomes: "Исход по каждому пути",
       quizTag: "Переход по клику",
+      viewability: "Верификация просмотра (OMID)",
     },
     outcomes: {
       complete: "Готов",
@@ -229,6 +235,7 @@ const ru = {
       q50: "50%",
       q75: "75%",
       complete: "досмотр",
+      viewable: "просмотр",
     },
   },
 };
@@ -324,6 +331,10 @@ const en: Dict = {
     openCreative: "Open",
     statsUnavailable:
       "Delivery numbers are unavailable right now, so counts and serving state are hidden rather than shown wrong. Refresh in a minute; if it persists, contact us.",
+    viewableNotApplicable:
+      "Measured by your verification vendor, not by us",
+    viewableSelfReported: "Self-reported, not OMID-accredited",
+    viewabilityHeading: "Viewability measurement",
     createCreative: "Create creative",
     edit: "Edit",
     saveChanges: "Save changes",
@@ -383,6 +394,7 @@ const en: Dict = {
       quizResult: "Result",
       quizOutcomes: "Result per answer path",
       quizTag: "Click-through",
+      viewability: "Viewability verification (OMID)",
     },
     outcomes: {
       complete: "Ready",
@@ -443,6 +455,7 @@ const en: Dict = {
       q50: "50%",
       q75: "75%",
       complete: "complete",
+      viewable: "viewable",
     },
   },
 };

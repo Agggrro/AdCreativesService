@@ -21,6 +21,16 @@ export interface CreativeConfig {
   /** Player dimensions; default 640x360. */
   width?: number;
   height?: number;
+  /**
+   * OMID verification vendor's name (VAST `<Verification vendor="...">`),
+   * e.g. a DoubleVerify/IAS/MOAT vendor key. Pass-through only — AdInteract
+   * is not itself an OMID vendor. SIMID-only; see ADR-0012.
+   */
+  verificationVendor?: string;
+  /** OMID verification vendor's JavaScriptResource URL. SIMID-only. */
+  verificationScriptUrl?: string;
+  /** Opaque vendor-supplied string passed through as VerificationParameters. */
+  verificationParameters?: string;
 }
 
 /** Everything the VAST builder needs, already resolved by the endpoint. */
@@ -55,4 +65,10 @@ export interface FormatAdapter {
   isServable(ctx: VastBuildContext): boolean;
   /** XML fragment to place inside <MediaFiles>. */
   mediaFilesInner(ctx: VastBuildContext): string;
+  /**
+   * Optional XML fragment for <AdVerifications> (OMID pass-through, SIMID
+   * only — see ADR-0012). Omitted entirely (not called) by formats that don't
+   * support VAST-level verification, e.g. VPAID.
+   */
+  adVerificationsInner?(ctx: VastBuildContext): string;
 }

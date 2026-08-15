@@ -125,6 +125,15 @@ inline script/style but keeps `default-src 'none'`. This document is never
 advertiser-controlled today; if that ever changes, this route's CSP needs
 re-review before it does.
 
+**The OMID verification pass-through (ADR-0012) does not change this.** A
+SIMID creative's `verificationScriptUrl` (advertiser-supplied) only ever
+reaches the VAST `<AdVerifications>` node — never this route, never this
+document. Per IAB's OMID Web Implementation Guide, a verification script
+loads into a sandboxed context the *video player* manages, not into the
+creative's own iframe, so there is no path by which the vendor's script
+reaches `runtime/shoppable/simid/index.html`. The "never advertiser-controlled
+today" statement above stays literally true after this change.
+
 ## RLS scope
 
 RLS protects the authenticated dashboard path only. The serving path deliberately

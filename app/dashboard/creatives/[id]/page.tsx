@@ -63,7 +63,11 @@ export default async function CreativePage({
     q50: row?.q50 ?? 0,
     q75: row?.q75 ?? 0,
     completes: row?.completes ?? 0,
+    viewable: row?.viewable ?? 0,
   };
+  // VPAID-only (ADR-0012): render as "not applicable to this format" rather
+  // than a confident zero for every other format.
+  const viewableApplicable = creative.selected_format === "vpaid";
 
   return (
     <div className="flex flex-col gap-6">
@@ -120,6 +124,38 @@ export default async function CreativePage({
             </div>
           ))}
         </div>
+      </div>
+
+      {/*
+        Viewability (ADR-0012) is deliberately its own strip, not a 7th funnel
+        tile: it isn't part of the sequential, always-applicable delivery
+        funnel (§6) — it's VPAID-only, self-reported, and structurally absent
+        for SIMID. A SIMID row prints the em dash in `text-fg-disabled` (not
+        the default `text-fg` the outage/unmeasurable dash above uses) so the
+        two "—" readings stay visually distinct even without reading the
+        caption.
+      */}
+      <div className="flex flex-col gap-2">
+        <h2 className="label-instr">{dict.dashboard.viewabilityHeading}</h2>
+        <Panel className="flex max-w-xs flex-col gap-2 p-4">
+          <span className="label-instr">{dict.catalog.funnel.viewable}</span>
+          <span
+            className={`data-instr text-[22px] font-medium leading-7 ${
+              statsAvailable && viewableApplicable ? "text-fg" : "text-fg-disabled"
+            }`}
+          >
+            {statsAvailable && viewableApplicable
+              ? number.format(counts.viewable)
+              : "—"}
+          </span>
+          {statsAvailable && (
+            <span className="text-xs leading-4 text-fg-muted">
+              {viewableApplicable
+                ? dict.dashboard.viewableSelfReported
+                : dict.dashboard.viewableNotApplicable}
+            </span>
+          )}
+        </Panel>
       </div>
 
       <div className="flex flex-col gap-2">

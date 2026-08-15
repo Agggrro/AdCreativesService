@@ -75,7 +75,10 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 - Additional templates (Branching Story, Lead-Gen) and additional formats.
 - Rich analytics dashboard, exports, reporting.
 - MRAID / in-app display product line.
-- OMID / OM SDK viewability integration.
+- Becoming our own OMID verification vendor (IAB Tech Lab partner
+  registration, running an OM SDK service, MRC accreditation). OMID
+  *pass-through* for SIMID and a self-built, non-accredited viewability
+  module for VPAID are implemented — see [ADR-0012](decisions/0012-viewability-measurement.md).
 - Advanced protection hardening (rotating signed keys, granular domain allow-lists).
 - Rate limiting/anti-abuse beyond basic caching.
 - Team/agency multi-seat, roles, white-label.

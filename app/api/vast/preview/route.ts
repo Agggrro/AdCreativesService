@@ -84,7 +84,7 @@ export async function POST(request: Request): Promise<Response> {
   // configuration Save would refuse to write.
   const { fields } = parseConfigSchema(template.config_schema);
   const { config, missingField } = buildConfigFromValues(fields, (name) =>
-    String(fieldsInput[name] ?? ""),
+    name === "selected_format" ? format : String(fieldsInput[name] ?? ""),
   );
   if (missingField) {
     return Response.json({ error: `${missingField} is required` }, { status: 400 });

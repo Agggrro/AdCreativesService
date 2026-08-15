@@ -166,7 +166,14 @@ export function parseConfigSchema(json: unknown): ConfigSchema {
   // required field is unreachable, unsavable, and invisible to whoever has to
   // debug it. Dropping the clause surfaces an extra field instead: still wrong,
   // but wrong in a way someone can see.
+  //
+  // "selected_format" is always a valid controller even though it's never a
+  // declared field: it's the sibling delivery-format radio (ConfiguratorForm's
+  // own state, not part of config_schema/config_json), the one thing a
+  // template-wide schema needs to gate a field by per format — e.g. an OMID
+  // verification field that only applies to SIMID (ADR-0012).
   const names = new Set(parsed.map((f) => f.name));
+  names.add("selected_format");
   const order = new Map(parsed.map((f, i) => [f.name, i]));
   for (const [i, field] of parsed.entries()) {
     if (!field.showWhen) continue;
@@ -235,7 +242,12 @@ export function visibleFieldNames(
   fields: ConfigField[],
   read: (name: string) => string,
 ): Set<string> {
-  const resolved: Record<string, string> = {};
+  // Seeded up front, not walked in schema order like every other field, since
+  // "selected_format" isn't a schema field at all — see the "fail visible"
+  // guard's comment in parseConfigSchema.
+  const resolved: Record<string, string> = {
+    selected_format: (read("selected_format") ?? "").trim(),
+  };
   const out = new Set<string>();
   for (const field of fields) {
     if (!isFieldVisible(field, (n) => resolved[n] ?? "")) continue;

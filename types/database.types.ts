@@ -249,6 +249,7 @@ export type Database = {
           q50: number;
           q75: number;
           completes: number;
+          viewable: number;
           is_entitled: boolean;
           should_serve: boolean;
         }[];
@@ -271,7 +272,8 @@ export type Database = {
         | "q75"
         | "complete"
         | "interaction"
-        | "click";
+        | "click"
+        | "viewable";
     };
     CompositeTypes: { [_ in never]: never };
   };

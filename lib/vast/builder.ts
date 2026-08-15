@@ -96,11 +96,34 @@ export function buildInlineVast(ctx: VastBuildContext): string {
   if (ctx.config.productImageUrl) adParams.productImageUrl = ctx.config.productImageUrl;
   if (ctx.config.width) adParams.width = ctx.config.width;
   if (ctx.config.height) adParams.height = ctx.config.height;
+  // Self-reported VPAID viewability (ADR-0012): the unit can't sign its own
+  // beacon URL (the HMAC secret is server-only), so it's pre-minted here like
+  // every other tracking URL. VPAID-only, by construction rather than by
+  // convention: `viewable` is documented (docs/data-model.md) as never
+  // produced by a SIMID creative, and AdParameters is fully inspectable
+  // (ADR-0003) — a SIMID document handed a working signed "viewable" URL
+  // could fire it itself even though nothing in the runtime does today, so
+  // simply not minting the URL for that format is what actually keeps the
+  // invariant true rather than merely documented. `viewableTrackingUrl` is a
+  // reserved AdParameters key: no template's config_schema may name a field
+  // that.
+  if (ctx.serving.selected_format === "vpaid") {
+    adParams.viewableTrackingUrl = trackingUrl(ctx.siteUrl, cid, "viewable");
+  }
   const adParameters = `            <AdParameters>${cdata(
     JSON.stringify(adParams),
   )}</AdParameters>\n`;
 
   const mediaFiles = indent(adapter.mediaFilesInner(ctx), 14);
+
+  // OMID pass-through (ADR-0012): SIMID-only today (adapter.adVerificationsInner
+  // is optional; VPAID's adapter doesn't implement it). Omitted entirely when
+  // the fragment is empty (no vendor configured) rather than emitting an empty
+  // <AdVerifications> element.
+  const adVerificationsFragment = adapter.adVerificationsInner?.(ctx) ?? "";
+  const adVerifications = adVerificationsFragment
+    ? `      <AdVerifications>\n${indent(adVerificationsFragment, 8)}\n      </AdVerifications>\n`
+    : "";
 
   // [ERRORCODE] is a VAST macro the player substitutes; it must stay literal.
   const errorUrl = `${trackingUrl(ctx.siteUrl, cid, "error")}&code=[ERRORCODE]`;
@@ -113,7 +136,7 @@ export function buildInlineVast(ctx: VastBuildContext): string {
       <AdTitle><![CDATA[AdInteract Interactive Creative]]></AdTitle>
       <Error>${cdata(errorUrl)}</Error>
       <Impression>${cdata(trackingUrl(ctx.siteUrl, cid, "impression"))}</Impression>
-      <Creatives>
+${adVerifications}      <Creatives>
         <Creative id="${escapeXml(cid)}" sequence="1">
           <UniversalAdId idRegistry="adinteract">${escapeXml(cid)}</UniversalAdId>
           <Linear>

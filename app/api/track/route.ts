@@ -10,14 +10,17 @@ export const dynamic = "force-dynamic";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Map VAST event names to the creative_event_type enum.
+// Map VAST/runtime event names to the creative_event_type enum.
 //
-// Only the events the VAST builder actually emits beacons for are accepted. The
-// enum also carries `interaction` and `click`, but nothing in the product emits
-// them (there is no <ClickTracking> element yet), so accepting them here would
-// only let a third party write event types we cannot produce — and those rows
-// now feed a customer-facing dashboard. Add a name back when a beacon starts
-// firing it, not before.
+// Only names something actually fires a beacon for are accepted — not every
+// value the enum carries. `interaction` and `click` stay unmapped (there is
+// no <ClickTracking> element yet); accepting them would only let a third
+// party write event types we cannot produce, and those rows feed a
+// customer-facing dashboard. Add a name back when a beacon starts firing it,
+// not before. `viewable` is the first entry here fired by the creative's own
+// JS (runtime/lib/vpaid-base.js's IntersectionObserver, ADR-0012) rather than
+// by the host player hitting a VAST <TrackingEvents> URL — VPAID-only; SIMID
+// never sends it.
 const EVENT_MAP: Record<string, CreativeEventType> = {
   impression: "impression",
   start: "start",
@@ -25,6 +28,7 @@ const EVENT_MAP: Record<string, CreativeEventType> = {
   midpoint: "q50",
   thirdQuartile: "q75",
   complete: "complete",
+  viewable: "viewable",
 };
 
 const NO_CONTENT = new Response(null, {

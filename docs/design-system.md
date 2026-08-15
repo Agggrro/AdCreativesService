@@ -325,11 +325,33 @@ Counting rules, because a metric that lies costs more than a metric that is miss
   Print the em dash *and* drop the rail to transparent — falling back to a neutral tone
   paints a claim ("idle") where there is only an absence.
 - The delivery funnel reads left to right in the order the player fires it:
-  impression → start → q25 → q50 → q75 → complete.
+  impression → start → q25 → q50 → q75 → complete. It is a closed, sequential set —
+  a metric that is conditional on something other than "did the aggregate load"
+  (see below) does not belong in it, even if it is a count of the same shape.
+- **A metric that is structurally not applicable to this row is a third state,
+  not the unmeasurable dash.** "Unmeasurable" (`statsAvailable === false`) is
+  transient and page-wide — the aggregate genuinely failed to load, and every
+  metric on the page is affected identically. "Not applicable" is permanent and
+  row-specific — the metric will never exist for this row, by a property of the
+  row itself (e.g. viewability for a SIMID creative: measured by the
+  advertiser's OMID vendor, never ingested by us — [ADR-0012](decisions/0012-viewability-measurement.md)).
+  Printing the same em dash in the same weight for both teaches the reader that
+  a permanent absence and a temporary outage look identical, which is exactly
+  the confusion this section exists to prevent for zero-vs-dash. The "not
+  applicable" reading prints the em dash in `text-fg-disabled` (not the
+  unmeasurable dash's `text-fg`) with a `caption`-role explanation beneath —
+  the metric's own qualifier slot, not a page-level banner — naming what does
+  measure it. A metric that can be N/A for some rows and a real reading for
+  others (viewability today; anything format- or plan-conditional later) does
+  not belong inside the closed delivery-funnel strip above — give it its own
+  labelled strip so a missing reading never turns a clean divisor into a
+  ragged grid, and so its distinct third state reads as deliberately separate,
+  not as a broken tile in the funnel.
 - **No derived ratio without the counts it comes from**, and no derived ratio at all where
-  the underlying event is not ingested. Today the product records impression, start and the
-  three quartiles plus complete — there is no click event, no error event, and no count of
-  ad requests, so CTR, error rate and fill rate may not appear on any screen.
+  the underlying event is not ingested. Today the product records impression, start, the
+  three quartiles, complete, and (VPAID-only, self-reported) viewable — there is no click
+  event, no error event, and no count of ad requests, so CTR, error rate and fill rate may
+  not appear on any screen.
 
 ## 7. The player well
 

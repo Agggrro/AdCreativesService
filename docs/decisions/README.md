@@ -26,6 +26,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0009](0009-mandatory-close-control.md) | Mandatory close control, no fixed watch duration | Accepted |
 | [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted |
 | [0011](0011-conditional-grouped-config-schemas.md) | Conditional, grouped config schemas — and per-path click-through | Accepted |
+| [0012](0012-viewability-measurement.md) | Viewability measurement — OMID pass-through for SIMID, a custom module for VPAID | Accepted |
 
 ## Template
 

@@ -1,6 +1,7 @@
 import type { FormatAdapter, VastBuildContext } from "../types";
 import { cdata } from "../xml";
 import { baseVideoMediaFile } from "../shared";
+import { buildAdVerification } from "../verification";
 
 /**
  * SIMID 1.1 — the interactive document is referenced via
@@ -19,5 +20,10 @@ export const simidAdapter: FormatAdapter = {
       `<InteractiveCreativeFile apiFramework="SIMID" type="text/html">` +
         `${cdata(ctx.interactiveUrl)}</InteractiveCreativeFile>`,
     ].join("\n");
+  },
+  // OMID pass-through (ADR-0012): emits the advertiser-supplied verification
+  // vendor's <Verification> node, or "" when none is configured.
+  adVerificationsInner(ctx: VastBuildContext): string {
+    return buildAdVerification(ctx);
   },
 };

@@ -81,6 +81,10 @@ function AdInteractVpaid(template) {
   this._timer = null;
   this._startedAt = 0;
   this._closed = false;
+  this._viewObserver = null;
+  this._viewTimer = null;
+  this._viewableFired = false;
+  this._onVisibilityChange = null;
 }
 
 AdInteractVpaid.prototype.handshakeVersion = function () {
@@ -169,6 +173,14 @@ AdInteractVpaid.prototype.startAd = function () {
   } catch (e) {
     /* never let the close control break the ad lifecycle */
   }
+  try {
+    // Self-reported viewability (ADR-0012), not OMID-accredited: never let a
+    // player without IntersectionObserver (or a missing beacon URL) break the
+    // ad lifecycle either.
+    this._startViewabilityObserver();
+  } catch (e) {
+    /* never let the viewability observer break the ad lifecycle */
+  }
   this._emit("AdStarted");
   this._emit("AdImpression");
   this._emit("AdVideoStart");
@@ -229,13 +241,84 @@ AdInteractVpaid.prototype._complete = function () {
   this._emit("AdVideoComplete");
 };
 
+/**
+ * Self-reported viewability (ADR-0012, not OMID-accredited): fires
+ * `AdParameters.viewableTrackingUrl` once the slot has been >=50% on-screen
+ * for a continuous 2s, the MRC video threshold. VPAID-only — SIMID's
+ * viewability is measured by whatever OMID vendor the advertiser configures
+ * (pass-through), never by us. A pixel `Image()` request is used instead of
+ * `fetch` to avoid CORS/opaque-response ambiguity across the sandboxed/
+ * cross-origin contexts VPAID units run in (IMA, Fluid Player, ...).
+ */
+AdInteractVpaid.prototype._startViewabilityObserver = function () {
+  var self = this;
+  var url = this._params.viewableTrackingUrl;
+  if (!url || !this._slot || typeof IntersectionObserver === "undefined") return;
+
+  function clearPendingFire() {
+    if (self._viewTimer) {
+      clearTimeout(self._viewTimer);
+      self._viewTimer = null;
+    }
+  }
+
+  function fireViewable() {
+    if (self._viewableFired) return;
+    self._viewableFired = true;
+    self._stopViewabilityObserver();
+    try {
+      new Image().src = url;
+    } catch (e) {
+      /* noop */
+    }
+  }
+
+  this._onVisibilityChange = function () {
+    // A backgrounded tab isn't "viewed" even if IntersectionObserver still
+    // reports the slot as intersecting; browsers don't guarantee identical
+    // throttling of IO callbacks on hidden tabs across the players this runs
+    // in, so this is checked explicitly rather than relied on implicitly.
+    if (document.hidden) clearPendingFire();
+  };
+
+  this._viewObserver = new IntersectionObserver(function (entries) {
+    var entry = entries[entries.length - 1];
+    var visible =
+      entry.isIntersecting && entry.intersectionRatio >= 0.5 && !document.hidden;
+    if (visible) {
+      if (!self._viewTimer) self._viewTimer = setTimeout(fireViewable, 2000);
+    } else {
+      clearPendingFire();
+    }
+  }, { threshold: [0, 0.5] });
+
+  this._viewObserver.observe(this._slot);
+  document.addEventListener("visibilitychange", this._onVisibilityChange);
+};
+
+/** Disconnects the observer/timer/listener without firing — used on every teardown path once the ad no longer needs measuring. */
+AdInteractVpaid.prototype._stopViewabilityObserver = function () {
+  if (this._viewTimer) {
+    clearTimeout(this._viewTimer);
+    this._viewTimer = null;
+  }
+  if (this._viewObserver) {
+    this._viewObserver.disconnect();
+    this._viewObserver = null;
+  }
+  if (this._onVisibilityChange) {
+    document.removeEventListener("visibilitychange", this._onVisibilityChange);
+    this._onVisibilityChange = null;
+  }
+};
+
 /** Shared by every terminal path (stop, skip, the mandatory close, a template's own early-end UI) so the quartile timer never outlives the ad it was tracking. */
 AdInteractVpaid.prototype._teardown = function () {
-  this._closed = true;
   if (this._timer) {
     clearInterval(this._timer);
     this._timer = null;
   }
+  this._stopViewabilityObserver();
 };
 AdInteractVpaid.prototype.stopAd = function () {
   this._teardown();
@@ -376,6 +459,7 @@ AdInteractVpaid.prototype._mountCloseControl = function () {
 
 AdInteractVpaid.prototype._closeCreative = function () {
   if (this._closed) return;
+  this._closed = true;
   if (this._videoSlot) {
     try {
       this._videoSlot.pause();

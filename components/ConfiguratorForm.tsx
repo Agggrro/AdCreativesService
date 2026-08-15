@@ -125,8 +125,11 @@ export function ConfiguratorForm({
   // visibility is only a projection of it, so toggling a step off and back on
   // returns what the user typed.
   const visible = useMemo(
-    () => visibleFieldNames(fields, (name) => values[name] ?? ""),
-    [fields, values],
+    () =>
+      visibleFieldNames(fields, (name) =>
+        name === "selected_format" ? format : values[name] ?? "",
+      ),
+    [fields, values, format],
   );
 
   const runs = useMemo(

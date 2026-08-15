@@ -22,5 +22,8 @@ export function parseCreativeConfig(json: Json): CreativeConfig {
     productImageUrl: str(obj.productImageUrl),
     width: num(obj.width),
     height: num(obj.height),
+    verificationVendor: str(obj.verificationVendor),
+    verificationScriptUrl: str(obj.verificationScriptUrl),
+    verificationParameters: str(obj.verificationParameters),
   };
 }
