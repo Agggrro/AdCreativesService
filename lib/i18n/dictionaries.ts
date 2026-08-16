@@ -32,7 +32,8 @@ export const LOCALE_TAG: Record<Locale, string> = {
 
 const ru = {
   brand: {
-    name: "CreoSmith",
+    nameLead: "Creo",
+    nameTail: "Smith",
   },
   common: {
     signIn: "Войти",
@@ -410,7 +411,8 @@ type Dict = typeof ru;
 
 const en: Dict = {
   brand: {
-    name: "CreoSmith",
+    nameLead: "Creo",
+    nameTail: "Smith",
   },
   common: {
     signIn: "Sign in",

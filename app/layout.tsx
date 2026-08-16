@@ -7,10 +7,12 @@ import "./globals.css";
 // Instrument runs on two faces only: Plex Sans for what a human wrote, Plex
 // Mono for what the machine owns (docs/design-system.md §4). Both subsets are
 // loaded because the UI ships in Russian and English.
+// 700 exists for the wordmark alone (docs/design-system.md §4) — no other role
+// on the type scale goes above 600.
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 

@@ -33,10 +33,28 @@ export function TopBar({
     <header className="border-b border-hairline bg-surface">
       <div className="mx-auto flex h-14 w-full max-w-[1080px] items-center justify-between gap-6 px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href={brandHref} className="flex items-center gap-2.5">
+          {/*
+            Named explicitly because the wordmark is split across two elements
+            for colour: the accessible name would otherwise be assembled from
+            nested nodes, and the a11y tree already reports them as separate
+            generics. One label, in the right order, regardless.
+          */}
+          <Link
+            href={brandHref}
+            aria-label={`${dict.brand.nameLead}${dict.brand.nameTail}`}
+            className="flex items-center gap-2.5"
+          >
             <BrandMark />
-            <span className="text-[15px] font-semibold tracking-[-0.01em]">
-              {dict.brand.name}
+            {/*
+              Two-toned to match the monogram: Creo takes the accent like the C,
+              Smith the fg like the S, so the mark and the word are visibly the
+              same object rather than a glyph with a caption. Split in the
+              dictionary rather than sliced here — §8 forbids a human-readable
+              literal in a component, even one this small.
+            */}
+            <span className="text-[15px] font-bold tracking-[-0.01em]">
+              <span className="text-accent">{dict.brand.nameLead}</span>
+              {dict.brand.nameTail}
             </span>
           </Link>
           {nav.length > 0 && <TopNav items={nav} />}

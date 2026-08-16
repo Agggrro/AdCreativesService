@@ -67,11 +67,12 @@ accent without re-checking that ratio.
 one primary button plus one current-state marker. A third occurrence means something else
 must give it up.
 
-The **persistent top-bar chrome is exempt from that count**: the brand mark is on every
+The **persistent top-bar chrome is exempt from that count**: the brand lockup is on every
 screen by definition, so counting it would spend one of the two slots before a page shows
-anything. The exemption covers the brand mark and the active-section underline, and
-nothing else — in particular the language control is *not* a task action and must not be
-accent-filled. Everything below the top bar counts.
+anything. The exemption covers the **whole lockup** — the monogram's `C` and the
+wordmark's `Creo`, which are one identity in two pieces, not two spends — plus the
+active-section underline. Nothing else: in particular the language control is *not* a task
+action and must not be accent-filled. Everything below the top bar counts.
 
 ### Semantics — deliberately cold
 
@@ -158,6 +159,7 @@ one grid with no font substitution.
 | body | 15/24 | 400 | Running text; keep near 65 characters wide |
 | small | 13/20 | 400 | Help text, table cells |
 | caption | 12/16 | 400 | The smallest sans size that exists: field help, a metric's qualifier, the player well's caption. Below this, use `small` — there is no 11px sans |
+| wordmark | 15/24 | 700 | `-0.01em`. The **only** role above 600, and the only consumer of Plex Sans 700 — it exists so the word carries the same weight as the monogram beside it. Do not reach for 700 anywhere else; a heading that needs more presence needs more size, not more weight |
 | data | 13/20 | 400 | Mono, tabular-nums |
 | label | 11/16 | 500 | Mono, uppercase, `0.09em` — instrument-panel legends (`label-instr`) |
 | chip | 11/16 | 500 | Mono, uppercase, `0.06em` — format chips, segment buttons, state words. Tighter than a label because it sits inside a box, not above one |
@@ -185,30 +187,46 @@ they sit in a dense table cell — a VAST tag at 12px is a downgrade, not a refi
 
 ## 6. Components
 
-### Brand mark
+### Brand lockup
 
-The mark is a **CS monogram**: an open Sienna `C` whose counter holds a play
-triangle, followed by an `S` in `fg`. It ships as `ui/BrandMark.tsx` — one inline
-SVG, 24px tall in the top bar, paired with the wordmark at 15px/600. It replaced a
-20px accent square holding the letter `A`, which the rename to CreoSmith left
-meaningless.
+The lockup is a **CS monogram** plus the wordmark, and the two are read as one object:
 
-Three system constraints shaped it, and they bind any future revision:
+- **Monogram** (`ui/BrandMark.tsx`) — an open Sienna `C` whose counter holds a play
+  triangle, then an `S`. One inline SVG, 28px tall. Only the `C` is warm; the triangle
+  and the `S` are `fg`.
+- **Wordmark** — `Creo` in `accent`, `Smith` in `fg`, at the `wordmark` role (§4). The
+  colour split is the same split as the glyph, which is the whole point: `C`↔`Creo`,
+  `S`↔`Smith`. The two halves explain each other, so the word is not a caption under a
+  logo.
 
-- **Flat.** The source reference is a bevelled 3D render. §2 has no shadows and no
-  gradients, so only the silhouette survives; depth is not reintroduced for the logo.
+It replaced a 20px accent square holding the letter `A`, which the rename to CreoSmith
+left meaningless. The strings are split in the dictionary (`brand.nameLead` /
+`brand.nameTail`), not sliced in the component — §8 admits no exception for short
+literals.
+
+Constraints that bind any future revision:
+
+- **Flat, and this was tested.** The source reference is a bevelled 3D render, and
+  reintroducing depth was tried on the real bar at real size — a soft `drop-shadow` and a
+  hard offset extrude, both on the glyph and the word. Both lost: at 28px a blur turns a
+  two-colour glyph to mud, and an offset copy reads as a rendering fault rather than as
+  depth. So §2's no-shadow rule costs nothing here, and the flat mark is the better
+  drawing on its own merits, not merely the compliant one. **Do not re-litigate this
+  without a render at 28px.**
 - **Warm, not slate.** The reference's second letter is cold slate. §3 rules that out
-  next to terracotta, so the `S` takes the `fg` neutral. The mark is two colours, both
-  tokens, and never a literal hex.
-- **The accent here is chrome, not action.** §3 already exempts the brand mark from the
-  two-appearance budget. That exemption covers this glyph and stops there — the play
-  triangle is *part of the mark*, not a second accent appearance, and the same shape
-  used anywhere below the top bar would count.
+  next to terracotta, so the `S` takes the `fg` neutral. Every colour is a token.
+- **The accent here is chrome, not action.** §3 exempts the whole lockup from the
+  two-appearance budget, and stops there: the same shapes used anywhere below the top bar
+  would count.
+- **28px is a floor, not a default.** Below it the play triangle silts up inside the
+  counter. A smaller surface — a favicon, say — takes the `C` alone, never a shrunken
+  lockup.
 
 The `C`'s radial terminals and the `S`'s flat ones both fall out of butt-capped arcs
-rather than hand-drawn outlines; the geometry is derived in the component's header
-comment. The glyph is `aria-hidden` — the wordmark next to it is the accessible name,
-and labelling both would announce the brand twice.
+rather than hand-drawn outlines, and the `S`'s bowls are elliptical (rx 12.5, ry 9.5)
+because circular ones read narrow beside the `C`; the geometry is derived in the
+component's header comment. The glyph is `aria-hidden` — the wordmark next to it is the
+accessible name, and labelling both would announce the brand twice.
 
 ### Data tables — the default for lists
 
