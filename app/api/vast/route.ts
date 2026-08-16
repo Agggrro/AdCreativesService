@@ -3,6 +3,7 @@ import { resolveInteractiveUrl } from "@/lib/storage";
 import { generateVast, emptyVast, parseCreativeConfig } from "@/lib/vast";
 import { snapshots, snapshotToServing } from "@/lib/serving";
 import { UUID_RE } from "@/lib/uuid";
+import { getCdnUrl } from "@/lib/site";
 import type { CreativeServing } from "@/types/database.types";
 
 // Public, unauthenticated ad-serving endpoint. Node runtime keeps full
@@ -162,7 +163,12 @@ export async function GET(request: Request): Promise<Response> {
     // Subscription gate: not entitled / not active => empty VAST.
     if (!serving.should_serve) return noAd();
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? url.origin;
+    // The ad domain, not the app domain (ADR-0018): every URL inside this
+    // document — beacons, the SIMID document, the unit — inherits it, and they
+    // are fetched by third-party players rather than by us. `getCdnUrl()` falls
+    // back to the app URL while NEXT_PUBLIC_CDN_URL is unset, which is what
+    // makes the cutover reversible by unsetting one variable.
+    const siteUrl = getCdnUrl();
 
     // Local HMAC, no network: both formats resolve to our own proxy routes now,
     // so building this document touches no Supabase service at all. A failure

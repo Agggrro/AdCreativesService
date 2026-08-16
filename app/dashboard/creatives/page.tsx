@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getSiteUrl } from "@/lib/site";
+import { getCdnUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
 import { LOCALE_TAG } from "@/lib/i18n/dictionaries";
 import { creativeErrorMessage } from "@/lib/creative-errors";
@@ -27,7 +27,6 @@ export default async function MyCreativesPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const supabase = await createServerSupabase();
-  const siteUrl = getSiteUrl();
   const { locale, dict } = await getDict();
   const sp = await searchParams;
   const deleteError = creativeErrorMessage(dict, sp.error, undefined);
@@ -115,7 +114,7 @@ export default async function MyCreativesPage({
             </TableHead>
             <tbody>
               {creatives.map((c) => {
-                const tag = `${siteUrl}/api/vast?creative_id=${c.id}`;
+                const tag = `${getCdnUrl()}/v?creative_id=${c.id}`;
                 const row = stats.get(c.id);
                 const serving = row?.should_serve ?? false;
                 const label = c.name ?? templateName.get(c.template_id) ?? "—";

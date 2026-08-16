@@ -7,6 +7,34 @@ export function getSiteUrl(): string {
 }
 
 /**
+ * Base URL for everything a third-party player fetches: the VAST tag, the
+ * tracking beacons, and the creative assets. Separate from `getSiteUrl()` so the
+ * ad domain and the app domain can differ (ADR-0018).
+ *
+ * Falls back to the app URL when unset, which is what makes the domain cutover a
+ * two-step: deploy the code with this empty and nothing changes; set it and the
+ * tags move. Rolling back is unsetting it again.
+ */
+export function getCdnUrl(): string {
+  return (process.env.NEXT_PUBLIC_CDN_URL ?? getSiteUrl()).replace(/\/+$/, "");
+}
+
+/**
+ * Bare hostname of the ad domain, or null when it is not configured. Used to
+ * recognise a request that arrived on it — see middleware.ts, which must never
+ * set a cookie there.
+ */
+export function getCdnHost(): string | null {
+  const url = process.env.NEXT_PUBLIC_CDN_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The origin a request actually arrived on — for URLs a *same-origin* client
  * must be able to fetch back (the live-preview tag and the beacons inside it).
  * The canonical `getSiteUrl()` is wrong for those: it is a fixed env var, so

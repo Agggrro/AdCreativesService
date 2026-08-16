@@ -47,7 +47,10 @@ export function trackingUrl(
 ): string {
   const base = siteUrl.replace(/\/+$/, "");
   const { exp, sig } = signTrackToken(creativeId, event);
-  return `${base}/api/track?cid=${encodeURIComponent(creativeId)}&e=${encodeURIComponent(event)}&exp=${exp}&sig=${encodeURIComponent(sig)}`;
+  // `/t`, not `/api/track` — a neutral path that does not announce what it is to
+  // every filter between the player and us (ADR-0018). `/api/track` still
+  // resolves, forever: it is what tags already pasted into a DSP point at.
+  return `${base}/t?cid=${encodeURIComponent(creativeId)}&e=${encodeURIComponent(event)}&exp=${exp}&sig=${encodeURIComponent(sig)}`;
 }
 
 /** Build a full inline VAST 4.2 document for an entitled creative. */

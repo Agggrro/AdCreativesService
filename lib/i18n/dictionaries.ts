@@ -250,6 +250,19 @@ const ru = {
       viewable: "просмотр",
     },
   },
+  // The ad domain's only page. Read by ad ops who found this hostname in a tag
+  // and need to know whose it is before whitelisting it — so it answers that
+  // question first and sells nothing.
+  cdn: {
+    heading: "Домен доставки рекламы",
+    whose:
+      "Этот домен принадлежит AdInteract и используется только для доставки рекламы: VAST-теги, счётчики показов и файлы интерактивных креативов.",
+    noSite:
+      "Сайта здесь нет. Продукт и контакты — на основном домене.",
+    whitelist:
+      "Если вам нужно внести домен в whitelist, добавьте его целиком. Отдаются только рекламные ответы; ни авторизации, ни кук на этом домене нет.",
+    goToSite: "Перейти на основной сайт",
+  },
   tools: {
     title: "Бесплатные инструменты",
     subtitle:
@@ -603,6 +616,16 @@ const en: Dict = {
       click: "click",
       viewable: "viewable",
     },
+  },
+  cdn: {
+    heading: "Ad delivery domain",
+    whose:
+      "This domain belongs to AdInteract and is used only to deliver advertising: VAST tags, impression counters, and interactive creative files.",
+    noSite:
+      "There is no website here. The product and its contacts live on the main domain.",
+    whitelist:
+      "If you need to whitelist this domain, add the whole host. It serves ad responses only — there is no sign-in and no cookie on it.",
+    goToSite: "Go to the main site",
   },
   tools: {
     title: "Free tools",

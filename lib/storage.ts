@@ -1,6 +1,6 @@
 import type { CreativeServing } from "@/types/database.types";
 import { signInteractiveToken } from "./vast/interactive-token";
-import { runtimeAsset } from "./runtime-manifest";
+import { runtimeAssetPath } from "./runtime-manifest";
 
 /** Bucket holding the interactive runtime assets (SIMID docs / VPAID units). */
 export const CREATIVES_BUCKET = "creatives";
@@ -14,10 +14,14 @@ export const CREATIVES_BUCKET = "creatives";
  */
 export { INTERACTIVE_TOKEN_TTL_SECONDS as SIGNED_URL_TTL_SECONDS } from "./vast/interactive-token";
 
-/** Which proxy route serves each format, and which token kind authorizes it. */
+/**
+ * Which proxy path serves each format. Neutral names (ADR-0018): the public URL
+ * says nothing about what it is. Both rewrite to the `/api/creative/*` routes,
+ * which keep working for tags already in flight.
+ */
 const PROXY_ROUTE = {
-  simid: "simid",
-  vpaid: "unit",
+  simid: "c/s",
+  vpaid: "api/creative/unit",
 } as const;
 
 /**
@@ -62,15 +66,22 @@ export function resolveInteractiveUrl(
   if (format !== "simid" && format !== "vpaid") return null;
 
   if (format === "vpaid") {
-    const asset = runtimeAsset(path);
-    if (asset) return asset.url;
+    const assetPath = runtimeAssetPath(path);
+    if (assetPath) {
+      // Our own host, not the blob store's. `/c/u/:path*` is an edge rewrite to
+      // the store (next.config.ts) — no function wakes, nothing reads Supabase,
+      // and the year-long cache on the content-addressed object still applies.
+      // What it buys is one domain in the tag: a customer's ad ops whitelists
+      // one hostname instead of ours plus `*.public.blob.vercel-storage.com`.
+      return `${origin.replace(/\/+$/, "")}/c/u/${assetPath}`;
+    }
     // else: fall through to the proxy, which still reads from Supabase Storage.
   }
 
   try {
     // Throws unless the path matches this kind's closed list of shapes.
     const { token } = signInteractiveToken(path, format);
-    return `${origin.replace(/\/+$/, "")}/api/creative/${PROXY_ROUTE[format]}/${token}`;
+    return `${origin.replace(/\/+$/, "")}/${PROXY_ROUTE[format]}/${token}`;
   } catch {
     return null;
   }

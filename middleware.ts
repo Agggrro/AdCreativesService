@@ -1,7 +1,24 @@
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { getCdnHost } from "@/lib/site";
 
 export async function middleware(request: NextRequest) {
+  // Nothing may set a cookie on the ad domain (ADR-0018). It loads inside other
+  // people's players on other people's pages, so any cookie there is a
+  // third-party cookie that browsers are busy killing anyway — and this is the
+  // one function in the app that writes them (lib/supabase/middleware.ts calls
+  // auth.getUser(), which rotates the session cookie onto the response).
+  //
+  // The hot ad paths never reach here at all: `v`, `t` and `c` are excluded by
+  // the matcher below, because middleware runs *before* the rewrites and so sees
+  // the public path, not `/api/vast`. This check covers everything else that
+  // arrives on that host — a stray crawler, a probe, the ad-ops page — and makes
+  // "no cookies" a property of the code rather than of the routing table.
+  const cdnHost = getCdnHost();
+  if (cdnHost && request.headers.get("host") === cdnHost) {
+    return NextResponse.next();
+  }
+
   return await updateSession(request);
 }
 
@@ -31,7 +48,13 @@ export const config = {
   //
   // "api/cron" is invoked by Vercel's scheduler with a bearer token, never a
   // session cookie; the route does its own authorization.
+  //
+  // "v", "t" and "c" are the neutral public paths from next.config.ts. They must
+  // be listed by those names, not by what they rewrite to: middleware runs
+  // before beforeFiles/afterFiles rewrites, so it sees `/v`, and the `api/vast`
+  // exclusion above would not cover it. Without them every impression would pay
+  // an edge invocation and an auth round trip.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/vast(?!/preview)|api/vast/preview/|api/track|api/stripe|api/creative|api/cron|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|v$|t$|c/|api/vast(?!/preview)|api/vast/preview/|api/track|api/stripe|api/creative|api/cron|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

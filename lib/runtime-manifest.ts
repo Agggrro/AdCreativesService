@@ -33,3 +33,17 @@ export function runtimeAsset(logicalKey: string): RuntimeAsset | null {
 export function hasRuntimeManifest(): boolean {
   return Object.keys(RUNTIME_MANIFEST.assets).length > 0;
 }
+
+/**
+ * The asset's path within the store (no leading slash), for composing our own
+ * URL for it. Null when the key has not been pushed.
+ */
+export function runtimeAssetPath(logicalKey: string): string | null {
+  const asset = runtimeAsset(logicalKey);
+  if (!asset) return null;
+  try {
+    return new URL(asset.url).pathname.replace(/^\/+/, "");
+  } catch {
+    return null;
+  }
+}

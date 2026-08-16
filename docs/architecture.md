@@ -83,10 +83,19 @@ See [data-model.md](data-model.md) for entities. Two access patterns coexist:
 
 ## C. Ad-Serving Layer
 
-### `GET /api/vast?creative_id=XYZ`
+### `GET /v?creative_id=XYZ` (formerly `/api/vast`)
 
 The heart of the product and the most demanding endpoint. It is called by ad players
 in the wild — **public, unauthenticated, high QPS, latency-sensitive**.
+
+It answers on both domains, under a neutral public path
+([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)): `/v` for the tag, `/t`
+for the beacons, `/c/s/…` and `/c/u/…` for the creative assets. `/api/*` still
+resolves and always will — tags already pasted into a DSP point there.
+
+On the ad domain (`NEXT_PUBLIC_CDN_URL`), those four paths plus one information page
+are the *only* things that answer; everything else is 404 at the routing layer, and
+no cookie is ever set on that host.
 
 Request flow:
 

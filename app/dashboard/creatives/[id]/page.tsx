@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getSiteUrl } from "@/lib/site";
+import { getCdnUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
 import { LOCALE_TAG, type Dict } from "@/lib/i18n/dictionaries";
 import { CopyButton } from "@/components/CopyButton";
@@ -37,7 +37,6 @@ export default async function CreativePage({
 }) {
   const { id } = await params;
   const supabase = await createServerSupabase();
-  const siteUrl = getSiteUrl();
   const { locale, dict } = await getDict();
 
   const [{ data: creative }, { data: overview, error: overviewError }] =
@@ -68,7 +67,7 @@ export default async function CreativePage({
     style: "percent",
     maximumFractionDigits: 2,
   });
-  const tag = `${siteUrl}/api/vast?creative_id=${creative.id}`;
+  const tag = `${getCdnUrl()}/v?creative_id=${creative.id}`;
   const counts: Record<string, number> = {
     impressions: row?.impressions ?? 0,
     clicks: row?.clicks ?? 0,
