@@ -2,6 +2,10 @@ import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getStripe, mapStripeStatus, getCurrentPeriodEnd } from "@/lib/stripe";
+import {
+  publishEntitlementSnapshot,
+  unpublishEntitlementSnapshot,
+} from "@/lib/serving/publish";
 import type { Database } from "@/types/database.types";
 
 // Needs the raw body for signature verification — Node runtime, no body parsing.
@@ -97,10 +101,19 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 /**
- * Upsert a subscription row from a Stripe Subscription. This is the only writer
- * of entitlement. Because the serving view computes entitlement live, no
- * separate "refresh" step is needed — the VAST kill-switch reacts within the
- * ~60s cache window. See docs/billing.md.
+ * Upsert a subscription row from a Stripe Subscription, then republish the
+ * user's entitlement snapshot. This is the only writer of entitlement.
+ *
+ * The republish used to be unnecessary: the serving view computed entitlement
+ * live on every ad request. Since ADR-0015 the serving path reads a CDN
+ * snapshot instead, so this handler is what makes a subscription change visible
+ * to the kill-switch — and a publish that does not land leaves the CDN holding
+ * the *previous* entitlement, which is exactly how a cancelled subscription
+ * would keep serving. Hence: it throws, the caller rolls back the idempotency
+ * claim and returns 500, and Stripe retries.
+ *
+ * Kill-switch latency is now the VAST response cache (~60s) plus Blob
+ * propagation (up to 60s) — see docs/billing.md.
  */
 async function upsertSubscription(supabase: DB, sub: Stripe.Subscription): Promise<void> {
   const meta = sub.metadata ?? {};
@@ -130,6 +143,23 @@ async function upsertSubscription(supabase: DB, sub: Stripe.Subscription): Promi
     { onConflict: "stripe_subscription_id" },
   );
   if (error) throw new Error(error.message);
+
+  try {
+    await publishEntitlementSnapshot(userId, supabase);
+  } catch (err) {
+    // Stripe's retries are finite, so a 500 alone could still end with the CDN
+    // holding stale entitlement forever. Dropping the document first makes the
+    // failure safe on its own: with no snapshot the serving path falls back to
+    // Postgres, which is slower but never wrong. Then rethrow so the event is
+    // retried and the snapshot gets rebuilt.
+    await unpublishEntitlementSnapshot(userId).catch((clearErr) => {
+      console.error("entitlement snapshot is stale and could not be cleared", {
+        userId,
+        clearErr,
+      });
+    });
+    throw err;
+  }
 }
 
 /** Link the Stripe customer to the profile and sync the resulting subscription. */

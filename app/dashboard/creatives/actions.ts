@@ -10,6 +10,46 @@ import {
   mediaObjectPath,
 } from "@/lib/creative-media";
 import { UUID_RE } from "@/lib/uuid";
+import {
+  publishCreativeSnapshot,
+  unpublishCreativeSnapshot,
+} from "@/lib/serving/publish";
+
+/**
+ * Publish the creative's serving snapshot, and on failure make sure no *stale*
+ * snapshot is left behind (ADR-0015).
+ *
+ * A save is not rolled back when publishing fails, and the user is not shown an
+ * error: the row is already committed, and `GET /api/vast` falls back to
+ * Postgres whenever a snapshot is missing — so the tag keeps serving, correctly,
+ * off the database. Telling a media buyer their save failed when it did not
+ * would only produce duplicate creatives.
+ *
+ * Deleting on failure is the part that matters. A stale snapshot is worse than
+ * no snapshot: it would serve the *previous* configuration indefinitely, while
+ * its absence degrades to the fallback, which is right by construction.
+ * `npm run snapshot:backfill` repairs the missing object afterwards.
+ */
+async function publishOrClear(creativeId: string): Promise<void> {
+  try {
+    await publishCreativeSnapshot(creativeId);
+  } catch (err) {
+    console.error("snapshot publish failed; clearing to force DB fallback", {
+      creativeId,
+      err,
+    });
+    try {
+      await unpublishCreativeSnapshot(creativeId);
+    } catch (clearErr) {
+      // Both legs failed: the CDN may still hold an older configuration. Loud,
+      // because only a backfill run will fix it.
+      console.error("snapshot clear ALSO failed; stale snapshot may be serving", {
+        creativeId,
+        clearErr,
+      });
+    }
+  }
+}
 
 export async function createCreative(formData: FormData): Promise<void> {
   const supabase = await createServerSupabase();
@@ -54,19 +94,27 @@ export async function createCreative(formData: FormData): Promise<void> {
   const rawName = String(formData.get("name") ?? "").trim();
   if (rawName.length > 200) fail("name_too_long");
 
-  const { error } = await supabase.from("creatives").insert({
-    user_id: user.id,
-    template_id: templateId,
-    name: rawName || null,
-    selected_format: selectedFormat,
-    config_json,
-    status: "active",
-  });
+  // `.select("id")` is what makes the row's id available to publish against;
+  // RLS (`creatives_select_own`) scopes the read back to the caller's own row.
+  const { data: created, error } = await supabase
+    .from("creatives")
+    .insert({
+      user_id: user.id,
+      template_id: templateId,
+      name: rawName || null,
+      selected_format: selectedFormat,
+      config_json,
+      status: "active",
+    })
+    .select("id")
+    .single();
   // The DB message is for our logs, not for a media buyer's screen.
-  if (error) {
+  if (error || !created) {
     console.error("createCreative insert failed", error);
     fail("save_failed");
   }
+
+  await publishOrClear(created!.id);
 
   redirect("/dashboard/creatives");
 }
@@ -143,6 +191,8 @@ export async function updateCreative(formData: FormData): Promise<void> {
     fail("save_failed");
   }
 
+  await publishOrClear(creativeId);
+
   redirect(`/dashboard/creatives/${creativeId}`);
 }
 
@@ -217,7 +267,35 @@ export async function deleteCreative(formData: FormData): Promise<void> {
     .select("config_json")
     .eq("id", creativeId)
     .maybeSingle();
-  const mediaPaths = existing ? ownedMediaPaths(existing.config_json, user.id) : [];
+
+  // This null check is now an authorization gate, not just a convenience. Under
+  // RLS "belongs to someone else" and "does not exist" are the same zero rows,
+  // and everything below has side effects outside the row's own RLS scope — the
+  // snapshot delete especially. Without stopping here, posting a stranger's
+  // creative_id would unpublish their snapshot.
+  if (!existing) {
+    console.error("deleteCreative found no owned row", { creativeId });
+    redirect("/dashboard/creatives?error=delete_failed");
+  }
+
+  const mediaPaths = ownedMediaPaths(existing.config_json, user.id);
+
+  // Snapshot before row — the opposite order to the media cleanup below, and
+  // for the opposite reason. An orphaned media file merely occupies space; an
+  // orphaned snapshot keeps serving ads for a creative the user has been told
+  // is gone, because the serving path would never reach the database to
+  // discover the row is missing. So this one is a precondition, not a
+  // best-effort follow-up: if it fails, the row stays and the user is told the
+  // delete failed.
+  try {
+    await unpublishCreativeSnapshot(creativeId);
+  } catch (err) {
+    console.error("deleteCreative could not remove the snapshot; row kept", {
+      creativeId,
+      err,
+    });
+    redirect("/dashboard/creatives?error=delete_failed");
+  }
 
   // RLS (`creatives_delete_own`) scopes this to the caller's own row; an id
   // that matches nobody's row (someone else's creative) deletes zero rows
