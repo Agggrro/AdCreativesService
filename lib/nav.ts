@@ -12,8 +12,8 @@ import { freeTools } from "@/lib/tools";
  * `exact: false` on the creatives entry is what keeps the section underlined
  * while the user is deep in the configurator. Tools carries `tools`, which is
  * what turns it into a dropdown instead of a plain link (docs/design-system.md
- * §6 "Nav dropdown") — the index it would otherwise land on is one extra step
- * for someone who already knows which of the two tools they want.
+ * §6 "Nav dropdown") — there's no `/tools` index page to link to any more,
+ * only the two tool pages the dropdown lists directly.
  */
 export function mainNav(dict: Dict): TopBarLink[] {
   return [

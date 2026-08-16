@@ -270,20 +270,19 @@ how the bug survived a round of "verified locally".
 ### Nav dropdown
 
 The Tools entry in the top bar (ADR-0013) is a disclosure button, not a link: it opens a
-panel listing the two free tools instead of routing through the `/tools` index first. That
-index still exists to be found by a search engine, but a visitor clicking the nav already
-knows they want the validator or the generator, so making them land on a table and click
-again was one step too many.
+panel listing the two free tools directly. There is no `/tools` index page — it shipped
+first (a table, one row per tool) and was removed once this dropdown replaced it as the
+only thing in the app that pointed at it (ADR-0013's consequences). Each tool now stands
+on its own page, reachable from this panel or directly — a search engine, a bookmark,
+`?tag=` on the validator.
 
 - `aria-expanded` + `aria-controls` on the trigger, a plain panel of real `Link`s under it
   — the two-item disclosure pattern, not a full ARIA `menu` role (which would promise
   arrow-key navigation this component does not implement).
 - Panel: `border border-hairline`, `rounded-ctl`, `bg-surface`, the `shadow-overlay` token
-  (§2), `divide-y divide-hairline` between items. Each item repeats the tool's name, its
-  `StateWord` (below, "Free tools"), and its one-line description — the same three facts
-  the `/tools` table row shows, so the dropdown is a faster path to the same information,
-  not a thinner one. Both surfaces read from `lib/tools.ts`'s `freeTools()`, so a tool's
-  state cannot go stale in one place and not the other.
+  (§2), `divide-y divide-hairline` between items. Each item carries the tool's name, its
+  `StateWord` (below, "Free tools"), and its one-line description, read from
+  `lib/tools.ts`'s `freeTools()` — the one place that list is assembled.
 - Round the first and last item's own corners (`rounded-t-ctl` / `rounded-b-ctl`); the panel
   itself is never `overflow-hidden`, for the same reason a segmented control isn't (§2's
   2px-offset focus ring).
@@ -346,14 +345,13 @@ is swapped by a segmented control is the pattern that rule was always compatible
 
 ### Free tools — the public utility surface
 
-`/tools` and the tools under it are public, unauthenticated pages that exist to be found
-by someone with a broken ad tag ([ADR-0013](decisions/0013-public-free-tools-section.md)).
-They are held to the same system as the dashboard, with three points worth stating because
-the temptation to relax them is highest on a marketing-adjacent surface.
+`/tools/vast-validator` and `/tools/vast-generator` are public, unauthenticated pages that
+exist to be found by someone with a broken ad tag ([ADR-0013](decisions/0013-public-free-tools-section.md)).
+There is no `/tools` index page; the two are listed together only in the top-bar dropdown
+("Nav dropdown" above). They are held to the same system as the dashboard, with two points
+worth stating because the temptation to relax them is highest on a marketing-adjacent
+surface.
 
-- **The tools index is a table, not a tile grid.** The catalog earns the one grid because
-  a template carries no state (above); a tool does — it is either available or not yet —
-  so it takes the data-table treatment with a real rail (`live` / `idle`).
 - **One well, same as anywhere.** The validator plays a real ad, so it gets the serving
   well (§7) and the page gets no second dark surface.
 - **Accent budget is one**, spent on the single primary that starts a run. A tool page is

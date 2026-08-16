@@ -74,7 +74,7 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 
 - Additional templates (Branching Story, Lead-Gen) and additional formats.
 - Rich analytics dashboard, exports, reporting.
-- The **free tools section** (`/tools`) was not in the MVP and is not part of the
+- The **free tools section** (`/tools/*`) was not in the MVP and is not part of the
   core loop above. It ships as an acquisition surface alongside it — see
   [ADR-0013](decisions/0013-public-free-tools-section.md). The VAST validator is
   built; the VAST generator is a placeholder route.

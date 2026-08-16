@@ -9,10 +9,11 @@ import { StateWord } from "@/components/ui/State";
 import { navItemClass } from "@/components/navItemClass";
 
 /**
- * The "Tools" nav entry (ADR-0013): a disclosure button that drops the two
- * free tools right there instead of linking to the `/tools` index first —
- * that index still exists for search-engine arrivals, it just isn't the path
- * a nav click takes anymore.
+ * The "Tools" nav entry (ADR-0013): a disclosure button that lists the two
+ * free tools right here. There is no `/tools` index page — this panel is the
+ * only place the two are listed together; each tool's own page is still
+ * reachable directly too (a search engine, a bookmark, `?tag=` on the
+ * validator).
  *
  * Not portalled, unlike the destructive-confirmation dialog
  * (docs/design-system.md §6, "Nav dropdown" — read it before reusing this as

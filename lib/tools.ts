@@ -10,9 +10,9 @@ export type ToolListing = {
 };
 
 /**
- * The two free tools (ADR-0013), shared by the `/tools` index table and the
- * top-bar dropdown so the two surfaces read from one list and cannot drift —
- * a tool that ships stays in sync in both places at once.
+ * The two free tools (ADR-0013), assembled once here for the top-bar dropdown
+ * (`ToolsNavMenu`) — the only place they're listed together now that
+ * `/tools` (the index page) is gone.
  */
 export function freeTools(dict: Dict): ToolListing[] {
   const t = dict.tools;

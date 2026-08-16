@@ -24,10 +24,13 @@ export const revalidate = 3600;
  * dashboard is deliberately absent — it would be a list of redirects to
  * `/login`.
  *
- * `/tools/vast-generator` is absent too, and that is the sitemap agreeing with
- * the `noindex` on the page itself: it is a placeholder, and a thin
- * "in development" page in the index is a weak quality signal for the whole
- * domain. It goes in when the generator ships.
+ * `/tools` itself isn't listed because it isn't a route any more — there is no
+ * index page, only the two tool pages below it, reached from the top-bar
+ * dropdown (`docs/design-system.md` §6, "Nav dropdown"). `/tools/vast-generator`
+ * is absent too, and that is the sitemap agreeing with the `noindex` on the
+ * page itself: it is a placeholder, and a thin "in development" page in the
+ * index is a weak quality signal for the whole domain. It goes in when the
+ * generator ships.
  *
  * Catalog entries are read with a plain anon client — the same rows RLS grants
  * a signed-out visitor through `templates_select_published`, and no service-role
@@ -47,7 +50,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: base, lastModified: now, changeFrequency: "weekly", priority: 1 },
     { url: `${base}/catalog`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${base}/tools`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     {
       url: `${base}/tools/vast-validator`,
       lastModified: now,

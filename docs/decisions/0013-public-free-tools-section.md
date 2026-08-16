@@ -84,3 +84,19 @@ validator's three-level severity needs.
 - **The generator's placeholder is a promise with a date attached to nothing.**
   If it stays a placeholder for long it reads worse than not listing it, so it
   should either ship or come off the index.
+- **The `/tools` index page was removed (2026-08-16).** The Tools entry in the
+  top bar became a disclosure dropdown the same week — a panel listing both
+  tools directly (`docs/design-system.md` §6, "Nav dropdown") — so nothing in
+  the app linked to the index any more. Rather than keep a page nothing points
+  at, it was deleted: `app/tools/page.tsx` is gone and its entry dropped from
+  `app/sitemap.ts`. The "tools index is a table, not a tile grid" decision
+  above described that page specifically and no longer describes anything
+  real — it's kept here as the record of what was decided, not as current
+  fact. `/tools/vast-validator` and `/tools/vast-generator` are unaffected:
+  each is still a real, standalone, public page, and each is still exactly
+  how the acquisition case in Context above works — a search engine lands a
+  visitor on the validator page directly, not on an index of two things to
+  choose from. If a free tools index is ever worth having again — more than
+  2-3 of them, something worth browsing or filtering on its own — build it
+  fresh against whatever the set looks like then, rather than restoring this
+  one from git history.
