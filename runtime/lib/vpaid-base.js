@@ -1,5 +1,5 @@
 /**
- * AdInteract — shared VPAID 2.0 base.
+ * CreoSmith — shared VPAID 2.0 base.
  *
  * Concatenated AFTER a per-template render module (which defines `var TEMPLATE`)
  * by runtime/build.mjs. The template only implements `onStart(slot, params, api)`;
@@ -62,7 +62,7 @@ function adInteractMediaLayer(url) {
   return el;
 }
 
-function AdInteractVpaid(template) {
+function CreoSmithVpaid(template) {
   this._t = template || {};
   this._slot = null;
   this._videoSlot = null;
@@ -87,11 +87,11 @@ function AdInteractVpaid(template) {
   this._onVisibilityChange = null;
 }
 
-AdInteractVpaid.prototype.handshakeVersion = function () {
+CreoSmithVpaid.prototype.handshakeVersion = function () {
   return "2.0";
 };
 
-AdInteractVpaid.prototype.initAd = function (
+CreoSmithVpaid.prototype.initAd = function (
   width,
   height,
   viewMode,
@@ -118,7 +118,7 @@ AdInteractVpaid.prototype.initAd = function (
   this._emit("AdLoaded");
 };
 
-AdInteractVpaid.prototype._setupVideo = function () {
+CreoSmithVpaid.prototype._setupVideo = function () {
   var self = this,
     v = this._videoSlot;
   v.src = this._params.videoUrl;
@@ -130,7 +130,7 @@ AdInteractVpaid.prototype._setupVideo = function () {
   });
 };
 
-AdInteractVpaid.prototype._api = function () {
+CreoSmithVpaid.prototype._api = function () {
   var self = this;
   return {
     params: this._params,
@@ -156,7 +156,7 @@ AdInteractVpaid.prototype._api = function () {
   };
 };
 
-AdInteractVpaid.prototype.startAd = function () {
+CreoSmithVpaid.prototype.startAd = function () {
   if (this._slot && getComputedStyle(this._slot).position === "static") {
     this._slot.style.position = "relative";
   }
@@ -194,7 +194,7 @@ AdInteractVpaid.prototype.startAd = function () {
   }
 };
 
-AdInteractVpaid.prototype._startTimer = function () {
+CreoSmithVpaid.prototype._startTimer = function () {
   var self = this;
   this._startedAt = Date.now();
   this._timer = setInterval(function () {
@@ -209,14 +209,14 @@ AdInteractVpaid.prototype._startTimer = function () {
   }, 250);
 };
 
-AdInteractVpaid.prototype._onVideoTime = function () {
+CreoSmithVpaid.prototype._onVideoTime = function () {
   var v = this._videoSlot;
   if (!v || !v.duration) return;
   this._attributes.remainingTime = v.duration - v.currentTime;
   this._progress(v.currentTime / v.duration);
 };
 
-AdInteractVpaid.prototype._progress = function (pct) {
+CreoSmithVpaid.prototype._progress = function (pct) {
   if (!this._q.q1 && pct >= 0.25) {
     this._q.q1 = true;
     this._emit("AdVideoFirstQuartile");
@@ -231,7 +231,7 @@ AdInteractVpaid.prototype._progress = function (pct) {
   }
 };
 
-AdInteractVpaid.prototype._complete = function () {
+CreoSmithVpaid.prototype._complete = function () {
   if (this._q.done) return;
   this._q.done = true;
   if (this._timer) {
@@ -250,7 +250,7 @@ AdInteractVpaid.prototype._complete = function () {
  * `fetch` to avoid CORS/opaque-response ambiguity across the sandboxed/
  * cross-origin contexts VPAID units run in (IMA, Fluid Player, ...).
  */
-AdInteractVpaid.prototype._startViewabilityObserver = function () {
+CreoSmithVpaid.prototype._startViewabilityObserver = function () {
   var self = this;
   var url = this._params.viewableTrackingUrl;
   if (!url || !this._slot || typeof IntersectionObserver === "undefined") return;
@@ -297,7 +297,7 @@ AdInteractVpaid.prototype._startViewabilityObserver = function () {
 };
 
 /** Disconnects the observer/timer/listener without firing — used on every teardown path once the ad no longer needs measuring. */
-AdInteractVpaid.prototype._stopViewabilityObserver = function () {
+CreoSmithVpaid.prototype._stopViewabilityObserver = function () {
   if (this._viewTimer) {
     clearTimeout(this._viewTimer);
     this._viewTimer = null;
@@ -313,18 +313,18 @@ AdInteractVpaid.prototype._stopViewabilityObserver = function () {
 };
 
 /** Shared by every terminal path (stop, skip, the mandatory close, a template's own early-end UI) so the quartile timer never outlives the ad it was tracking. */
-AdInteractVpaid.prototype._teardown = function () {
+CreoSmithVpaid.prototype._teardown = function () {
   if (this._timer) {
     clearInterval(this._timer);
     this._timer = null;
   }
   this._stopViewabilityObserver();
 };
-AdInteractVpaid.prototype.stopAd = function () {
+CreoSmithVpaid.prototype.stopAd = function () {
   this._teardown();
   this._emit("AdStopped");
 };
-AdInteractVpaid.prototype.skipAd = function () {
+CreoSmithVpaid.prototype.skipAd = function () {
   this._teardown();
   this._emit("AdSkipped");
   this._emit("AdStopped");
@@ -338,7 +338,7 @@ AdInteractVpaid.prototype.skipAd = function () {
  * change). Clicking it once live tears down the creative like a user-
  * initiated skip: no auto-expiry, no forced completion, the viewer decides.
  */
-AdInteractVpaid.prototype._mountCloseControl = function () {
+CreoSmithVpaid.prototype._mountCloseControl = function () {
   var self = this;
   var slot = this._slot;
   if (!slot) return;
@@ -457,7 +457,7 @@ AdInteractVpaid.prototype._mountCloseControl = function () {
   }, delaySeconds * 1000);
 };
 
-AdInteractVpaid.prototype._closeCreative = function () {
+CreoSmithVpaid.prototype._closeCreative = function () {
   if (this._closed) return;
   this._closed = true;
   if (this._videoSlot) {
@@ -470,71 +470,71 @@ AdInteractVpaid.prototype._closeCreative = function () {
   if (this._slot) this._slot.innerHTML = "";
   this.skipAd();
 };
-AdInteractVpaid.prototype.resizeAd = function (width, height, viewMode) {
+CreoSmithVpaid.prototype.resizeAd = function (width, height, viewMode) {
   this._attributes.width = width;
   this._attributes.height = height;
   this._attributes.viewMode = viewMode;
   this._emit("AdSizeChange");
 };
-AdInteractVpaid.prototype.pauseAd = function () {
+CreoSmithVpaid.prototype.pauseAd = function () {
   if (this._videoSlot) this._videoSlot.pause();
   this._emit("AdPaused");
 };
-AdInteractVpaid.prototype.resumeAd = function () {
+CreoSmithVpaid.prototype.resumeAd = function () {
   if (this._videoSlot) this._videoSlot.play();
   this._emit("AdPlaying");
 };
-AdInteractVpaid.prototype.expandAd = function () {};
-AdInteractVpaid.prototype.collapseAd = function () {};
+CreoSmithVpaid.prototype.expandAd = function () {};
+CreoSmithVpaid.prototype.collapseAd = function () {};
 
-AdInteractVpaid.prototype.getAdLinear = function () {
+CreoSmithVpaid.prototype.getAdLinear = function () {
   return true;
 };
-AdInteractVpaid.prototype.getAdWidth = function () {
+CreoSmithVpaid.prototype.getAdWidth = function () {
   return this._attributes.width;
 };
-AdInteractVpaid.prototype.getAdHeight = function () {
+CreoSmithVpaid.prototype.getAdHeight = function () {
   return this._attributes.height;
 };
-AdInteractVpaid.prototype.getAdExpanded = function () {
+CreoSmithVpaid.prototype.getAdExpanded = function () {
   return this._attributes.expanded;
 };
-AdInteractVpaid.prototype.getAdSkippableState = function () {
+CreoSmithVpaid.prototype.getAdSkippableState = function () {
   return false;
 };
-AdInteractVpaid.prototype.getAdRemainingTime = function () {
+CreoSmithVpaid.prototype.getAdRemainingTime = function () {
   return this._attributes.remainingTime;
 };
-AdInteractVpaid.prototype.getAdDuration = function () {
+CreoSmithVpaid.prototype.getAdDuration = function () {
   return this._attributes.duration;
 };
-AdInteractVpaid.prototype.getAdVolume = function () {
+CreoSmithVpaid.prototype.getAdVolume = function () {
   return this._attributes.volume;
 };
-AdInteractVpaid.prototype.setAdVolume = function (volume) {
+CreoSmithVpaid.prototype.setAdVolume = function (volume) {
   this._attributes.volume = volume;
   if (this._videoSlot) this._videoSlot.volume = volume;
   this._emit("AdVolumeChange");
 };
-AdInteractVpaid.prototype.getAdCompanions = function () {
+CreoSmithVpaid.prototype.getAdCompanions = function () {
   return "";
 };
-AdInteractVpaid.prototype.getAdIcons = function () {
+CreoSmithVpaid.prototype.getAdIcons = function () {
   return false;
 };
 
-AdInteractVpaid.prototype.subscribe = function (callback, event, context) {
+CreoSmithVpaid.prototype.subscribe = function (callback, event, context) {
   this._cb[event] = { fn: callback, ctx: context };
 };
-AdInteractVpaid.prototype.unsubscribe = function (event) {
+CreoSmithVpaid.prototype.unsubscribe = function (event) {
   delete this._cb[event];
 };
-AdInteractVpaid.prototype._emit = function (event, args) {
+CreoSmithVpaid.prototype._emit = function (event, args) {
   var c = this._cb[event];
   if (c && typeof c.fn === "function") c.fn.apply(c.ctx || null, args || []);
 };
 
 // The player entry point. TEMPLATE is defined by the concatenated render module.
 var getVPAIDAd = function () {
-  return new AdInteractVpaid(typeof TEMPLATE !== "undefined" ? TEMPLATE : {});
+  return new CreoSmithVpaid(typeof TEMPLATE !== "undefined" ? TEMPLATE : {});
 };

@@ -1,6 +1,6 @@
-# AdInteract Documentation
+# CreoSmith Documentation
 
-This folder is the **living design record** for AdInteract. It is documentation-first:
+This folder is the **living design record** for CreoSmith. It is documentation-first:
 we fix decisions here *before* writing code, and we keep these files in sync with the
 code on every change (see the [`doc-sync`](../.claude/skills/doc-sync/SKILL.md) skill).
 

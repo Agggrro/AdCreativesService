@@ -1,11 +1,11 @@
 ---
 name: design-check
-description: Hold AdInteract's UI to the "Instrument" design system. Invoke BEFORE building any new interface — page, component, modal, state, empty/error view — and again at the end of the UI unit of work. Covers tokens, the human/machine typography split, state-rail tables, the accent budget, focus states, and RU/EN string coverage.
+description: Hold CreoSmith's UI to the "Instrument" design system. Invoke BEFORE building any new interface — page, component, modal, state, empty/error view — and again at the end of the UI unit of work. Covers tokens, the human/machine typography split, state-rail tables, the accent budget, focus states, and RU/EN string coverage.
 ---
 
 # design-check
 
-AdInteract's UI is governed by **Instrument** — a single light theme, a Sienna accent
+CreoSmith's UI is governed by **Instrument** — a single light theme, a Sienna accent
 that only ever means *action*, cold semantics, hairlines instead of shadows, and mono
 type for everything the machine owns. The full contract is
 [`docs/design-system.md`](../../../docs/design-system.md); the rationale is

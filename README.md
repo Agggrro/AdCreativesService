@@ -1,4 +1,4 @@
-# AdInteract
+# CreoSmith
 
 Self-serve B2B SaaS for generating and managing **interactive video ad creatives**
 (SIMID / VPAID / future standards) without writing code. Users configure a template,

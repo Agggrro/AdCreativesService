@@ -9,7 +9,20 @@
 export const LOCALES = ["ru", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
-export const LOCALE_COOKIE = "adinteract_locale";
+export const LOCALE_COOKIE = "creosmith_locale";
+
+/**
+ * The pre-rename cookie name, read as a fallback so the AdInteract → CreoSmith
+ * rename does not silently reset every existing visitor to `DEFAULT_LOCALE`
+ * ("en"): a Russian user who had chosen RU would otherwise come back to an
+ * English UI with nothing to explain it.
+ *
+ * Read-only and never written — the switcher writes `LOCALE_COOKIE` alone, so a
+ * visitor migrates the first time they touch the control. Delete this once the
+ * old cookies have aged out (they were written with a 1-year max-age, so any
+ * time after August 2027).
+ */
+export const LEGACY_LOCALE_COOKIE = "adinteract_locale";
 
 /** BCP-47 tags for Intl date/number formatting. */
 export const LOCALE_TAG: Record<Locale, string> = {
@@ -19,8 +32,7 @@ export const LOCALE_TAG: Record<Locale, string> = {
 
 const ru = {
   brand: {
-    name: "AdInteract",
-    mark: "A",
+    name: "CreoSmith",
   },
   common: {
     signIn: "Войти",
@@ -51,7 +63,7 @@ const ru = {
     ctaDashboard: "Перейти в кабинет",
   },
   auth: {
-    signInTitle: "Вход в AdInteract",
+    signInTitle: "Вход в CreoSmith",
     signInSubtitle: "Управляйте своими интерактивными креативами.",
     signUpTitle: "Создание аккаунта",
     signUpSubtitle: "Начните собирать интерактивные креативы.",
@@ -256,7 +268,7 @@ const ru = {
   cdn: {
     heading: "Домен доставки рекламы",
     whose:
-      "Этот домен принадлежит AdInteract и используется только для доставки рекламы: VAST-теги, счётчики показов и файлы интерактивных креативов.",
+      "Этот домен принадлежит CreoSmith и используется только для доставки рекламы: VAST-теги, счётчики показов и файлы интерактивных креативов.",
     noSite:
       "Сайта здесь нет. Продукт и контакты — на основном домене.",
     whitelist:
@@ -398,8 +410,7 @@ type Dict = typeof ru;
 
 const en: Dict = {
   brand: {
-    name: "AdInteract",
-    mark: "A",
+    name: "CreoSmith",
   },
   common: {
     signIn: "Sign in",
@@ -430,7 +441,7 @@ const en: Dict = {
     ctaDashboard: "Go to dashboard",
   },
   auth: {
-    signInTitle: "Sign in to AdInteract",
+    signInTitle: "Sign in to CreoSmith",
     signInSubtitle: "Manage your interactive ad creatives.",
     signUpTitle: "Create your account",
     signUpSubtitle: "Start building interactive ad creatives.",
@@ -620,7 +631,7 @@ const en: Dict = {
   cdn: {
     heading: "Ad delivery domain",
     whose:
-      "This domain belongs to AdInteract and is used only to deliver advertising: VAST tags, impression counters, and interactive creative files.",
+      "This domain belongs to CreoSmith and is used only to deliver advertising: VAST tags, impression counters, and interactive creative files.",
     noSite:
       "There is no website here. The product and its contacts live on the main domain.",
     whitelist:

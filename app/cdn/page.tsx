@@ -14,7 +14,7 @@ import { dictionaries, LOCALES } from "@/lib/i18n/dictionaries";
  * host, which docs/architecture.md forbids.
  */
 export const metadata: Metadata = {
-  title: "AdInteract — ad delivery domain",
+  title: "CreoSmith — ad delivery domain",
   // Nothing here is a landing page; indexing it would only put a bare
   // infrastructure host into search results.
   robots: { index: false, follow: false },

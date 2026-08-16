@@ -1,5 +1,5 @@
 // ============================================================================
-// AdInteract — database types
+// CreoSmith — database types
 // ----------------------------------------------------------------------------
 // Hand-authored to mirror supabase/schema.sql. When the schema changes, update
 // this file (or regenerate with `supabase gen types typescript` once a project

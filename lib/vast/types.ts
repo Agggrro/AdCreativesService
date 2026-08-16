@@ -23,7 +23,7 @@ export interface CreativeConfig {
   height?: number;
   /**
    * OMID verification vendor's name (VAST `<Verification vendor="...">`),
-   * e.g. a DoubleVerify/IAS/MOAT vendor key. Pass-through only — AdInteract
+   * e.g. a DoubleVerify/IAS/MOAT vendor key. Pass-through only — CreoSmith
    * is not itself an OMID vendor. SIMID-only; see ADR-0012.
    */
   verificationVendor?: string;

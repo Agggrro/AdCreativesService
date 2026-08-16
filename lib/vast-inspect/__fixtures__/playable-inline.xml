@@ -11,7 +11,7 @@
 <VAST version="4.2">
   <Ad id="playable-1">
     <InLine>
-      <AdSystem>AdInteract Fixtures</AdSystem>
+      <AdSystem>CreoSmith Fixtures</AdSystem>
       <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
       <Impression><![CDATA[https://tracking.example.com/impression]]></Impression>
       <AdServingId>fixture-playable</AdServingId>

@@ -147,13 +147,13 @@ export function buildInlineVast(ctx: VastBuildContext): string {
 <VAST version="4.2">
   <Ad id="${escapeXml(cid)}">
     <InLine>
-      <AdSystem version="1.0">AdInteract</AdSystem>
-      <AdTitle><![CDATA[AdInteract Interactive Creative]]></AdTitle>
+      <AdSystem version="1.0">CreoSmith</AdSystem>
+      <AdTitle><![CDATA[CreoSmith Interactive Creative]]></AdTitle>
       <Error>${cdata(errorUrl)}</Error>
       <Impression>${cdata(trackingUrl(ctx.siteUrl, cid, "impression"))}</Impression>
 ${adVerifications}      <Creatives>
         <Creative id="${escapeXml(cid)}" sequence="1">
-          <UniversalAdId idRegistry="adinteract">${escapeXml(cid)}</UniversalAdId>
+          <UniversalAdId idRegistry="creosmith">${escapeXml(cid)}</UniversalAdId>
           <Linear>
             <Duration>${duration}</Duration>
 ${adParameters}            <MediaFiles>

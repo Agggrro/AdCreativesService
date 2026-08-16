@@ -5,7 +5,7 @@
 
 ## Context
 
-AdInteract is a self-serve B2B SaaS that must reach market quickly with a small team.
+CreoSmith is a self-serve B2B SaaS that must reach market quickly with a small team.
 It needs: marketing/landing pages, an authenticated dashboard, server endpoints
 (including a public ad-serving endpoint), a relational DB with row-level access
 control, subscription billing, and global low-latency serving.

@@ -15,7 +15,7 @@
 | Creative runtime assets, via `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 120s token that names one Storage path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
 | Serving snapshots (Vercel Blob) | Read only by our own functions, never by a player | **Private store, not public.** Keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md) |
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
-| UI language cookie (`adinteract_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
+| UI language cookie (`creosmith_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
 | Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage (no app server in the path) | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
 | `POST /api/tools/vast/inspect`, `GET /api/tools/vast/hop` | The open internet, and **an arbitrary third-party host the caller names** | Public, unauthenticated, no rate limit. This is the only outbound-fetch boundary in the product — see "Outbound fetches to untrusted URLs" below |
 
@@ -42,6 +42,31 @@
 - Public/anon Supabase key is fine client-side **because RLS is enforced** — RLS is
   therefore load-bearing for the dashboard and must be correct (audit with the
   `supabase-rls-auditor` subagent).
+
+### KDF labels are part of the key, so renaming one rotates it
+
+Three signing keys are derived from `PREVIEW_TOKEN_SECRET` with a fixed label —
+`creosmith:track-token:v1`, `creosmith:interactive-token:v1`,
+`creosmith:vast-hop-token:v1`. The label is an input to the HMAC, so **editing the
+string is a key rotation**, whatever the reason for the edit. It was edited once
+already, when the product was renamed from AdInteract.
+
+What a rotation costs is bounded, and worth stating precisely so the next rename does
+not get talked out of a correct change by an imagined one:
+
+- **A VAST tag already pasted into a DSP is unaffected.** `/v?creative_id=…` carries no
+  signature; the tokens live *inside* the response and are minted fresh on every build
+  (`builder.ts` → `signTrackToken`, `storage.ts` → `signInteractiveToken`). No tag needs
+  reissuing.
+- **Only tokens in flight at deploy break** — beacons up to their 1-hour TTL, interactive
+  creative URLs up to 120s. The effect is undercounted events in that window, and it
+  fails closed (a dropped beacon), never open.
+- **`TRACK_TOKEN_SECRET`, when set, bypasses its label entirely** — that derivation is
+  the fallback path only. A deploy that has the dedicated secret provisioned loses
+  nothing at all on the tracking key.
+
+Bump the `:v1` suffix deliberately if a real rotation is ever wanted; do not rely on a
+rename to do it.
 
 ## Public VAST endpoint hardening
 

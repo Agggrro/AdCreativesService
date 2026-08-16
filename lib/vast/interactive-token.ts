@@ -54,7 +54,7 @@ function deriveKey(): Buffer {
   const master = process.env.PREVIEW_TOKEN_SECRET;
   if (!master) throw new Error("Missing PREVIEW_TOKEN_SECRET");
   return createHmac("sha256", master)
-    .update("adinteract:interactive-token:v1")
+    .update("creosmith:interactive-token:v1")
     .digest();
 }
 

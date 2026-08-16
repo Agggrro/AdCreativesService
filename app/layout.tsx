@@ -22,7 +22,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AdInteract — Interactive Video Ad Creatives",
+  title: "CreoSmith — Interactive Video Ad Creatives",
   description:
     "Generate and manage interactive video ad creatives (SIMID/VPAID) and get a dynamic VAST tag — no code.",
 };

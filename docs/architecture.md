@@ -4,7 +4,7 @@
 
 ## Overview
 
-AdInteract has three logically distinct parts with **different trust models and
+CreoSmith has three logically distinct parts with **different trust models and
 performance profiles**. Keeping them separate is the core architectural idea.
 
 ```

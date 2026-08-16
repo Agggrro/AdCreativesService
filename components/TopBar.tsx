@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Dict } from "@/lib/i18n/dictionaries";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { TopNav } from "@/components/TopNav";
+import { BrandMark } from "@/components/ui/BrandMark";
 import type { ToolListing } from "@/lib/tools";
 
 export type TopBarLink = {
@@ -33,9 +34,7 @@ export function TopBar({
       <div className="mx-auto flex h-14 w-full max-w-[1080px] items-center justify-between gap-6 px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Link href={brandHref} className="flex items-center gap-2.5">
-            <span className="flex size-5 items-center justify-center rounded-ctl bg-accent font-mono text-xs font-medium text-white">
-              {dict.brand.mark}
-            </span>
+            <BrandMark />
             <span className="text-[15px] font-semibold tracking-[-0.01em]">
               {dict.brand.name}
             </span>

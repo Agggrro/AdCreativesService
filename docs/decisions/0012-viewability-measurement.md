@@ -40,7 +40,7 @@ apiFramework="omid" browserOptional="true">...</JavaScriptResource>
 </Verification></AdVerifications>` between `<Impression>` and `<Creatives>`
 (`lib/vast/verification.ts`, wired through `FormatAdapter`'s new optional
 `adVerificationsInner` in `lib/vast/adapters/simid.ts` and
-`lib/vast/builder.ts`). AdInteract is not itself an OMID vendor and never
+`lib/vast/builder.ts`). CreoSmith is not itself an OMID vendor and never
 claims to be.
 
 **No CSP change, and no change to the SIMID document itself.** Per IAB's OMID
@@ -192,7 +192,7 @@ exception.
 
 ## Consequences
 
-- **A SIMID creative's viewability is entirely opaque to AdInteract.** We
+- **A SIMID creative's viewability is entirely opaque to CreoSmith.** We
   never see the vendor's measurement, cannot alert on it, and cannot show it
   in-product. This is the honest shape of a pass-through and matches
   ADR-0003's posture: we do not claim capability we don't have.

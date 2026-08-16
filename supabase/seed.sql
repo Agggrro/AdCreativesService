@@ -1,5 +1,5 @@
 -- ============================================================================
--- AdInteract — seed data (templates catalog)
+-- CreoSmith — seed data (templates catalog)
 -- ----------------------------------------------------------------------------
 -- runtime_keys point at asset paths inside the `creatives` Storage bucket; build
 -- the units with `npm run build:runtime` and upload runtime/dist/** to those

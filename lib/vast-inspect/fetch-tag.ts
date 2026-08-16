@@ -292,7 +292,7 @@ function requestOnce(url: URL, deadlineMs: number): Promise<RawResponse> {
           // The one URL we show to a stranger's server. It names the tool so an
           // ad server operator seeing us in their logs can find out what we are,
           // which means it has to be the domain a human would actually land on.
-          "user-agent": "AdInteract-VAST-Validator/1.0 (+https://creosmith.com/tools/vast-validator)",
+          "user-agent": "CreoSmith-VAST-Validator/1.0 (+https://creosmith.com/tools/vast-validator)",
           accept: "application/xml, text/xml, */*",
           "accept-encoding": "identity",
         },

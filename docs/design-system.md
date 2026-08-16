@@ -1,6 +1,6 @@
-# Instrument — the AdInteract design system
+# Instrument — the CreoSmith design system
 
-> The visual and interaction contract for every AdInteract surface. Binding on all UI
+> The visual and interaction contract for every CreoSmith surface. Binding on all UI
 > work: new pages, new components, new states, and edits to existing ones. Enforced by
 > the [`design-check`](../.claude/skills/design-check/SKILL.md) skill and the
 > [`design-system-reviewer`](../.claude/agents/design-system-reviewer.md) subagent.
@@ -184,6 +184,31 @@ they sit in a dense table cell — a VAST tag at 12px is a downgrade, not a refi
   container. The page body never scrolls sideways.
 
 ## 6. Components
+
+### Brand mark
+
+The mark is a **CS monogram**: an open Sienna `C` whose counter holds a play
+triangle, followed by an `S` in `fg`. It ships as `ui/BrandMark.tsx` — one inline
+SVG, 24px tall in the top bar, paired with the wordmark at 15px/600. It replaced a
+20px accent square holding the letter `A`, which the rename to CreoSmith left
+meaningless.
+
+Three system constraints shaped it, and they bind any future revision:
+
+- **Flat.** The source reference is a bevelled 3D render. §2 has no shadows and no
+  gradients, so only the silhouette survives; depth is not reintroduced for the logo.
+- **Warm, not slate.** The reference's second letter is cold slate. §3 rules that out
+  next to terracotta, so the `S` takes the `fg` neutral. The mark is two colours, both
+  tokens, and never a literal hex.
+- **The accent here is chrome, not action.** §3 already exempts the brand mark from the
+  two-appearance budget. That exemption covers this glyph and stops there — the play
+  triangle is *part of the mark*, not a second accent appearance, and the same shape
+  used anywhere below the top bar would count.
+
+The `C`'s radial terminals and the `S`'s flat ones both fall out of butt-capped arcs
+rather than hand-drawn outlines; the geometry is derived in the component's header
+comment. The glyph is `aria-hidden` — the wordmark next to it is the accessible name,
+and labelling both would announce the brand twice.
 
 ### Data tables — the default for lists
 

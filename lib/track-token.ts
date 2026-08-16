@@ -33,7 +33,7 @@ function deriveKey(): Buffer {
   const master = process.env.PREVIEW_TOKEN_SECRET;
   if (!master) throw new Error("Missing TRACK_TOKEN_SECRET (or PREVIEW_TOKEN_SECRET as fallback)");
   return createHmac("sha256", master)
-    .update("adinteract:track-token:v1")
+    .update("creosmith:track-token:v1")
     .digest();
 }
 

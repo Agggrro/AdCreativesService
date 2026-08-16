@@ -1,5 +1,5 @@
 /**
- * AdInteract runtime build. Concatenates the shared VPAID base with each
+ * CreoSmith runtime build. Concatenates the shared VPAID base with each
  * template's render module, then minifies the result (terser: mangle +
  * compress, no control-flow-flattening/self-defending presets — those add
  * runtime overhead that risks tripping player init timeouts, see ADR-0003)

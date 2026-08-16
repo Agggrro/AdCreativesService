@@ -3,7 +3,7 @@ import { cdata, escapeXml } from "./xml";
 
 /**
  * Builds a VAST 4.1+ <AdVerifications><Verification> block for an OMID
- * verification vendor (pass-through only — see ADR-0012; AdInteract is not
+ * verification vendor (pass-through only — see ADR-0012; CreoSmith is not
  * itself an OMID vendor). Returns "" — never a malformed/partial node — when
  * no vendor script URL is configured, the URL isn't well-formed https, or no
  * vendor name is given: `vendor` is a required VAST attribute, and a

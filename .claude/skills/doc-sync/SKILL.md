@@ -1,11 +1,11 @@
 ---
 name: doc-sync
-description: Keep AdInteract's docs/ in sync with code on every change. Invoke at the end of a unit of work, or whenever behavior, DB schema, billing, security posture, API contracts, or AdTech-standard handling changes. Checks that the relevant docs/ files and ADRs were updated, and flags drift between code and documentation.
+description: Keep CreoSmith's docs/ in sync with code on every change. Invoke at the end of a unit of work, or whenever behavior, DB schema, billing, security posture, API contracts, or AdTech-standard handling changes. Checks that the relevant docs/ files and ADRs were updated, and flags drift between code and documentation.
 ---
 
 # doc-sync
 
-AdInteract is **documentation-first**. Docs in `docs/` are the agreed design record and
+CreoSmith is **documentation-first**. Docs in `docs/` are the agreed design record and
 must never silently drift from the code. This skill is the discipline that keeps them
 honest. Run it at the end of a unit of work (and it is referenced as a quality gate in
 `CLAUDE.md`).

@@ -16,7 +16,7 @@
 <VAST version="4.2">
   <Ad id="ad-1">
     <InLine>
-      <AdSystem version="1.0">AdInteract Fixtures</AdSystem>
+      <AdSystem version="1.0">CreoSmith Fixtures</AdSystem>
       <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
       <Impression id="imp-1"><![CDATA[https://tracking.example.com/impression?id=1&cb=[CACHEBUSTING]]]></Impression>
       <Pricing model="cpm" currency="USD"><![CDATA[4.50]]></Pricing>

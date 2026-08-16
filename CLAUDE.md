@@ -1,4 +1,4 @@
-# AdInteract — Project Context (CLAUDE.md)
+# CreoSmith — Project Context (CLAUDE.md)
 
 > This file is loaded into every Claude Code session. It is the **single source of
 > truth for how we work**. Keep it short and current. Detailed knowledge lives in
@@ -6,7 +6,7 @@
 
 ## What we're building
 
-**AdInteract** is a B2B self-serve SaaS where media buyers and creative agencies
+**CreoSmith** is a B2B self-serve SaaS where media buyers and creative agencies
 generate and manage **interactive video ad creatives** (SIMID / VPAID / future
 standards) without writing code. Users configure a template, get a dynamic **VAST
 tag URL**, and paste it into their DSP. Access is gated by subscription: when a

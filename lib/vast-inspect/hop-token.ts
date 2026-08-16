@@ -28,7 +28,7 @@ interface HopTokenPayload {
 function deriveKey(): Buffer {
   const master = process.env.PREVIEW_TOKEN_SECRET;
   if (!master) throw new Error("Missing PREVIEW_TOKEN_SECRET");
-  return createHmac("sha256", master).update("adinteract:vast-hop-token:v1").digest();
+  return createHmac("sha256", master).update("creosmith:vast-hop-token:v1").digest();
 }
 
 function sign(payloadB64: string): string {

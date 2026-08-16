@@ -1,5 +1,5 @@
 -- ============================================================================
--- AdInteract — database schema
+-- CreoSmith — database schema
 -- ----------------------------------------------------------------------------
 -- Mirrors docs/data-model.md. Two access patterns coexist:
 --   * Dashboard path: RLS-enforced, per-user (anon/authenticated roles).
