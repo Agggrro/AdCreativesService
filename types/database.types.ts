@@ -181,31 +181,32 @@ export type Database = {
           },
         ];
       };
-      creative_events: {
+      // ADR-0016: aggregated, not append-only. No client or app code writes this
+      // directly — `increment_creative_event()` is the only writer, because the
+      // upsert it performs cannot be expressed through PostgREST.
+      creative_event_counters: {
         Row: {
-          id: number;
           creative_id: string;
           event_type: Database["public"]["Enums"]["creative_event_type"];
-          meta: Json;
-          occurred_at: string;
+          /** date_trunc('hour', …) at ingest; collapsed to midnight after 30 days. */
+          bucket: string;
+          count: number;
         };
         Insert: {
-          id?: never;
           creative_id: string;
           event_type: Database["public"]["Enums"]["creative_event_type"];
-          meta?: Json;
-          occurred_at?: string;
+          bucket: string;
+          count?: number;
         };
         Update: {
-          id?: never;
           creative_id?: string;
           event_type?: Database["public"]["Enums"]["creative_event_type"];
-          meta?: Json;
-          occurred_at?: string;
+          bucket?: string;
+          count?: number;
         };
         Relationships: [
           {
-            foreignKeyName: "creative_events_creative_id_fkey";
+            foreignKeyName: "creative_event_counters_creative_id_fkey";
             columns: ["creative_id"];
             referencedRelation: "creatives";
             referencedColumns: ["id"];
@@ -237,22 +238,34 @@ export type Database = {
         Args: { p_creative_id: string };
         Returns: Database["private"]["Views"]["creative_serving"]["Row"][];
       };
-      // Dashboard analytics: the only read path into creative_events. Scoped to
-      // auth.uid() inside the function, hence no arguments (ADR-0008).
+      // Dashboard analytics: the only read path into creative_event_counters.
+      // Scoped to auth.uid() inside the function, hence no arguments (ADR-0008).
       get_creative_overview: {
         Args: Record<string, never>;
         Returns: {
           creative_id: string;
           impressions: number;
-          starts: number;
-          q25: number;
-          q50: number;
-          q75: number;
-          completes: number;
+          /** VPAID-only (ADR-0012). Always 0 for SIMID — render as "n/a", not zero. */
           viewable: number;
+          /** Final call-to-action only; never an intermediate interaction (ADR-0016). */
+          clicks: number;
           is_entitled: boolean;
           should_serve: boolean;
         }[];
+      };
+      // The ingest beacon's only write. Service role only.
+      increment_creative_event: {
+        Args: {
+          p_creative_id: string;
+          p_event_type: Database["public"]["Enums"]["creative_event_type"];
+        };
+        Returns: undefined;
+      };
+      // Collapses hourly buckets older than N days into one per day. Called by
+      // the daily cron; returns how many day-buckets it merged.
+      rollup_creative_events: {
+        Args: { p_older_than_days?: number };
+        Returns: number;
       };
     };
     Enums: {
@@ -324,7 +337,7 @@ export type Profile = Tables<"profiles">;
 export type Template = Tables<"templates">;
 export type Creative = Tables<"creatives">;
 export type Subscription = Tables<"subscriptions">;
-export type CreativeEvent = Tables<"creative_events">;
+export type CreativeEventCounter = Tables<"creative_event_counters">;
 export type CreativeServing =
   Database["private"]["Views"]["creative_serving"]["Row"];
 
@@ -333,7 +346,7 @@ export type ProfileInsert = TablesInsert<"profiles">;
 export type TemplateInsert = TablesInsert<"templates">;
 export type CreativeInsert = TablesInsert<"creatives">;
 export type SubscriptionInsert = TablesInsert<"subscriptions">;
-export type CreativeEventInsert = TablesInsert<"creative_events">;
+export type CreativeEventCounterInsert = TablesInsert<"creative_event_counters">;
 
 // Enum unions
 export type PlanType = Enums<"plan_type">;

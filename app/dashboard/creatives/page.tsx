@@ -9,9 +9,17 @@ import { CopyButton } from "@/components/CopyButton";
 import { DeleteCreativeButton } from "@/components/DeleteCreativeButton";
 import { buttonClass, LinkButton } from "@/components/ui/Button";
 import { Notice, Panel } from "@/components/ui/Field";
-import { RAIL, ServingBadge } from "@/components/ui/State";
+import { ServingBadge } from "@/components/ui/State";
 import { Chip } from "@/components/ui/Chip";
-import { CELL, HEAD, NUM_HEAD, ROW, TableFrame } from "@/components/ui/Table";
+import {
+  CELL,
+  HEAD,
+  NUM_HEAD,
+  railCell,
+  ROW,
+  TableFrame,
+  TableHead,
+} from "@/components/ui/Table";
 
 export default async function MyCreativesPage({
   searchParams,
@@ -35,8 +43,9 @@ export default async function MyCreativesPage({
         .select("id, name, selected_format, template_id, created_at")
         .order("created_at", { ascending: false }),
       supabase.from("templates").select("id, name"),
-      // The only read path into creative_events: an owner-scoped aggregate
-      // (ADR-0008). Six counts per creative, one round trip.
+      // The only read path into creative_event_counters: an owner-scoped
+      // aggregate (ADR-0008, ADR-0016). Three counts plus the two serving flags
+      // per creative, one round trip.
       supabase.rpc("get_creative_overview"),
     ]);
 
@@ -83,26 +92,27 @@ export default async function MyCreativesPage({
           <table className="w-full table-fixed border-collapse text-[13px]">
             <colgroup>
               <col />
-              <col className="w-[76px]" />
-              <col className="w-[92px]" />
-              <col className="w-[80px]" />
               <col className="w-[88px]" />
+              <col className="w-[120px]" />
+              <col className="w-[80px]" />
               <col className="w-[132px]" />
               <col className="w-[190px]" />
               <col className="w-[260px]" />
             </colgroup>
-            <thead>
-              <tr className="border-b border-hairline">
+            <TableHead>
                 <th className={HEAD}>{dict.dashboard.creativeName}</th>
                 <th className={HEAD}>{dict.dashboard.format}</th>
+                {/* Impressions and clicks only. Viewability is VPAID-only, and
+                    this list mixes formats — a column that is structurally N/A
+                    for some rows would print a ragged em dash with nowhere to
+                    put the qualifier §6 requires. It lives on the detail page,
+                    in its own strip. */}
                 <th className={NUM_HEAD}>{dict.dashboard.impressions}</th>
-                <th className={NUM_HEAD}>{dict.dashboard.starts}</th>
-                <th className={NUM_HEAD}>{dict.dashboard.completes}</th>
+                <th className={NUM_HEAD}>{dict.dashboard.clicks}</th>
                 <th className={HEAD}>{dict.dashboard.status}</th>
                 <th className={HEAD}>{dict.dashboard.vastTag}</th>
                 <th className={HEAD} />
-              </tr>
-            </thead>
+            </TableHead>
             <tbody>
               {creatives.map((c) => {
                 const tag = `${siteUrl}/api/vast?creative_id=${c.id}`;
@@ -112,11 +122,9 @@ export default async function MyCreativesPage({
                 return (
                   <tr key={c.id} className={ROW}>
                     <td
-                      className={`${CELL} border-l-[3px] pl-[13px] ${
-                        statsAvailable
-                          ? RAIL[serving ? "live" : "dead"]
-                          : "border-l-transparent"
-                      }`}
+                      className={railCell(
+                        statsAvailable ? (serving ? "live" : "dead") : null,
+                      )}
                     >
                       <Link
                         href={`/dashboard/creatives/${c.id}`}
@@ -134,10 +142,7 @@ export default async function MyCreativesPage({
                       {statsAvailable ? number.format(row?.impressions ?? 0) : "—"}
                     </td>
                     <td className={`${CELL} data-instr text-right`}>
-                      {statsAvailable ? number.format(row?.starts ?? 0) : "—"}
-                    </td>
-                    <td className={`${CELL} data-instr text-right`}>
-                      {statsAvailable ? number.format(row?.completes ?? 0) : "—"}
+                      {statsAvailable ? number.format(row?.clicks ?? 0) : "—"}
                     </td>
                     <td className={`${CELL} whitespace-nowrap`}>
                       {statsAvailable ? (

@@ -152,12 +152,14 @@ Video's `config_schema` gained three fields — `verificationVendor`,
 `verificationScriptUrl`, `verificationParameters` — grouped under
 `"viewability"`, each gated to `selected_format = "simid"`.
 
-**Dashboard: `viewable` gets its own strip, not a 7th funnel tile.** It
-isn't part of the sequential, always-applicable delivery funnel
-(`docs/design-system.md` §6: impression → start → q25 → q50 → q75 →
-complete) — appending it there would have broken that section's closed
-definition, and 7 has no clean column divisor at the grid's intermediate
-breakpoint, producing a ragged row of exposed hairline background. It also
+**Dashboard: `viewable` gets its own strip, not another delivery tile.** It
+isn't part of the sequential, always-applicable delivery set
+(`docs/design-system.md` §6) — appending it there would break that section's
+closed definition. (When this was written the set was six, impression → start →
+q25 → q50 → q75 → complete, and the column-divisor argument below was about
+making it seven. [ADR-0016](0016-three-events-hourly-counters.md) has since cut
+it to two, impression → click; the reason viewability stays out is the closed-set
+rule, which is unchanged, not the arithmetic.) It also
 needed a state the funnel's existing vocabulary didn't have: §6 defines the
 em dash strictly as "not measurable" (a transient, page-wide condition —
 `statsAvailable === false`), and reusing that exact glyph for "structurally
@@ -167,12 +169,22 @@ indistinguishable from an outage. The viewability panel
 
 - **VPAID, stats available:** a real count, `data-instr text-fg`, caption
   "Self-reported, not OMID-accredited."
-- **SIMID (any stats state), or VPAID with stats unavailable and format ==
-  simid is false:** em dash in `text-fg-disabled` (not the funnel's `text-fg`
-  dash), caption "Measured by your verification vendor, not by us."
-- **Stats genuinely unavailable:** em dash in `text-fg-disabled`, no
-  caption — the page-level `statsUnavailable` banner already explains this
-  once; repeating a long-form explanation under one tile would be noise.
+- **VPAID, stats unavailable:** em dash in `text-fg` — the *outage* dash, the
+  same one the delivery strip shows — keeping its caption.
+- **SIMID, any stats state:** em dash in `text-fg-disabled` (the permanent
+  "not applicable" dash), caption "Measured by your verification vendor, not by
+  us."
+
+> **Corrected 2026-08-16.** This list previously had a third bullet giving
+> "stats genuinely unavailable" the `text-fg-disabled` dash with no caption,
+> which inverted §6: the disabled tone is reserved for a *permanent,
+> row-specific* absence and `text-fg` for a *transient, page-wide* one. As
+> written, a VPAID creative during an outage showed the "never measurable"
+> dash while the delivery strip beside it showed the outage dash — two
+> readings of the same event on one screen — and a SIMID creative lost its
+> caption exactly when the page banner was offering it the wrong explanation.
+> Tone and caption are now driven by applicability alone, never by
+> `statsAvailable`.
 
 `docs/design-system.md` §6 is amended alongside this ADR to document the new
 metric and this second dash state as the system's vocabulary, not an inline

@@ -243,19 +243,126 @@ create trigger subscriptions_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
--- creative_events  (append-only analytics ingest)
+-- creative_event_counters  (aggregated analytics ingest — ADR-0016)
 -- ---------------------------------------------------------------------------
-create table if not exists public.creative_events (
-  id          bigint generated always as identity primary key,
+-- Replaces the append-only `creative_events`, which stored one row per beacon.
+-- Two problems, both structural rather than tuning:
+--   * up to seven rows written per impression, into the same database that
+--     serves login and the Stripe webhook;
+--   * `get_creative_overview()` scanned every event a creative had ever
+--     produced, so the dashboard got slower forever rather than with a window.
+-- Counting into (creative, event, hour) buckets makes the write one upsert and
+-- the table's size a function of time, not of traffic.
+create table if not exists public.creative_event_counters (
   creative_id uuid not null references public.creatives(id) on delete cascade,
   event_type  creative_event_type not null,
-  meta        jsonb not null default '{}',
-  occurred_at timestamptz not null default now()
+  -- date_trunc('hour', …). Hourly rather than daily so intraday pacing stays
+  -- visible; the daily cron rolls buckets older than 30 days into midnight.
+  bucket      timestamptz not null,
+  count       bigint not null default 0,
+  primary key (creative_id, event_type, bucket)
 );
-comment on table public.creative_events is 'Append-only ad telemetry. Written by the serving/ingest layer (service role). Consider partitioning post-MVP.';
+comment on table public.creative_event_counters is 'Aggregated ad telemetry (ADR-0016). Written by the ingest layer via increment_creative_event(); read only through get_creative_overview().';
 
-create index if not exists creative_events_creative_time_idx
-  on public.creative_events (creative_id, occurred_at desc);
+-- No secondary index on purpose: the primary key is (creative_id, …), which is
+-- exactly the prefix every read scans by. The old table carried an index on
+-- (creative_id, occurred_at) that the only real query never used.
+
+-- ---------------------------------------------------------------------------
+-- Ingest: one upsert per beacon
+-- ---------------------------------------------------------------------------
+-- SECURITY DEFINER so it can be the single writer, with EXECUTE restricted to
+-- the service role. PostgREST cannot express `on conflict do update set count =
+-- count + 1`, and doing it as read-then-write in app code would lose events
+-- under concurrency — which, on this path, is the normal case.
+create or replace function public.increment_creative_event(
+  p_creative_id uuid,
+  p_event_type  creative_event_type
+)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.creative_event_counters (creative_id, event_type, bucket, count)
+  values (p_creative_id, p_event_type, date_trunc('hour', now()), 1)
+  on conflict (creative_id, event_type, bucket)
+  do update set count = public.creative_event_counters.count + 1;
+$$;
+
+revoke all on function public.increment_creative_event(uuid, creative_event_type) from public;
+grant execute on function public.increment_creative_event(uuid, creative_event_type) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Roll hourly buckets older than the window into one midnight bucket per day.
+-- Called by the daily cron (app/api/cron/health). Idempotent: a second run over
+-- the same range finds only already-collapsed rows and changes nothing.
+-- ---------------------------------------------------------------------------
+create or replace function public.rollup_creative_events(p_older_than_days int default 30)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_cutoff timestamptz := date_trunc('day', now()) - make_interval(days => p_older_than_days);
+  v_rolled bigint;
+begin
+  with collapsed as (
+    delete from public.creative_event_counters
+     where bucket < v_cutoff
+       and bucket <> date_trunc('day', bucket)
+    returning creative_id, event_type, date_trunc('day', bucket) as day, count
+  ), summed as (
+    select creative_id, event_type, day, sum(count) as count
+      from collapsed
+     group by creative_id, event_type, day
+  ), merged as (
+    insert into public.creative_event_counters (creative_id, event_type, bucket, count)
+    select creative_id, event_type, day, count from summed
+    on conflict (creative_id, event_type, bucket)
+    do update set count = public.creative_event_counters.count + excluded.count
+    returning 1
+  )
+  select count(*) into v_rolled from merged;
+  return coalesce(v_rolled, 0);
+end;
+$$;
+
+revoke all on function public.rollup_creative_events(int) from public;
+grant execute on function public.rollup_creative_events(int) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Migration from the old append-only table, if it is still there.
+-- ---------------------------------------------------------------------------
+-- Only the three events ADR-0016 keeps are carried over; the rest are dropped
+-- with the table. This block is a no-op on a database that has already applied
+-- it, which is what keeps schema.sql a re-runnable full apply.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables
+     where table_schema = 'public' and table_name = 'creative_events'
+  ) then
+    -- Compared as text, not as enum literals, and that is load-bearing: on a
+    -- database whose enum predates `viewable`, the `alter type ... add value`
+    -- near the top of this file ran in *this* transaction, and Postgres refuses
+    -- to read a value added by an uncommitted ALTER TYPE. Writing 'viewable' as
+    -- an enum literal here would abort the whole atomic apply on exactly the
+    -- installs this migration exists for. Same hazard the
+    -- `check_function_bodies` bracket handles for get_creative_overview.
+    insert into public.creative_event_counters (creative_id, event_type, bucket, count)
+    select creative_id, event_type, date_trunc('hour', occurred_at), count(*)
+      from public.creative_events
+     where event_type::text in ('impression', 'viewable', 'click')
+     group by creative_id, event_type, date_trunc('hour', occurred_at)
+    on conflict (creative_id, event_type, bucket)
+    do update set count = public.creative_event_counters.count + excluded.count;
+
+    drop table public.creative_events;
+  end if;
+end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- stripe_events  (webhook idempotency ledger)
@@ -279,7 +386,7 @@ alter table public.profiles        enable row level security;
 alter table public.templates       enable row level security;
 alter table public.creatives       enable row level security;
 alter table public.subscriptions   enable row level security;
-alter table public.creative_events enable row level security;
+alter table public.creative_event_counters enable row level security;
 alter table public.stripe_events   enable row level security;
 -- stripe_events: no policy => no client access; only the service role (webhook) touches it.
 
@@ -324,9 +431,9 @@ drop policy if exists subscriptions_select_own on public.subscriptions;
 create policy subscriptions_select_own on public.subscriptions
   for select to authenticated using (user_id = (select auth.uid()));
 
--- creative_events: no direct client access. RLS enabled with no policy => the
--- anon/authenticated roles are denied. Writes/reads go through the service role
--- (ingest) or future owner-scoped aggregate views.
+-- creative_event_counters: no direct client access. RLS enabled with no policy =>
+-- the anon/authenticated roles are denied. Writes go through the service role
+-- (increment_creative_event); reads go through get_creative_overview().
 
 -- ---------------------------------------------------------------------------
 -- Storage: creative-media (advertiser-uploaded creative assets)
@@ -397,14 +504,14 @@ grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;
 grant all on all sequences in schema public to anon, authenticated, service_role;
 
--- Two tables have no client contract at all: `creative_events` is written by the
+-- Two tables have no client contract at all: `creative_event_counters` is written by the
 -- ingest beacon with the service role and read only through
 -- public.get_creative_overview(), and `stripe_events` is webhook-only. Take the
 -- table-level privileges away rather than relying on RLS alone — TRUNCATE is a
 -- table privilege that **no policy can gate**, and "RLS on, zero policies" does
 -- not stop it. SECURITY DEFINER functions are unaffected: they are checked
 -- against their owner, not the caller.
-revoke all on public.creative_events, public.stripe_events from anon, authenticated;
+revoke all on public.creative_event_counters, public.stripe_events from anon, authenticated;
 
 -- Default-closed for future tables. The previous `grant all on tables` default
 -- meant any table created later was born readable AND writable by anon until
@@ -533,21 +640,21 @@ grant execute on function public.get_creative_serving(uuid) to service_role;
 -- ---------------------------------------------------------------------------
 -- Dashboard analytics read (the "Мои креативы" section)
 -- ---------------------------------------------------------------------------
--- `creative_events` has RLS enabled with no policies, so the session client
--- reads zero rows and must stay that way: opening it with an owner policy would
--- expose `meta` and per-row `occurred_at` forever in exchange for six integers,
--- and PostgREST cannot aggregate, so counting would cost a round trip per
--- creative. This function is the whole dashboard analytics surface.
+-- `creative_event_counters` has RLS enabled with no policies, so the session
+-- client reads zero rows and must stay that way: opening it with an owner policy
+-- would expose per-hour buckets forever in exchange for three integers, and
+-- PostgREST cannot aggregate, so counting would cost a round trip per creative.
+-- This function is the whole dashboard analytics surface.
 --
 -- It takes NO parameter on purpose: the only rows it can ever return are the
 -- caller's own. A p_creative_id argument is the shape that eventually ships
 -- without an ownership check.
 --
--- It can read `creative_events` only because its owner is exempt from RLS. Two
--- ways that silently degrades to zeros rather than failing loudly, both worth
--- knowing before debugging an empty dashboard: running
--- `alter table public.creative_events force row level security`, or applying
--- this file as a role that neither owns the table nor has BYPASSRLS.
+-- It can read the counters only because its owner is exempt from RLS. Two ways
+-- that silently degrades to zeros rather than failing loudly, both worth knowing
+-- before debugging an empty dashboard: running `alter table
+-- public.creative_event_counters force row level security`, or applying this
+-- file as a role that neither owns the table nor has BYPASSRLS.
 --
 -- This function's body references the literal 'viewable', added to
 -- creative_event_type by `alter type ... add value` above, in the SAME
@@ -574,17 +681,19 @@ drop function if exists public.get_creative_overview();
 create function public.get_creative_overview()
 returns table (
   creative_id  uuid,
+  -- ADR-0016 cut the funnel to three ingested events. `starts`, the three
+  -- quartiles and `completes` are gone — five trackers, one player-fired beacon
+  -- each, for numbers a buyer's own DSP already reports.
   impressions  bigint,
-  starts       bigint,
-  q25          bigint,
-  q50          bigint,
-  q75          bigint,
-  completes    bigint,
   -- VPAID-only (ADR-0012): a SIMID creative never produces this event, since
   -- its viewability is measured by the advertiser's own OMID vendor, which we
   -- don't ingest. Always 0 for SIMID rows — the dashboard must render that as
   -- "not applicable to this format", never as a confident zero.
   viewable     bigint,
+  -- Fired only from the creative's final call-to-action, the one that opens the
+  -- advertiser's URL — never from an intermediate interaction such as a quiz
+  -- answer. See runtime/lib/vpaid-base.js's clickThrough().
+  clicks       bigint,
   is_entitled  boolean,
   should_serve boolean
 )
@@ -595,13 +704,9 @@ stable
 as $$
   select
     c.id,
-    count(e.*) filter (where e.event_type = 'impression'),
-    count(e.*) filter (where e.event_type = 'start'),
-    count(e.*) filter (where e.event_type = 'q25'),
-    count(e.*) filter (where e.event_type = 'q50'),
-    count(e.*) filter (where e.event_type = 'q75'),
-    count(e.*) filter (where e.event_type = 'complete'),
-    count(e.*) filter (where e.event_type = 'viewable'),
+    coalesce(sum(e.count) filter (where e.event_type = 'impression'), 0),
+    coalesce(sum(e.count) filter (where e.event_type = 'viewable'), 0),
+    coalesce(sum(e.count) filter (where e.event_type = 'click'), 0),
     -- Both flags, from the one shared definition. `should_serve` matches the
     -- serving gate exactly; the dashboard renders entitlement today only because
     -- creatives.status has no update path, and the day a kill switch ships this
@@ -609,14 +714,14 @@ as $$
     private.is_entitled(c.user_id, c.template_id),
     (c.status = 'active' and private.is_entitled(c.user_id, c.template_id))
   from public.creatives c
-  left join public.creative_events e on e.creative_id = c.id
+  left join public.creative_event_counters e on e.creative_id = c.id
   where c.user_id = (select auth.uid())
   group by c.id;
 $$;
 set local check_function_bodies = on;
 
 comment on function public.get_creative_overview() is
-  'Per-creative funnel counts + entitlement for the signed-in owner. The only read path into creative_events.';
+  'Per-creative delivery counts + entitlement for the signed-in owner. The only read path into creative_event_counters.';
 
 revoke all on function public.get_creative_overview() from public;
 grant execute on function public.get_creative_overview() to authenticated;

@@ -435,10 +435,17 @@ Counting rules, because a metric that lies costs more than a metric that is miss
 - **When the numbers are unmeasurable, the state rail has nothing to encode either.**
   Print the em dash *and* drop the rail to transparent — falling back to a neutral tone
   paints a claim ("idle") where there is only an absence.
-- The delivery funnel reads left to right in the order the player fires it:
-  impression → start → q25 → q50 → q75 → complete. It is a closed, sequential set —
-  a metric that is conditional on something other than "did the aggregate load"
-  (see below) does not belong in it, even if it is a count of the same shape.
+- The delivery strip reads left to right in the order the events can occur:
+  **impression → click**. It is a closed, sequential set — a metric that is
+  conditional on something other than "did the aggregate load" (see below) does not
+  belong in it, even if it is a count of the same shape.
+
+  It used to be six: impression → start → q25 → q50 → q75 → complete. The five
+  video-progress trackers — start, the three quartiles and complete — were removed in
+  [ADR-0016](decisions/0016-three-events-hourly-counters.md) — they cost a
+  player-fired beacon each to reproduce numbers the buyer's own DSP already
+  reports. The rule that survives is the shape, not the membership: whatever is in
+  the strip must be sequential, unconditional, and read left to right.
 - **A metric that is structurally not applicable to this row is a third state,
   not the unmeasurable dash.** "Unmeasurable" (`statsAvailable === false`) is
   transient and page-wide — the aggregate genuinely failed to load, and every
@@ -459,10 +466,23 @@ Counting rules, because a metric that lies costs more than a metric that is miss
   ragged grid, and so its distinct third state reads as deliberately separate,
   not as a broken tile in the funnel.
 - **No derived ratio without the counts it comes from**, and no derived ratio at all where
-  the underlying event is not ingested. Today the product records impression, start, the
-  three quartiles, complete, and (VPAID-only, self-reported) viewable — there is no click
-  event, no error event, and no count of ad requests, so CTR, error rate and fill rate may
-  not appear on any screen.
+  the underlying event is not ingested. Today the product records exactly three
+  ([ADR-0016](decisions/0016-three-events-hourly-counters.md)): **impression**,
+  **click** (fired only from the final call-to-action that opens the advertiser's
+  URL — never from an intermediate interaction such as a quiz answer), and
+  **viewable** (VPAID-only, self-reported). There is still no error event and no
+  count of ad requests, so **error rate and fill rate may not appear on any screen**.
+  CTR became derivable when click arrived and **is displayed, over impressions**.
+  Two rules come with it, and they generalise to any ratio added later:
+  - **A derived ratio may close the delivery strip, never sit inside it.** The
+    counts are a sequential set of things that happened; a ratio is a reading
+    about them. It goes last, after the counts it comes from.
+  - **Its qualifier names the denominator, always.** "of impressions", not a bare
+    percentage. Impressions and viewable impressions give different numbers, and a
+    buyer reading an unlabelled CTR will assume whichever is worse for us.
+  With no impressions yet the ratio is genuinely not measurable, so it prints the
+  em dash — the transient one, in `text-fg`: it becomes measurable the moment
+  delivery starts. It is not `0%`, which would be a claim that nobody clicked.
 
 ## 7. The player well
 
@@ -565,7 +585,7 @@ never two stacked captions.
 | ✕ | Warm red for errors. The alarm is cold `#B02537`, or it stops being an alarm. |
 | ✕ | Card grids where a table belongs. The catalog is the one grid, and only because a template has no state. |
 | ✕ | A live creative running anywhere but a player well, or more than one live unit on a page. The VPAID host is a single global — the second unit overwrites the first. |
-| ✕ | Derived-ratio metrics (CTR, VTR, fill rate) without the counts they come from, or at all where the underlying event is not ingested. |
+| ✕ | Derived-ratio metrics without the counts they come from. VTR and fill rate are barred outright — their events are not ingested. CTR is permitted since ADR-0016 made click a real count, but only with its denominator stated (§6). |
 | ✕ | Raw Tailwind palette colours (`gray-200`, `green-100`, `blue-600`, …). Tokens only. |
 | ✕ | Rounded pills as a default shape. 3px radius; `50%` only for the status dot. |
 | ✕ | Icon-only actions, no exceptions. Verbs label actions; an icon accompanies a word. Tried once as a data-table space-saving device (a copy/edit/delete action cell) and retracted: even a spec-correct 18px icon with a proper stroke read as an indistinguishable speck once it had no word to lean on, confirmed twice from live screenshots and a DevTools inspection that ruled out a rendering bug — the icon was never the problem, having no label was. If a row's action cell is too narrow for labelled buttons, the fix is narrower *other* columns or a taller cell, not a smaller word. |

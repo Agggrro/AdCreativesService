@@ -44,8 +44,11 @@ actually meant to be experienced.
 - A template's interactive mechanic (slider, quiz, scratch, gate) is no longer at
   risk of a host player tearing it down mid-interaction on an arbitrary timer; it
   persists until the viewer is actually done.
-- Tracking/billing quartile events keep firing on the old internal pace, so
-  `get_creative_overview`'s funnel numbers are unaffected by this change — the
+- The unit keeps raising its VPAID quartile events on the old internal pace, so
+  nothing a host player expects changes. (They are no longer *counted*:
+  [ADR-0016](0016-three-events-hourly-counters.md) removed the quartile trackers
+  from the VAST document, so `get_creative_overview` no longer reports them. The
+  point below still holds for the events themselves.) The
   timer is explicitly torn down (`_teardown()`, shared by `stopAd`/`skipAd`) the
   moment the ad ends any way (close click, host stop, a template's own early-end
   UI via `api.stop()`), so nothing fires late after `AdStopped`.

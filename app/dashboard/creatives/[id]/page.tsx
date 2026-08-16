@@ -8,17 +8,26 @@ import { CopyButton } from "@/components/CopyButton";
 import { Panel } from "@/components/ui/Field";
 import { ServingBadge } from "@/components/ui/State";
 
-/** The funnel reads left to right in the order a player fires it (§6). */
-const FUNNEL = [
-  { key: "impressions", label: "impression" },
-  { key: "starts", label: "start" },
-  { key: "q25", label: "q25" },
-  { key: "q50", label: "q50" },
-  { key: "q75", label: "q75" },
-  { key: "completes", label: "complete" },
+/**
+ * The delivery strip reads left to right in the order the events can occur (§6):
+ * a creative must be shown before it can be clicked.
+ *
+ * Two members, not six. ADR-0016 dropped start and the three quartiles — each was
+ * a player-fired beacon reproducing a number the buyer's own DSP already reports.
+ * Viewability stays out of this strip for the reason §6 gives: it is conditional
+ * on the format, and a conditional metric inside a closed set reads as a broken
+ * tile rather than a deliberate absence.
+ */
+const DELIVERY = [
+  { key: "impressions", label: "impression", hint: null },
+  // The qualifier is not decoration: this number is lower than the click count a
+  // buyer's DSP reports, because it counts only the call-to-action that opened
+  // the advertiser's URL. Left unexplained it reads as undercounting.
+  { key: "clicks", label: "click", hint: "clicksHint" },
 ] as const satisfies readonly {
   key: string;
   label: keyof Dict["catalog"]["funnel"];
+  hint: keyof Dict["dashboard"] | null;
 }[];
 
 export default async function CreativePage({
@@ -55,14 +64,14 @@ export default async function CreativePage({
   // never as zeros and a confident "not serving" (§6).
   const statsAvailable = !overviewError;
   const number = new Intl.NumberFormat(LOCALE_TAG[locale]);
+  const percent = new Intl.NumberFormat(LOCALE_TAG[locale], {
+    style: "percent",
+    maximumFractionDigits: 2,
+  });
   const tag = `${siteUrl}/api/vast?creative_id=${creative.id}`;
   const counts: Record<string, number> = {
     impressions: row?.impressions ?? 0,
-    starts: row?.starts ?? 0,
-    q25: row?.q25 ?? 0,
-    q50: row?.q50 ?? 0,
-    q75: row?.q75 ?? 0,
-    completes: row?.completes ?? 0,
+    clicks: row?.clicks ?? 0,
     viewable: row?.viewable ?? 0,
   };
   // VPAID-only (ADR-0012): render as "not applicable to this format" rather
@@ -104,7 +113,7 @@ export default async function CreativePage({
             qualifier={serving ? undefined : dict.dashboard.notServingHint}
           />
         ) : (
-          <span className="text-[11px] text-fg-muted">
+          <span className="text-xs leading-4 text-fg-muted">
             {dict.dashboard.statsUnavailable}
           </span>
         )}
@@ -112,8 +121,8 @@ export default async function CreativePage({
 
       <div className="flex flex-col gap-2">
         <h2 className="label-instr">{dict.dashboard.funnel}</h2>
-        <div className="grid gap-px overflow-hidden rounded-ctl border border-hairline bg-hairline sm:grid-cols-3 lg:grid-cols-6">
-          {FUNNEL.map((step) => (
+        <div className="grid gap-px overflow-hidden rounded-ctl border border-hairline bg-hairline sm:grid-cols-3">
+          {DELIVERY.map((step) => (
             <div key={step.key} className="flex flex-col gap-2 bg-surface p-4">
               <span className="label-instr">
                 {dict.catalog.funnel[step.label]}
@@ -121,40 +130,74 @@ export default async function CreativePage({
               <span className="data-instr text-[22px] font-medium leading-7">
                 {statsAvailable ? number.format(counts[step.key]) : "—"}
               </span>
+              {step.hint && statsAvailable && (
+                <span className="text-xs leading-4 text-fg-muted">
+                  {dict.dashboard[step.hint]}
+                </span>
+              )}
             </div>
           ))}
+          {/*
+            The ratio closes the strip rather than sitting inside it (§6): the
+            counts are a sequence of things that happened, this is a reading
+            about them. Its qualifier names the denominator because impressions
+            and viewable impressions give different numbers and an unlabelled
+            percentage invites the reader to assume the worse one.
+          */}
+          <div className="flex flex-col gap-2 bg-surface p-4">
+            <span className="label-instr">{dict.dashboard.ctr}</span>
+            <span className="data-instr text-[22px] font-medium leading-7">
+              {/* Not `0%` when nothing has been delivered — that would claim
+                  nobody clicked. No denominator means not measurable yet. */}
+              {statsAvailable && counts.impressions > 0
+                ? percent.format(counts.clicks / counts.impressions)
+                : "—"}
+            </span>
+            <span className="text-xs leading-4 text-fg-muted">
+              {dict.dashboard.ctrOfImpressions}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/*
-        Viewability (ADR-0012) is deliberately its own strip, not a 7th funnel
-        tile: it isn't part of the sequential, always-applicable delivery
-        funnel (§6) — it's VPAID-only, self-reported, and structurally absent
-        for SIMID. A SIMID row prints the em dash in `text-fg-disabled` (not
-        the default `text-fg` the outage/unmeasurable dash above uses) so the
-        two "—" readings stay visually distinct even without reading the
+{/*
+        Viewability (ADR-0012) is deliberately its own strip, not a third
+        delivery tile: it isn't part of the sequential, always-applicable
+        delivery set (§6) — it's VPAID-only, self-reported, and structurally
+        absent for SIMID. A SIMID row prints the em dash in `text-fg-disabled`
+        (not the default `text-fg` the outage/unmeasurable dash above uses) so
+        the two "—" readings stay visually distinct even without reading the
         caption.
       */}
       <div className="flex flex-col gap-2">
         <h2 className="label-instr">{dict.dashboard.viewabilityHeading}</h2>
         <Panel className="flex max-w-xs flex-col gap-2 p-4">
           <span className="label-instr">{dict.catalog.funnel.viewable}</span>
+          {/*
+            Colour and caption are driven by *applicability alone*, never by
+            `statsAvailable`. §6 assigns the two dashes opposite meanings —
+            `text-fg` for a transient page-wide outage, `text-fg-disabled` for a
+            permanent row-specific absence — so keying the disabled tone off the
+            outage made a VPAID creative's outage dash read as "never
+            measurable", disagreeing with the delivery strip's outage dash four
+            lines above, on the same screen, in the same outage. And a SIMID
+            creative lost its caption exactly when the page-level banner was
+            offering it the wrong explanation.
+          */}
           <span
             className={`data-instr text-[22px] font-medium leading-7 ${
-              statsAvailable && viewableApplicable ? "text-fg" : "text-fg-disabled"
+              viewableApplicable ? "text-fg" : "text-fg-disabled"
             }`}
           >
             {statsAvailable && viewableApplicable
               ? number.format(counts.viewable)
               : "—"}
           </span>
-          {statsAvailable && (
-            <span className="text-xs leading-4 text-fg-muted">
-              {viewableApplicable
-                ? dict.dashboard.viewableSelfReported
-                : dict.dashboard.viewableNotApplicable}
-            </span>
-          )}
+          <span className="text-xs leading-4 text-fg-muted">
+            {viewableApplicable
+              ? dict.dashboard.viewableSelfReported
+              : dict.dashboard.viewableNotApplicable}
+          </span>
         </Panel>
       </div>
 

@@ -34,7 +34,9 @@ are policy-banned and deceptive. May revisit a clearly-branded "chat preview" la
   offer SIMID per-creative only when a base `videoUrl`/loop is supplied.
 - Per-creative config is injected via VAST `<AdParameters>` (already built). Clicks →
   VPAID `AdClickThru` / SIMID `clickThru`; quartile events are **timer-driven** when
-  there is no video (billing still gets start/quartiles/complete).
+  there is no video. (They are raised to the player but no longer counted —
+  [ADR-0016](../decisions/0016-three-events-hourly-counters.md) cut the ingested set
+  to impression, viewable and click.)
 
 ## Architecture
 

@@ -46,10 +46,21 @@ path, so every row rendered the same `live` rail — the exact failure
   parameterless `SECURITY DEFINER` aggregate scoped to `auth.uid()`, returning six counts
   and `is_entitled`. `creative_events` keeps zero RLS policies and stays unreadable from
   the client.
+  > **Amended by [ADR-0016](0016-three-events-hourly-counters.md) (2026-08-16):** three
+  > counts, not six, and the table behind it is now `creative_event_counters`. The shape
+  > of the decision — one owner-scoped definer aggregate, zero RLS policies on the
+  > underlying table — is unchanged.
 - **The creatives list shows a serving state derived from entitlement**, not
   `creatives.status`. Two honest values: serving, or not serving with a link to Подписки.
 - **Only ingested metrics are displayed:** impression, start, and the completion funnel.
   No clicks, no CTR, no request count, no fill rate.
+  > **Reversed in part by [ADR-0016](0016-three-events-hourly-counters.md)
+  > (2026-08-16):** the ingested set is now impression, viewable and **click** — the
+  > last fired only from the call-to-action that opens the advertiser's URL. Start and
+  > the quartiles are no longer ingested at all. CTR became derivable and is permitted,
+  > though not yet displayed. Request count and fill rate remain unavailable, so those
+  > two stay barred. The principle — display nothing we do not ingest — is untouched;
+  > what changed is what we ingest.
 - **`creatives.name` is added** so two creatives from one template are distinguishable by
   something other than a uuid.
 

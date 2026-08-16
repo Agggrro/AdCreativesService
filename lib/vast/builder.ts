@@ -14,14 +14,11 @@ function asRecord(json: Json): Record<string, Json> {
 const XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>';
 const DEFAULT_DURATION_SECONDS = 30;
 
-// VAST standard quartile/start tracking event names.
-const QUARTILE_EVENTS = [
-  "start",
-  "firstQuartile",
-  "midpoint",
-  "thirdQuartile",
-  "complete",
-] as const;
+// No <TrackingEvents> is emitted at all any more (ADR-0016). The five
+// start/quartile/complete trackers cost one player-fired beacon each — seven per
+// impression once <Impression> and viewability are counted — to reproduce
+// numbers the buyer's own DSP already reports. An element with no children
+// would be pointless, so the whole node is dropped rather than left empty.
 
 /** Minimal valid empty VAST — the fail-closed / not-entitled response. */
 export function emptyVast(): string {
@@ -38,7 +35,7 @@ export function formatDuration(seconds: number): string {
 }
 
 /**
- * Build a signed tracking/beacon URL for the ingest endpoint (see step 7).
+ * Build a signed tracking/beacon URL for the ingest endpoint (`GET /api/track`).
  * Signed so a party who only knows `creativeId` (visible in the VAST tag
  * itself) cannot mint arbitrary hits against `/api/track` — see
  * lib/track-token.ts and docs/security.md.
@@ -66,18 +63,33 @@ export function buildInlineVast(ctx: VastBuildContext): string {
     ctx.config.durationSeconds ?? DEFAULT_DURATION_SECONDS,
   );
 
-  const trackingEvents = QUARTILE_EVENTS.map(
-    (ev) =>
-      `            <Tracking event="${ev}">${cdata(
-        trackingUrl(ctx.siteUrl, cid, ev),
-      )}</Tracking>`,
-  ).join("\n");
-
-  const videoClicks = ctx.config.clickThroughUrl
-    ? `            <VideoClicks>\n` +
-      `              <ClickThrough>${cdata(ctx.config.clickThroughUrl)}</ClickThrough>\n` +
-      `            </VideoClicks>\n`
+  // Emitted after <MediaFiles>, which is the XSD's order for Linear's derived
+  // sequence (Duration, AdParameters, MediaFiles, VideoClicks, Icons). It used to
+  // sit before it. lib/vast-inspect/rules/ordering.ts deliberately does not
+  // enforce Linear's order — the XSD contradicts real tags there — but "not
+  // warned about" is not a reason for our own output to be the wrong one, and
+  // this block went from conditional to unconditional in the same change.
+  //
+  // <VideoClicks> is emitted even without a tag-level <ClickThrough>: the click
+  // tracker is the point, and some templates carry no tag-level destination at
+  // all (quiz routes each outcome to its own URL, which the unit passes to the
+  // player at click time). VAST 4.2 allows ClickTracking without ClickThrough.
+  //
+  // What fires it is the player handling the unit's AdClickThru, and the runtime
+  // raises that **only** from the final call-to-action that opens the
+  // advertiser's URL — never from an intermediate interaction. So this counts
+  // clicks that led somewhere, not clicks on the ad. See
+  // runtime/lib/vpaid-base.js's clickThrough() and its call sites.
+  const clickThrough = ctx.config.clickThroughUrl
+    ? `              <ClickThrough>${cdata(ctx.config.clickThroughUrl)}</ClickThrough>\n`
     : "";
+  const videoClicks =
+    `            <VideoClicks>\n` +
+    clickThrough +
+    `              <ClickTracking>${cdata(
+      trackingUrl(ctx.siteUrl, cid, "click"),
+    )}</ClickTracking>\n` +
+    `            </VideoClicks>\n`;
 
   // AdParameters carries the creative config to the SIMID/VPAID runtime
   // (server-injected; never baked into the static asset — ADR-0003). Start from
@@ -141,12 +153,10 @@ ${adVerifications}      <Creatives>
           <UniversalAdId idRegistry="adinteract">${escapeXml(cid)}</UniversalAdId>
           <Linear>
             <Duration>${duration}</Duration>
-${adParameters}            <TrackingEvents>
-${trackingEvents}
-            </TrackingEvents>
-${videoClicks}            <MediaFiles>
+${adParameters}            <MediaFiles>
 ${mediaFiles}
             </MediaFiles>
+${videoClicks}
           </Linear>
         </Creative>
       </Creatives>
