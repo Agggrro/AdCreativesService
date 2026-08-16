@@ -1,3 +1,4 @@
+import { waitUntil } from "@vercel/functions";
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifyTrackToken } from "@/lib/track-token";
 import type { CreativeEventType } from "@/types/database.types";
@@ -11,22 +12,25 @@ export const dynamic = "force-dynamic";
 // Map VAST/runtime event names to the creative_event_type enum.
 //
 // Only names something actually fires a beacon for are accepted — not every
-// value the enum carries. `interaction` and `click` stay unmapped (there is
-// no <ClickTracking> element yet); accepting them would only let a third
-// party write event types we cannot produce, and those rows feed a
-// customer-facing dashboard. Add a name back when a beacon starts firing it,
-// not before. `viewable` is the first entry here fired by the creative's own
-// JS (runtime/lib/vpaid-base.js's IntersectionObserver, ADR-0012) rather than
-// by the host player hitting a VAST <TrackingEvents> URL — VPAID-only; SIMID
-// never sends it.
+// value the enum carries. Accepting a name we never emit would only let a third
+// party write event types we cannot produce, into numbers a customer reads.
+//
+// ADR-0016 cut this to three. `start` and the quartiles are gone: the player
+// fired one beacon each, seven per impression, for numbers the buyer's own DSP
+// already reports. What is left is what only we can report:
+//   * `impression` — the one number that must reconcile with the DSP.
+//   * `viewable`   — self-reported, VPAID-only (ADR-0012); fired by the unit's
+//                    own IntersectionObserver, not by the host player.
+//   * `click`      — fired via VAST <ClickTracking> when the player handles the
+//                    unit's AdClickThru, which the runtime raises **only** from
+//                    the final call-to-action that opens the advertiser's URL.
+//                    An intermediate interaction (a quiz answer, a slider drag)
+//                    never reaches it. `interaction` stays unmapped for the same
+//                    reason it always was: nothing emits it.
 const EVENT_MAP: Record<string, CreativeEventType> = {
   impression: "impression",
-  start: "start",
-  firstQuartile: "q25",
-  midpoint: "q50",
-  thirdQuartile: "q75",
-  complete: "complete",
   viewable: "viewable",
+  click: "click",
 };
 
 const NO_CONTENT = new Response(null, {
@@ -52,10 +56,34 @@ export async function GET(request: Request): Promise<Response> {
       verifyTrackToken(cid, eventName, url.searchParams.get("exp"), url.searchParams.get("sig"))
     ) {
       const supabase = createServiceClient();
-      // Ignore FK/insert errors (unknown creative, etc.) — beacon is best-effort.
-      await supabase
-        .from("creative_events")
-        .insert({ creative_id: cid, event_type: eventType });
+      // Not awaited: the player is blocked on this 204, and a single impression
+      // fires up to seven beacons, each of which used to hold the response open
+      // for a round trip to Postgres. `waitUntil` keeps the function alive for
+      // the insert without making the beacon wait for it.
+      //
+      // Ignore FK/insert errors (unknown creative, etc.) — beacon is
+      // best-effort, as before. The `.catch` is load-bearing rather than
+      // decorative: off Vercel `waitUntil` is a no-op, so the promise is
+      // orphaned and an unhandled rejection would surface in local dev.
+      // One upsert into the (creative, event, hour) counter instead of a row per
+      // beacon (ADR-0016). Done in SQL rather than read-then-write in app code,
+      // because concurrent beacons for the same creative are the normal case on
+      // this path and a lost update would silently undercount.
+      //
+      // `Promise.resolve` because the query builder is a PromiseLike, not a
+      // Promise: it has no `.catch`, and both settle paths have to be handled
+      // here for the reason above.
+      waitUntil(
+        Promise.resolve(
+          supabase.rpc("increment_creative_event", {
+            p_creative_id: cid,
+            p_event_type: eventType,
+          }),
+        ).then(
+          () => undefined,
+          () => undefined,
+        ),
+      );
     }
   } catch {
     // never surface tracking errors to the player

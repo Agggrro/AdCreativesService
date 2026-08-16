@@ -1,5 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/service";
-import { CREATIVES_BUCKET } from "@/lib/storage";
+import { loadRuntimeBytes } from "@/lib/runtime-bytes";
 import { verifyInteractiveToken } from "@/lib/vast/interactive-token";
 
 // Public, unauthenticated: a player's SIMID iframe navigates straight here,
@@ -22,22 +21,28 @@ export async function GET(
 ): Promise<Response> {
   const { token } = await params;
 
-  const payload = verifyInteractiveToken(token);
+  // "simid" is required explicitly: a token minted for a VPAID unit must not be
+  // replayable here and re-served as an HTML document.
+  const payload = verifyInteractiveToken(token, "simid");
   if (!payload) return notFound();
 
   try {
-    const supabase = createServiceClient();
-    const { data, error } = await supabase.storage
-      .from(CREATIVES_BUCKET)
-      .download(payload.path);
-    if (error || !data) return notFound();
+    const body = await loadRuntimeBytes(payload.path);
+    if (!body) return notFound();
 
-    const body = await data.arrayBuffer();
     return new Response(body, {
       status: 200,
       headers: {
+        // The player's iframe navigates here from a publisher's page. A
+        // navigation does not need CORS, but SIMID players that pre-fetch the
+        // document (or read it back) do — and `*` costs nothing here: the
+        // response is already authorized by the token in the URL, carries no
+        // credentials, and no `Vary: Origin` is set so the CDN cache stays whole.
+        "Access-Control-Allow-Origin": "*",
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "public, max-age=60",
+        // `s-maxage` is what Vercel's CDN consumes; `max-age` alone would only
+        // have set the browser's TTL and left every request hitting the function.
+        "Cache-Control": "public, max-age=60, s-maxage=60, stale-if-error=300",
         // The opposite of Storage's own default on purpose: this document is
         // one of our own static reference implementations (runtime/*/simid/
         // index.html), not advertiser-controlled, so its inline script/style

@@ -21,7 +21,17 @@ export const config = {
   // timeout, so a Supabase getUser() round trip per hop is pure cost. The /tools
   // *pages* stay inside the matcher, since they render the top bar and need to
   // know whether the visitor is signed in.
+  //
+  // "api/creative" is the asset path a player fetches for the SIMID document and
+  // the VPAID fallback unit. It was missing from this list, so every one of
+  // those fetches was paying a Supabase auth.getUser() round trip before serving
+  // a byte — on a request that has no session by construction, so the call could
+  // only ever return null. That is a Supabase dependency on exactly the path
+  // ADR-0015 and ADR-0017 set out to make Supabase-free.
+  //
+  // "api/cron" is invoked by Vercel's scheduler with a bearer token, never a
+  // session cookie; the route does its own authorization.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|api/vast(?!/preview)|api/vast/preview/|api/track|api/stripe|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/vast(?!/preview)|api/vast/preview/|api/track|api/stripe|api/creative|api/cron|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
