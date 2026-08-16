@@ -2,8 +2,15 @@ import Link from "next/link";
 import type { Dict } from "@/lib/i18n/dictionaries";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { TopNav } from "@/components/TopNav";
+import type { ToolListing } from "@/lib/tools";
 
-export type TopBarLink = { href: string; label: string; exact?: boolean };
+export type TopBarLink = {
+  href: string;
+  label: string;
+  exact?: boolean;
+  /** Present only on the Tools entry — renders it as a dropdown instead of a link. */
+  tools?: ToolListing[];
+};
 
 /**
  * The one top bar: brand mark, section links, then the language control next to

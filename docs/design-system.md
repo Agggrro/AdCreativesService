@@ -252,8 +252,9 @@ choice sits nearest the reading direction's start. `Escape` and a backdrop click
 cancel. Confirming submits a server action — no client-side fetch/JSON round trip for a
 plain delete.
 
-**Every overlay is portalled to `<body>` (`createPortal`), without exception.** `position:
-fixed` removes an element from layout flow but leaves it in the DOM tree, so an overlay
+**Every overlay is portalled to `<body>` (`createPortal`), with one documented exception**
+(below, "Nav dropdown", and narrow on purpose — see there before citing it as precedent).
+`position: fixed` removes an element from layout flow but leaves it in the DOM tree, so an overlay
 opened from inside a table cell stays that cell's descendant and keeps inheriting from it.
 The delete dialog shipped this way and inherited `white-space: nowrap` from its row's
 `<td>`: the body copy rendered as one 880px line inside a 384px card and spilled across
@@ -265,6 +266,46 @@ or `contain` — each of which silently makes itself the containing block instea
 Test an overlay **in the context it actually opens from**, never in isolation: rendered
 standalone this dialog computed `white-space: normal` and looked perfect, which is exactly
 how the bug survived a round of "verified locally".
+
+### Nav dropdown
+
+The Tools entry in the top bar (ADR-0013) is a disclosure button, not a link: it opens a
+panel listing the two free tools instead of routing through the `/tools` index first. That
+index still exists to be found by a search engine, but a visitor clicking the nav already
+knows they want the validator or the generator, so making them land on a table and click
+again was one step too many.
+
+- `aria-expanded` + `aria-controls` on the trigger, a plain panel of real `Link`s under it
+  — the two-item disclosure pattern, not a full ARIA `menu` role (which would promise
+  arrow-key navigation this component does not implement).
+- Panel: `border border-hairline`, `rounded-ctl`, `bg-surface`, the `shadow-overlay` token
+  (§2), `divide-y divide-hairline` between items. Each item repeats the tool's name, its
+  `StateWord` (below, "Free tools"), and its one-line description — the same three facts
+  the `/tools` table row shows, so the dropdown is a faster path to the same information,
+  not a thinner one. Both surfaces read from `lib/tools.ts`'s `freeTools()`, so a tool's
+  state cannot go stale in one place and not the other.
+- Round the first and last item's own corners (`rounded-t-ctl` / `rounded-b-ctl`); the panel
+  itself is never `overflow-hidden`, for the same reason a segmented control isn't (§2's
+  2px-offset focus ring).
+- **Not portalled** — the system's one documented exception to "every overlay is portalled"
+  above, and it is *not* a blanket carve-out for `position: absolute`. The portal rule
+  guards against two separate hazards, and each has to be checked on its own terms, not
+  waved through by positioning scheme:
+  - **CSS inheritance** (the `white-space: nowrap` incident above) follows the DOM tree
+    regardless of `position` — `absolute` inherits exactly as `fixed` does. The only honest
+    defense is that the specific path from `<header>` down to this panel is verified free of
+    anything inheritable that would leak in (no `overflow-hidden`, `white-space`, or
+    `truncate` on any ancestor) — a claim about *this* DOM path today, not a property of
+    `absolute` in general. Re-check it, don't assume it, if this trigger is ever reused
+    inside a different header.
+  - **The viewport-anchor hazard** — an ancestor gaining `transform`, `filter`, or `contain`
+    and silently becoming the containing block — is genuinely specific to `position: fixed`,
+    and does not apply here at all: the panel is `position: absolute` against a `relative`
+    wrapper it owns one level up, so there is no viewport anchor to hijack in the first
+    place. It also needs to scroll together with the header (which is not `sticky`), which
+    `fixed` would get wrong regardless of the ancestor chain.
+  Portal a nav dropdown the day either check stops holding — a different header, or a need
+  to escape a clipping ancestor.
 
 ### Segmented controls
 

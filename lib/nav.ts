@@ -1,5 +1,6 @@
 import type { Dict } from "@/lib/i18n/dictionaries";
 import type { TopBarLink } from "@/components/TopBar";
+import { freeTools } from "@/lib/tools";
 
 /**
  * The product sections for a signed-in user (ADR-0008, extended by ADR-0013).
@@ -9,14 +10,17 @@ import type { TopBarLink } from "@/components/TopBar";
  * are a side entrance rather than part of the core loop.
  *
  * `exact: false` on the creatives entry is what keeps the section underlined
- * while the user is deep in the configurator.
+ * while the user is deep in the configurator. Tools carries `tools`, which is
+ * what turns it into a dropdown instead of a plain link (docs/design-system.md
+ * §6 "Nav dropdown") — the index it would otherwise land on is one extra step
+ * for someone who already knows which of the two tools they want.
  */
 export function mainNav(dict: Dict): TopBarLink[] {
   return [
     { href: "/catalog", label: dict.nav.catalog },
     { href: "/dashboard/creatives", label: dict.nav.myCreatives },
     { href: "/dashboard/subscriptions", label: dict.nav.subscriptions },
-    { href: "/tools", label: dict.nav.tools },
+    { href: "/tools", label: dict.nav.tools, tools: freeTools(dict) },
   ];
 }
 
@@ -32,6 +36,6 @@ export function mainNav(dict: Dict): TopBarLink[] {
 export function publicNav(dict: Dict): TopBarLink[] {
   return [
     { href: "/catalog", label: dict.nav.catalog },
-    { href: "/tools", label: dict.nav.tools },
+    { href: "/tools", label: dict.nav.tools, tools: freeTools(dict) },
   ];
 }

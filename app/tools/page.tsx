@@ -2,8 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getDict } from "@/lib/i18n/server";
 import { AppTopBar } from "@/components/AppTopBar";
-import { StateWord, type Tone } from "@/components/ui/State";
+import { StateWord } from "@/components/ui/State";
 import { CELL, HEAD, railCell, ROW, TableFrame, TableHead } from "@/components/ui/Table";
+import { freeTools } from "@/lib/tools";
 
 // ADR-0013's whole premise is being found by someone searching for a VAST
 // validator, so these pages carry their own title rather than inheriting the
@@ -27,29 +28,7 @@ export const metadata: Metadata = {
 export default async function ToolsPage() {
   const { dict } = await getDict();
   const t = dict.tools;
-
-  const tools: Array<{
-    href: string;
-    name: string;
-    description: string;
-    tone: Tone;
-    state: string;
-  }> = [
-    {
-      href: "/tools/vast-validator",
-      name: t.validatorName,
-      description: t.validatorDescription,
-      tone: "live",
-      state: t.stateAvailable,
-    },
-    {
-      href: "/tools/vast-generator",
-      name: t.generatorName,
-      description: t.generatorDescription,
-      tone: "idle",
-      state: t.stateSoon,
-    },
-  ];
+  const tools = freeTools(dict);
 
   return (
     <main className="flex flex-1 flex-col">
