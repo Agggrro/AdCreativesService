@@ -15,6 +15,31 @@ export interface RuntimeManifest {
 }
 
 export const RUNTIME_MANIFEST: RuntimeManifest = {
-  generatedAt: null,
-  assets: {},
+  "generatedAt": "2026-08-16T19:35:51.631Z",
+  "assets": {
+    "age-gate/vpaid.js": {
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/age-gate/vpaid.c0bf83ca.js",
+      "sha256": "c0bf83caab62a1a6a121478067df4c03aa0cb1007c96502899b396c58353f5c5"
+    },
+    "quiz/vpaid.js": {
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/quiz/vpaid.bea30c8d.js",
+      "sha256": "bea30c8dc84e32a56b2e37dcd9393d1537c7f506d6ecd958cef6b8b527da8576"
+    },
+    "scratch-reveal/vpaid.js": {
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/scratch-reveal/vpaid.a0bf2a5d.js",
+      "sha256": "a0bf2a5d02f6b0e57aa3ced0475a43dc2471155c8b180d639ae6f5e702d28d8f"
+    },
+    "shoppable/simid/index.html": {
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/shoppable/simid/index.9e4bd199.html",
+      "sha256": "9e4bd199f75ea64491fbac02cc300bde7e037f6cc316f2fce996e2bc770f9a68"
+    },
+    "shoppable/vpaid/unit.js": {
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/shoppable/vpaid/unit.c69525fe.js",
+      "sha256": "c69525fe8acc990a58c5737edfbf9136dd8376ddae3423e176aa452bf36bcceb"
+    },
+    "slider/vpaid.js": {
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/slider/vpaid.04dbdf42.js",
+      "sha256": "04dbdf42cdee5d78f54ce8aca87fe986612ed7fc55c0401253ca22994c61c5b3"
+    }
+  }
 };
