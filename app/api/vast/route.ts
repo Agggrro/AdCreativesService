@@ -132,6 +132,15 @@ async function loadServing(creativeId: string): Promise<Load> {
     return { status: "ok", serving: snapshotToServing(snapshot, entitlement) };
   }
 
+  // Stable prefix so the fallback rate is greppable in Observability. Without
+  // it this path is invisible: everything keeps working, just against the
+  // database we went to some trouble to leave, and nothing says so. A non-zero
+  // rate here means a publisher is broken or a backfill is owed — see
+  // `npm run check:snapshots`.
+  console.warn("[serving-fallback] snapshot miss, reading Postgres", {
+    creativeId,
+  });
+
   const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("get_creative_serving", {
     p_creative_id: creativeId,
