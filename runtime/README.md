@@ -1,9 +1,12 @@
 # Creative runtime assets
 
 The interactive units served inside the VAST creative. **Source** lives here; the
-**built** output (`npm run build:runtime` → `runtime/dist/**`) is what actually gets
-uploaded to the Supabase **`creatives`** Storage bucket, which the VAST endpoint
-serves via short-TTL signed URLs (ADR-0003 / ADR-0004).
+**built** output (`npm run build:runtime` → `runtime/dist/**`) is uploaded to a
+**public, content-addressed Vercel Blob store** and recorded in `runtime/manifest.ts`
+([ADR-0017](../docs/decisions/0017-runtime-assets-on-public-cdn.md)). VPAID units are
+then fetched straight off the CDN by the player; the SIMID document still goes through
+`/api/creative/simid/[token]`, because no object store will serve HTML as a runnable
+document.
 
 ## Layout
 
@@ -29,9 +32,9 @@ serves via short-TTL signed URLs (ADR-0003 / ADR-0004).
   pipeline, so it isn't built by `build.mjs` and doesn't get the base's media
   helper or close control yet).
 
-## Files → bucket keys
+## Files → logical keys
 
-| Local path | Upload to (bucket key) | Standard |
+| Local path | Logical key | Standard |
 | --- | --- | --- |
 | `shoppable/simid/index.html` | `shoppable/simid/index.html` | SIMID 1.1 |
 | `dist/shoppable/vpaid/unit.js` | `shoppable/vpaid/unit.js` | VPAID 2.0 |
@@ -40,30 +43,53 @@ serves via short-TTL signed URLs (ADR-0003 / ADR-0004).
 | `dist/quiz/vpaid.js` | `quiz/vpaid.js` | VPAID 2.0 |
 | `dist/age-gate/vpaid.js` | `age-gate/vpaid.js` | VPAID 2.0 |
 
-These keys match `templates.runtime_keys` in [`../supabase/seed.sql`](../supabase/seed.sql).
+These keys match `templates.runtime_keys` in [`../supabase/seed.sql`](../supabase/seed.sql)
+and are what `runtime/manifest.ts` maps to real CDN URLs. The **object** key on the
+CDN is not the logical key: it carries a content hash
+(`runtime/quiz/vpaid.<sha256[0..8]>.js`), which is what lets it be cached for a year
+([ADR-0017](../docs/decisions/0017-runtime-assets-on-public-cdn.md)).
 
 ## Setup
 
-1. Create a **private** bucket named `creatives` in Supabase Storage (private so the
-   files are only reachable via signed URLs — `lib/storage.ts` signs them).
-2. Run `npm run build:runtime`, then `npm run runtime:push` to upload every built unit
-   to the keys above. The push derives its bucket keys from the `dist/` layout, so the
-   table above and the upload cannot drift apart; `npm run runtime:push quiz` pushes a
-   single template. `build:runtime` wipes `dist/` first, so a unit whose key moves
-   (as `shoppable`'s once did) cannot leave a phantom object behind to be uploaded.
-3. Apply [`../supabase/schema.sql`](../supabase/schema.sql) then
+1. Create a Vercel Blob store with access **Public** and connect it to the project.
+   Public because the player fetches the VPAID unit straight off the CDN with no
+   function in the path. This is a *different* store from the private one holding the
+   serving snapshots — Blob allows 100 stores even on Hobby, and its docs recommend
+   separating public from private content.
+2. Put its read/write token in `.env.local` as `RUNTIME_BLOB_READ_WRITE_TOKEN`.
+3. Run `npm run build:runtime`, then `npm run runtime:push`. The push hashes each
+   built file, uploads it under a content-addressed key, and writes
+   `runtime/manifest.ts`. `npm run runtime:push quiz` pushes a single template and
+   updates only its manifest entry. `build:runtime` wipes `dist/` first, so a unit
+   whose key moves (as `shoppable`'s once did) cannot leave a phantom object behind.
+4. **Commit `runtime/manifest.ts`.** The app imports it at build time, so an
+   unpushed commit means the deployed app still points at the previous URLs.
+5. Apply [`../supabase/schema.sql`](../supabase/schema.sql) then
    [`../supabase/seed.sql`](../supabase/seed.sql) — `npm run db:schema` and
    `npm run db:seed`. Both files are idempotent full-applies, so re-running the seed
    *is* how a template change ships; there is no migrations directory.
 
-Both commands read `.env.local`. `runtime:push` needs `SUPABASE_SERVICE_ROLE_KEY`
-(already required by the app); the `db:*` commands need `DATABASE_URL`, which nothing
-else uses — see [`.env.example`](../.env.example).
+Commands read `.env.local`. `runtime:push` needs `RUNTIME_BLOB_READ_WRITE_TOKEN`; the
+`db:*` commands need `DATABASE_URL`, which nothing else uses — see
+[`.env.example`](../.env.example).
+
+The Supabase `creatives` bucket is still the fallback source for any key not yet in the
+manifest ([`../lib/runtime-bytes.ts`](../lib/runtime-bytes.ts)), which is what lets the
+CDN move ship before the store exists. Once every template has been pushed, that
+fallback is dead weight and can go.
 
 **Order matters when shipping a template change.** Push the runtime first (harmless on
-its own — no saved creative references a capability it does not have yet), then deploy
-the app, then apply the seed. Seeding before the deploy leaves the live configurator
-rendering a schema its code does not understand.
+its own — no saved creative references a capability it does not have yet), **commit the
+manifest**, then deploy the app, then apply the seed, **then run
+`npm run snapshot:backfill`**.
+
+That last step is not optional. Seeding before the deploy leaves the live configurator
+rendering a schema its code does not understand; skipping the backfill leaves something
+worse, because it is silent. Serving snapshots copy `template_type`, `runtime_keys` and
+`supported_standards` out of `templates` ([ADR-0015](../docs/decisions/0015-serving-snapshots-on-cdn.md)),
+so a seed that moves a runtime key leaves every snapshot for that template pointing at
+the old object — which fails closed to an empty ad, with nothing in the logs to say
+why. The backfill is idempotent, so running it after every seed is the safe habit.
 
 ## How config reaches the unit
 

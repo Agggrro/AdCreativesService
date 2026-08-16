@@ -10,13 +10,35 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * document has to be re-served from our own domain with the right headers
  * instead of a direct Storage signed URL.
  *
- * Short TTL mirrors lib/storage.ts's SIGNED_URL_TTL_SECONDS convention
- * (ADR-0003: short-lived, signed, per-request access).
+ * The lifetime of an interactive asset URL, and the single definition of it —
+ * `lib/storage.ts` imports this rather than declaring its own. The dependency
+ * runs in that direction and only that direction: storage already imports
+ * `signInteractiveToken` from here, so pointing this constant the other way
+ * makes the two modules circular, and the failure is `SIGNED_URL_TTL_SECONDS is
+ * not initialized` at request time — invisible to typecheck, lint and build.
+ *
+ * Deliberately a little longer than the VAST response cache, so a cached VAST
+ * can never hand a player a URL that has already expired (ADR-0003:
+ * short-lived, signed, per-request access).
  */
-const INTERACTIVE_TOKEN_TTL_SECONDS = 120;
+export const INTERACTIVE_TOKEN_TTL_SECONDS = 120;
 
-/** Only ever proxy our own runtime SIMID documents, never an arbitrary bucket path. */
-const SAFE_PATH_RE = /^[a-z0-9_-]+\/simid\/index\.html$/i;
+/**
+ * Only ever proxy our own runtime objects, never an arbitrary bucket path — one
+ * closed list of shapes per kind, matching the keys `runtime/build.mjs` writes
+ * and `templates.runtime_keys` stores.
+ *
+ * The kind is carried by the path rather than by a field in the payload, and
+ * each route demands its own: that is what stops a token minted for a SIMID
+ * document being replayed against the VPAID route and re-served as
+ * `application/javascript` (or the reverse).
+ */
+const SAFE_PATHS = {
+  simid: /^[a-z0-9_-]+\/simid\/index\.html$/i,
+  vpaid: /^[a-z0-9_-]+\/(?:vpaid\.js|vpaid\/unit\.js)$/i,
+} as const;
+
+export type InteractiveKind = keyof typeof SAFE_PATHS;
 
 interface InteractiveTokenPayload {
   path: string;
@@ -41,12 +63,17 @@ function sign(payloadB64: string): string {
 }
 
 /** Mint a short-TTL token for one Storage object path. Throws if the path looks wrong. */
-export function signInteractiveToken(path: string): {
+export function signInteractiveToken(
+  path: string,
+  kind: InteractiveKind,
+): {
   token: string;
   expiresInSeconds: number;
 } {
-  if (!SAFE_PATH_RE.test(path)) {
-    throw new Error(`Refusing to mint an interactive token for an unexpected path: ${path}`);
+  if (!SAFE_PATHS[kind].test(path)) {
+    throw new Error(
+      `Refusing to mint a ${kind} interactive token for an unexpected path: ${path}`,
+    );
   }
   const exp = Math.floor(Date.now() / 1000) + INTERACTIVE_TOKEN_TTL_SECONDS;
   const payloadB64 = Buffer.from(JSON.stringify({ path, exp }), "utf8").toString("base64url");
@@ -58,7 +85,10 @@ export function signInteractiveToken(path: string): {
  * problem — the route must fail closed (404), exactly like /api/vast fails
  * closed to empty VAST.
  */
-export function verifyInteractiveToken(token: string): { path: string } | null {
+export function verifyInteractiveToken(
+  token: string,
+  kind: InteractiveKind,
+): { path: string } | null {
   const dot = token.indexOf(".");
   if (dot <= 0 || dot === token.length - 1) return null;
   const payloadB64 = token.slice(0, dot);
@@ -82,7 +112,8 @@ export function verifyInteractiveToken(token: string): { path: string } | null {
     ) as Partial<InteractiveTokenPayload>;
     if (typeof parsed.path !== "string" || typeof parsed.exp !== "number") return null;
     if (parsed.exp < Math.floor(Date.now() / 1000)) return null;
-    if (!SAFE_PATH_RE.test(parsed.path)) return null;
+    // Re-checked against the *calling route's* kind, not just any known shape.
+    if (!SAFE_PATHS[kind].test(parsed.path)) return null;
     return { path: parsed.path };
   } catch {
     return null;

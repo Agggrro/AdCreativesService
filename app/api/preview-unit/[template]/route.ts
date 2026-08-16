@@ -1,5 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/service";
-import { CREATIVES_BUCKET } from "@/lib/storage";
+import { loadRuntimeBytes } from "@/lib/runtime-bytes";
 import { PREVIEW_UNIT_PATHS } from "@/lib/preview-units";
 
 // Serves a built VPAID unit JS for the in-browser preview harness. The unit code
@@ -28,12 +27,13 @@ export async function GET(
   if (!path) return js("// unknown template\n", 404);
 
   try {
-    const supabase = createServiceClient();
-    const { data, error } = await supabase.storage
-      .from(CREATIVES_BUCKET)
-      .download(path);
-    if (error || !data) return js("// unit not uploaded yet\n");
-    return js(await data.text());
+    // Through the manifest, like the serving path — not a direct bucket read.
+    // Reading Supabase directly meant the public catalog demo could run an older
+    // unit than real tags did, the moment a push landed without a re-upload to
+    // the old bucket. A demo that is not the shipped unit is not a demo.
+    const body = await loadRuntimeBytes(path);
+    if (!body) return js("// unit not uploaded yet\n");
+    return js(new TextDecoder().decode(body));
   } catch {
     return js("// preview unavailable\n");
   }
