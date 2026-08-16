@@ -19,7 +19,14 @@ not secrecy of client code. Concretely:
 1. **Dynamic VAST kill-switch** — the primary lever. No active subscription →
    empty/fallback VAST; payload is never served.
 2. **Short-TTL signed URLs** for the SIMID iframe / VPAID unit.
-3. **Domain / referer allow-listing** so the unit only runs where authorized.
+3. ~~**Domain / referer allow-listing** so the unit only runs where authorized.~~
+   **Dropped 2026-08-16, never implemented.** Kept struck through rather than deleted
+   so this record still says what was decided. It was carried in four other documents
+   as though it existed, which is worse than not having it: `Referer` is spoofable
+   server-side and routinely stripped, and an in-unit check is patchable precisely
+   because this ADR concedes the code is inspectable — so it was only ever a
+   deterrent, and a documented one nobody could rely on. Removed from CLAUDE.md,
+   `docs/security.md`, `docs/architecture.md` and `docs/adtech-standards.md`.
 4. **Server-side config injection** — product data/links injected at serve time, not
    baked into static assets.
 5. **Minification / obfuscation** of the runtime.

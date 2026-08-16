@@ -26,8 +26,11 @@ product thesis is validated.
 7. **Billing** — Stripe Checkout for Single + All-Access; webhook as source of truth;
    denormalized entitlement refresh.
 8. **Dashboard** — my creatives, my subscription/billing status, copy VAST tags.
-9. **Minimal serving telemetry** — at least impression + quartiles wired into
-   `creative_events` (proves the analytics foundation; rich dashboard is post-MVP).
+9. **Minimal serving telemetry** — impression, viewable and click counted into
+   `creative_event_counters` ([ADR-0016](decisions/0016-three-events-hourly-counters.md);
+   proves the analytics foundation, rich dashboard is post-MVP). Quartiles were part of
+   this line until they were removed for costing a beacon each to duplicate a number the
+   buyer's DSP already reports.
 
 ## Implementation status (2026-06-30)
 
@@ -39,7 +42,7 @@ Code-complete and building green:
 - [x] VAST tag generation + dynamic `GET /api/vast` (gated, fail-closed, cached)
 - [x] Billing: Checkout + webhook (source of truth) + idempotency
 - [x] Dashboard (subscriptions, templates, creatives with copyable tags)
-- [x] Telemetry beacon `GET /api/track` -> `creative_events`
+- [x] Telemetry beacon `GET /api/track` -> `creative_event_counters`
 - [x] UI on the **Instrument** design system ([design-system.md](design-system.md),
       [ADR-0007](decisions/0007-design-system-instrument.md)), bilingual RU/EN with a
       top-bar switcher (locale in a cookie; a `profiles.locale` column is the follow-up)
@@ -114,8 +117,11 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 3. **Billing:** recurring Stripe subscriptions with a **7-day trial** for new accounts
    that attach a card. Draft prices: **$2/week** & **$5/month** (single template),
    **$30/month** (Ultimate/all-access). See [billing.md](billing.md).
-4. **VAST cache:** TTL **~60s** + **invalidation on Stripe webhook**. Subscription
-   changes take effect within ~1 minute. Acceptable per product.
+4. **VAST cache:** TTL **~60s** + **snapshot republished on the Stripe webhook**.
+   Subscription changes take effect within **~2 minutes worst case** — the 60s response
+   cache plus up to 60s of Blob propagation
+   ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md); it was ~1 minute while the
+   serving view was read live). Acceptable per product.
 
 ## Cost posture (MVP)
 

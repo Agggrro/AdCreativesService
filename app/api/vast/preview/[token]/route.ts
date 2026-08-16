@@ -1,4 +1,3 @@
-import { createServiceClient } from "@/lib/supabase/service";
 import { getRequestOrigin } from "@/lib/site";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { buildPreviewServing } from "@/lib/vast/preview-context";
@@ -69,7 +68,6 @@ export async function GET(
   if (!payload) return vastResponse(emptyVast(), request);
 
   try {
-    const serviceClient = createServiceClient();
     const serving = buildPreviewServing({
       pid: payload.pid,
       tid: payload.tid,
@@ -86,7 +84,7 @@ export async function GET(
     // canonical URL — it is fetched by third-party players, not same-origin.)
     const siteUrl = getRequestOrigin(request);
 
-    const interactiveUrl = await resolveInteractiveUrl(serviceClient, serving, siteUrl);
+    const interactiveUrl = resolveInteractiveUrl(serving, siteUrl);
     if (!interactiveUrl) return vastResponse(emptyVast(), request);
 
     const config = parseCreativeConfig(payload.cfg);

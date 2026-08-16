@@ -14,11 +14,17 @@
     "db:schema": "node --env-file=.env.local scripts/db-apply.mjs supabase/schema.sql",
     "db:seed": "node --env-file=.env.local scripts/db-apply.mjs supabase/seed.sql",
     "deploy:status": "node --env-file=.env.local scripts/deploy-status.mjs",
-    "check:vast": "node scripts/check-vast-fixtures.mjs"
+    "check:vast": "node scripts/check-vast-fixtures.mjs",
+    "check:entitlement": "node --env-file-if-exists=.env.local scripts/check-entitlement.mjs",
+    "snapshot:backfill": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/snapshot-backfill.mjs",
+    "check:snapshots": "node --env-file-if-exists=.env.local --import ./scripts/register-app-imports.mjs scripts/check-snapshots.mjs",
+    "test:entitlement": "node --test lib/serving/entitlement.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
+    "@vercel/blob": "^2.8.0",
+    "@vercel/functions": "^3.9.3",
     "fast-xml-parser": "^5.10.1",
     "fluid-player": "^3.59.0",
     "lucide-react": "^1.22.0",

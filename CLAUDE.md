@@ -34,8 +34,8 @@ bug even if the code "works". Details in [docs/adtech-standards.md](docs/adtech-
    layer. See [ADR-0002](docs/decisions/0002-multi-format-creative-delivery.md).
 2. **We do access control, not code hiding.** Client-executed creative JS is always
    inspectable. We never claim the code is "impossible to access". Our real levers:
-   dynamic VAST kill-switch, short-TTL signed URLs, domain/referer allow-lists,
-   server-side config injection, obfuscation. See [ADR-0003](docs/decisions/0003-access-control-over-code-hiding.md).
+   dynamic VAST kill-switch, short-TTL signed URLs, server-side config injection,
+   obfuscation. See [ADR-0003](docs/decisions/0003-access-control-over-code-hiding.md).
 3. **The VAST endpoint is a public, high-QPS, latency-sensitive ad-serving path.**
    - No user session → **RLS does not apply**; use a scoped service-role read.
    - **Never call Stripe on this path.** Subscription state is denormalized and
@@ -86,6 +86,12 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
   a false positive on a conformant tag is as much a defect as a missed violation.
 - After any Supabase migration, query, or RLS change → **`supabase-rls-auditor`** subagent.
 - After any Stripe/subscription/webhook change → **`billing-integrity-reviewer`** subagent.
+- After changing **either** copy of the entitlement predicate — `private.is_entitled` in
+  `supabase/schema.sql` or `lib/serving/entitlement.ts` — change the other in the same
+  commit and run `npm run check:entitlement` (compares Postgres's own verdict against the
+  TypeScript port) plus `npm run test:entitlement`. See [ADR-0015](docs/decisions/0015-serving-snapshots-on-cdn.md).
+- After changing anything a serving snapshot projects (creative writers, the Stripe
+  webhook, `templates` via `npm run db:seed`) → run `npm run snapshot:backfill`.
 - Before **and** after any UI/UX work — new page, component, state, or user-visible
   string → run the **`design-check`** skill, then the **`design-system-reviewer`** subagent.
 - Before pushing anything touching payments, auth, or the public VAST endpoint →

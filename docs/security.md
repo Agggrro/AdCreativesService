@@ -12,7 +12,8 @@
 | `POST /api/vast/preview` | Signed-in dashboard users | Authenticated (no subscription check); never touches Stripe or the entitlement gate |
 | `GET /api/vast/preview/[token]` | Third-party player SDKs (Google IMA, Fluid Player), fetched with no session | Public by necessity; self-authorizing via HMAC signature + 120s expiry, **fail closed** like `/api/vast` |
 | `POST /api/stripe/webhook` | Stripe | Signature-verified; treat unsigned/invalid as hostile |
-| Creative runtime assets | Player iframes on third-party pages | Signed, short-TTL, domain/referer allow-listed |
+| Creative runtime assets, via `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 120s token that names one Storage path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
+| Serving snapshots (Vercel Blob) | Read only by our own functions, never by a player | **Private store, not public.** Keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md) |
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
 | UI language cookie (`adinteract_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
 | Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage (no app server in the path) | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
@@ -33,6 +34,11 @@
   secret reuse) so this shipped without a required new Vercel variable — set a
   dedicated value (`openssl rand -base64 32`) to fully separate the two trust
   domains.
+- `BLOB_READ_WRITE_TOKEN` — server-only. Read/write access to the serving-snapshot
+  store. On Vercel the SDK authenticates with OIDC instead (`BLOB_STORE_ID` +
+  `VERCEL_OIDC_TOKEN`, both injected and rotated by the platform, neither secret), so
+  this static token is needed only for code running **outside** Vercel — which today
+  means `npm run snapshot:backfill`.
 - Public/anon Supabase key is fine client-side **because RLS is enforced** — RLS is
   therefore load-bearing for the dashboard and must be correct (audit with the
   `supabase-rls-auditor` subagent).
@@ -159,23 +165,51 @@ fragments of other companies' ad tags.
 ## Creative payload protection (see ADR-0003)
 
 We provide **access control, not secrecy of client code**. Layers: dynamic VAST
-kill-switch, short-TTL signed URLs, domain/referer allow-lists, server-side config
-injection, obfuscation. We never claim creative JS is unrecoverable.
+kill-switch, short-TTL signed URLs, server-side config injection, obfuscation. We
+never claim creative JS is unrecoverable. (Domain/referer allow-listing was listed
+here for a long time and never existed — dropped, see ADR-0003.)
 
-**SIMID's signed URL is one hop indirect.** Supabase Storage forces `.html`
-objects to `text/plain` with `Content-Security-Policy: sandbox` (no
-`allow-scripts`) — a platform-level anti-XSS-hosting policy that can't be
-turned off per bucket, and that silently breaks the SIMID postMessage
-handshake if the player loads that URL directly. `GET /api/creative/simid/[token]`
-(`app/api/creative/simid/[token]/route.ts`) exists to work around it: an
-HMAC-signed, 120s-TTL token (`lib/vast/interactive-token.ts`) authorizes
-exactly one Storage object path, matched against `^[a-z0-9_-]+/simid/index\.html$`
-as defense in depth against the token ever being minted for something outside
-`runtime/*/simid/index.html`. The route downloads that object service-role and
-re-serves it as `text/html` with a CSP that allows the (first-party, static)
-inline script/style but keeps `default-src 'none'`. This document is never
-advertiser-controlled today; if that ever changes, this route's CSP needs
-re-review before it does.
+**The two interactive assets are protected differently, and the asymmetry is
+deliberate** — see [ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md).
+
+**The VPAID unit is a public, immutable CDN object.** Anyone holding the URL can
+fetch it indefinitely, and that is accepted rather than overlooked: the file is our
+own template code, identical for every advertiser using that template. The
+advertiser's configuration is injected at serve time through `<AdParameters>` and
+is not in the file, so the kill-switch still bites — a lapsed subscription yields
+empty VAST, no `<AdParameters>`, and the retained URL returns an anonymous
+template. ADR-0003 already refuses to claim the code is unrecoverable. The residual
+exposure is bandwidth (hotlinking), the same one ADR-0010 accepted for the public
+`creative-media` bucket.
+
+**The SIMID document is still one hop indirect**, reached through our own route
+with an HMAC-signed, 120s-TTL token (`lib/vast/interactive-token.ts`). The token
+authorizes exactly one object path, matched against a closed list of shapes per
+kind — `^[a-z0-9_-]+/simid/index\.html$` for SIMID,
+`^[a-z0-9_-]+/(?:vpaid\.js|vpaid/unit\.js)$` for VPAID (still used by the fallback
+route) — as defense in depth against a token ever being minted for something
+outside `runtime/`. **The kind is re-checked against the calling route's own
+pattern**, so a token minted for a SIMID document cannot be replayed against the
+VPAID route and re-served as executable JavaScript, or the reverse.
+
+- `GET /api/creative/simid/[token]` exists because Supabase Storage forces
+  `.html` objects to `text/plain` with `Content-Security-Policy: sandbox` (no
+  `allow-scripts`) — a platform-level anti-XSS-hosting policy that can't be
+  turned off per bucket, and that silently breaks the SIMID postMessage handshake
+  if the player loads that URL directly. The route downloads the object
+  service-role and re-serves it as `text/html` with a CSP that allows the
+  (first-party, static) inline script/style but keeps `default-src 'none'`. This
+  document is never advertiser-controlled today; if that ever changes, this
+  route's CSP needs re-review before it does.
+- `GET /api/creative/unit/[token]` exists for a different reason — availability,
+  not correctness. `createSignedUrl` is a network call to Supabase, and it used
+  to sit on the VAST generation path ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)).
+  It re-serves the unit as `application/javascript` with `nosniff`, and carries
+  no CSP: the unit executes in the player's document, where our header would
+  govern nothing.
+
+This does not weaken ADR-0003's lever. The URL is still signed and still expires
+in 120s; only the signer changed, from Supabase to us.
 
 **The OMID verification pass-through (ADR-0012) does not change this.** A
 SIMID creative's `verificationScriptUrl` (advertiser-supplied) only ever

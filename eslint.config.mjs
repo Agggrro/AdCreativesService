@@ -19,6 +19,25 @@ const eslintConfig = defineConfig([
     // why it went unnoticed.
     "runtime/dist/**",
   ]),
+  {
+    // Hand-written ES5 creative units, not app code. Two default rules model
+    // them wrongly, and leaving them on kept `npm run lint` permanently red —
+    // which is what made it useless as a CI gate.
+    //
+    // - `no-this-alias`: `var self = this` is the ES5 closure idiom these units
+    //   are written in on purpose. They run inside third-party players with no
+    //   transpile step, so arrow functions are not an option.
+    // - `no-unused-vars`: each template declares `var TEMPLATE`, which is read
+    //   by `runtime/lib/vpaid-base.js` only after `runtime/build.mjs`
+    //   concatenates the two files. ESLint lints them separately and cannot see
+    //   the reference; the same goes for `getVPAIDAd`, which the player looks up
+    //   on the global object rather than importing.
+    files: ["runtime/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-this-alias": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

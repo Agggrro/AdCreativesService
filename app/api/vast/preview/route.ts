@@ -1,6 +1,5 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getRequestOrigin } from "@/lib/site";
-import { createServiceClient } from "@/lib/supabase/service";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { parseConfigSchema, buildConfigFromValues } from "@/lib/config-schema";
 import { buildPreviewServing } from "@/lib/vast/preview-context";
@@ -102,9 +101,10 @@ export async function POST(request: Request): Promise<Response> {
     rk: template.runtime_keys,
   });
 
-  // Resolve the signed unit URL once (service-role, same as production) so the
-  // Sandbox tab can use it directly without a second round trip through VAST XML.
-  const serviceClient = createServiceClient();
+  // Resolve the unit URL once (same helper as production) so the Sandbox tab
+  // can use it directly without a second round trip through VAST XML. No
+  // service-role client is needed for this any more: the URL is a locally
+  // signed token, not a Supabase Storage signed URL (ADR-0015).
   const serving = buildPreviewServing({
     pid: minted.previewId,
     tid: template.id,
@@ -120,7 +120,7 @@ export async function POST(request: Request): Promise<Response> {
   // mixed-content/private-network failure that surfaces only as code 1005.
   const siteUrl = getRequestOrigin(request);
 
-  const scriptUrl = await resolveInteractiveUrl(serviceClient, serving, siteUrl);
+  const scriptUrl = resolveInteractiveUrl(serving, siteUrl);
   if (!scriptUrl) {
     return Response.json(
       { error: "interactive asset not available for this template/format" },

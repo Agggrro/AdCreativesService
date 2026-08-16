@@ -18,7 +18,7 @@ performance profiles**. Keeping them separate is the core architectural idea.
                 ▼                            ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  B. Database (Supabase / PostgreSQL)                               │
-│     users · templates · creatives · subscriptions · creative_events│
+│     users · templates · creatives · subscriptions · counters       │
 │     RLS protects user-facing access. A denormalized "serving view" │
 │     gives the VAST path a fast, RLS-free read.                     │
 └──────────────────────────────────────────────────────────────────┘
@@ -58,7 +58,7 @@ sample config derived from the template's own `config_schema` defaults
 [`lib/supabase/`](../lib/supabase).
 
 Dashboard analytics are read through the owner-scoped aggregate
-`public.get_creative_overview()` (see [data-model.md](data-model.md)); `creative_events`
+`public.get_creative_overview()` (see [data-model.md](data-model.md)); `creative_event_counters`
 itself stays unreadable from the client.
 
 The UI is bilingual (RU/EN). Copy lives in [`lib/i18n/dictionaries.ts`](../lib/i18n/dictionaries.ts)
@@ -91,12 +91,22 @@ in the wild — **public, unauthenticated, high QPS, latency-sensitive**.
 Request flow:
 
 1. Parse + validate `creative_id` (and optional `format` override, macros).
-2. Read the denormalized serving record via the `get_creative_serving` RPC
-   (service-role; PostgREST doesn't expose the `private` schema, so a SECURITY
-   DEFINER function in `public` — EXECUTE restricted to `service_role` — is the
-   read path). See [data-model.md](data-model.md).
+2. Read the serving state from the **CDN snapshots**, not the database
+   ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)): `creative/<creative_id>`
+   for the creative and its template's runtime facts, then
+   `entitlement/<user_id>` for that user's subscription rows. Neither read touches
+   Postgres.
+   - **Fallback:** if the creative snapshot is absent or carries an unrecognised
+     `schema_version`, the endpoint falls back to the `get_creative_serving` RPC
+     (service-role; PostgREST doesn't expose the `private` schema, so a SECURITY
+     DEFINER function in `public` — EXECUTE restricted to `service_role` — is the
+     read path). See [data-model.md](data-model.md). A miss degrades to the previous
+     behaviour, never to a dark ad.
 3. **Subscription gate:** is there an active subscription covering this creative's
    template (single-template sub for that `template_id`, OR an all-access sub)?
+   Evaluated in `lib/serving/entitlement.ts` from the snapshot's facts — including
+   comparing `current_period_end` against the clock, so a subscription still lapses
+   on time when no webhook arrives to say it did.
    - **Active** → build a valid VAST 4.2 document containing the interactive payload
      for the selected format via the **format adapter** (see below).
    - **Inactive / missing / invalid** → return empty VAST: `<VAST version="4.2"></VAST>`
@@ -112,6 +122,19 @@ Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
 - **Cache deliberately.** Short-TTL edge cache keyed by `creative_id` (+ format),
   with explicit invalidation when the creative config or subscription status changes.
 - **Fail closed.** Any error or ambiguity → empty/fallback VAST, never the payload.
+- **Answer by reason, not uniformly.** A settled "no ad" (unknown id, lapsed
+  subscription, archived creative) is a 200 with empty VAST and the full
+  `s-maxage=60` — it is correct and stable. A failure to read our own state is a
+  **503**, and successful responses carry `stale-if-error=300`, so the CDN hands the
+  player the last good document instead of an empty one. Both used to be an empty
+  200, which made a one-second blip indistinguishable from "no ad" and cached it as
+  a valid answer for a full minute on every PoP that missed during it.
+- **CORS on the response, and no `Vary: Origin`.** The tag is read cross-origin by
+  players on publishers' pages, so `Access-Control-Allow-Origin: *` is required for
+  the ad to render at all. Varying on origin would shard this cache per publisher —
+  an origin miss for every new site the tag appears on.
+- **No database write on the beacon path.** `GET /api/track` hands its insert to
+  `waitUntil` and returns 204 immediately — up to seven beacons fire per impression.
 
 ### Format adapter layer
 
@@ -254,29 +277,47 @@ the subscription record + the denormalized serving status. See [billing.md](bill
 ### Creative runtime / CDN
 
 The actual interactive unit (SIMID iframe document / VPAID JS) is served via
-**short-TTL signed URLs** with domain/referer allow-listing, and gets its config
-**injected server-side** (never baked into static assets). This is the protection
-model — see [ADR-0003](decisions/0003-access-control-over-code-hiding.md).
+**short-TTL signed URLs** and gets its config **injected server-side** (never baked
+into static assets). This is the protection model — see
+[ADR-0003](decisions/0003-access-control-over-code-hiding.md), whose domain/referer
+allow-listing layer was dropped as never-implemented.
 
-**MVP hosting: Supabase Storage** (free tier, CDN-backed) with native signed URLs
-(`createSignedUrl`, short expiry). No separate paid CDN for MVP. If serving volume
-later justifies it, swap the storage adapter for a dedicated CDN (Cloudflare R2, etc.)
-without touching the serving logic. See [ADR-0004](decisions/0004-mvp-on-free-tiers.md).
+**Hosting: a public Vercel Blob store, content-addressed**
+([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)). `npm run runtime:push`
+hashes each built file, uploads it as `runtime/<template>/<file>.<sha256[0..8]>.js`
+with a year-long cache, and writes the committed `runtime/manifest.ts` that maps
+logical `runtime_keys` to real URLs. The app imports that manifest at build time, so
+resolving a unit URL costs no network call.
 
-**SIMID is the one exception to "direct signed URL":** Supabase Storage always
-serves `.html` objects as `text/plain` with a script-blocking
-`Content-Security-Policy: sandbox` — a deliberate, non-configurable
-anti-XSS-hosting policy on Supabase's side, not a bucket misconfiguration.
-Loaded as a player's iframe `src`, that silently kills the SIMID postMessage
-handshake: the video plays (it's a plain `<MediaFile>`, unaffected) but the
-interactive overlay's script never runs, so it never renders. `resolveInteractiveUrl()`
-(`lib/storage.ts`) special-cases `format === "simid"`: instead of a Storage
-signed URL, it mints a short-TTL HMAC token (`lib/vast/interactive-token.ts`,
-same access-control shape as the live-preview token) and points the player at
-`GET /api/creative/simid/[token]`, which downloads the object server-side
-(service role) and re-serves the same bytes as `text/html` with a permissive-
-but-scoped CSP. VPAID (`.js`, executed via `<script src>`, which browsers don't
-gate on Content-Type the same way) is unaffected and keeps the direct signed URL.
+The two formats then diverge, and not symmetrically:
+
+- **VPAID goes straight to the CDN.** `<MediaFile>` carries the public hashed URL,
+  so the player fetches it with no function in the path and a stable cache key. The
+  previous scheme put a 120s token in the URL, which changed every minute — meaning
+  nearly every asset fetch was a cache miss *and* a Supabase download.
+- **SIMID keeps a proxy route,** because it cannot be served directly by anyone.
+  Vercel Blob sets `content-disposition: attachment` on HTML ("prevents hosting HTML
+  pages", per its docs) and Supabase Storage forces `.html` to `text/plain` with a
+  script-blocking `Content-Security-Policy: sandbox`. Either way a player's iframe
+  will not run the document: the video plays (it's a plain `<MediaFile>`, unaffected)
+  but the interactive overlay's script never runs. `GET /api/creative/simid/[token]`
+  fetches the bytes and re-serves them as `text/html` with a permissive-but-scoped
+  CSP.
+
+`lib/runtime-bytes.ts` falls back to the Supabase `creatives` bucket for any logical
+key not yet in the manifest, which is what let this ship before the public store
+existed. Supabase Storage was the MVP host under
+[ADR-0004](decisions/0004-mvp-on-free-tiers.md); that fallback is the last of it on
+this path.
+
+The SIMID token's kind comes from the object path and the route demands it
+explicitly, so a token minted for the other format cannot be replayed against it.
+
+The consequence that matters: building a VAST document is now pure local
+computation, and for VPAID the asset request is too — it is a static CDN object.
+Only the SIMID document still runs through a function, and its bytes come from the
+same public store, so a Supabase outage no longer stops either format once the
+manifest is populated.
 
 ### Advertiser media uploads
 
@@ -307,7 +348,10 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | Concern | Runtime | Why |
 | --- | --- | --- |
 | Dashboard / auth pages | Node (Vercel) | Rich, low QPS |
-| `GET /api/vast` | Node + CDN cache (`s-maxage=60`) | Full supabase-js/storage support; CDN cache absorbs QPS/latency. Edge is a documented future optimization. |
+| `GET /api/vast` | Node + CDN cache (`s-maxage=60`) | Reads CDN snapshots, not Postgres, and mints asset URLs locally — no Supabase call on this path at all ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)). Node only for the `node:crypto` HMAC; edge needs those helpers ported to Web Crypto first, and is the natural next optimization. |
+| VPAID unit | Public Vercel Blob (CDN, 1y immutable) | Content-addressed URL straight in `<MediaFile>` — no function at all ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)) |
+| `GET /api/creative/unit/[token]` | Node | Fallback only, for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
+| Serving snapshots | Vercel Blob (private), 60s cache | Written by the creative writers and the Stripe webhook; read by `/api/vast`. Private because keys derive from `creative_id`, which is public in every tag URL. |
 | `POST /api/stripe/webhook` | Node | Needs raw body for signature verification |
 | `GET /api/creative/simid/[token]` | Node | Service-role Storage download; must be Node for supabase-js storage support, same as `/api/vast` |
 | `/api/tools/vast/*` | Node | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). Node is required, not incidental: the SSRF guard installs its own `lookup` on the socket via `node:http`/`node:dns`, which has no edge equivalent. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |

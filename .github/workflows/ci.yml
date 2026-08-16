@@ -1,0 +1,96 @@
+# The gates CLAUDE.md lists, run automatically instead of from memory.
+#
+# The nightly job exists for one specific reason: since ADR-0015 the entitlement
+# predicate has two implementations — `private.is_entitled` in Postgres and
+# `lib/serving/entitlement.ts` — and a drift between them either darks a live tag
+# or tells a buyer their dead tag is fine. `check:entitlement` compares Postgres's
+# own verdict against the TypeScript port, so it needs a real database and cannot
+# run on a pull request from a fork.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 03:00 UTC daily.
+    - cron: "0 3 * * *"
+
+# A newer push makes an in-flight run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: typecheck / lint / test / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 24 for native TypeScript type stripping: `npm run test:entitlement`
+          # runs `node --test` directly against a .ts file, with no build step.
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm run test:entitlement
+
+      # No secrets: app/sitemap.ts returns its static pages when the Supabase
+      # env vars are absent, so a build with none is a real build.
+      - run: npm run build
+
+  drift:
+    name: nightly drift checks
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      # The validator's hop tokens are HMAC-signed; any value works for a
+      # fixture run, it just has to exist.
+      PREVIEW_TOKEN_SECRET: ci-fixture-run-not-a-real-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # check:vast drives the real routes over HTTP, so it needs the app up.
+      - name: Start the app
+        run: |
+          npm run start &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:3000/api/vast?creative_id=x; then
+              echo "up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "server did not come up in 60s"; exit 1
+
+      - name: VAST fixture corpus
+        run: npm run check:vast
+
+      # Skipped rather than failed when the secret is absent: a permanently red
+      # nightly is a nightly nobody reads.
+      - name: Entitlement predicate vs Postgres
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::DATABASE_URL secret is not set — skipping the SQL/TypeScript entitlement comparison."
+            echo "Add it under Settings -> Secrets and variables -> Actions to enable this check."
+            exit 0
+          fi
+          npm run check:entitlement

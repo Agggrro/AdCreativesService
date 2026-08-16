@@ -57,6 +57,11 @@ covered = (plan_type = 'all_access')
 This boolean is **denormalized into the serving record** so the VAST path never
 queries Stripe and never does a live join. See [architecture.md](architecture.md).
 
+`private.is_entitled` is the one definition of this predicate in SQL, and
+`lib/serving/entitlement.ts` is its port for the snapshot path. They must not drift:
+`npm run check:entitlement` compares Postgres's own verdict against the TypeScript
+over a matrix of statuses, periods and plan types, and is the gate that enforces it.
+
 ## Money flow
 
 1. User clicks subscribe → **Stripe Checkout** session (server-created) with
@@ -75,10 +80,23 @@ queries Stripe and never does a live join. See [architecture.md](architecture.md
     `cancel_at_period_end`, `template_id` (from metadata).
   - `customer.subscription.deleted` → mark `canceled`.
   - `invoice.payment_failed` → mark `past_due`.
-- **No separate "refresh" step.** The serving record is a *live* view
-  (`private.creative_serving`) that recomputes entitlement on read, so writing the
-  `subscriptions` row is sufficient — the VAST kill-switch reacts within the ~60s
-  cache window automatically.
+- **The webhook must also republish the entitlement snapshot.** This used to be
+  unnecessary: the serving record was a *live* view (`private.creative_serving`) that
+  recomputed entitlement on read, so writing the `subscriptions` row was sufficient.
+  Since [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md) the serving path reads
+  a CDN snapshot, so this handler is what makes a subscription change visible to the
+  kill-switch.
+  - It writes **one** document, `entitlement/<user_id>`, regardless of how many
+    creatives the user owns.
+  - A publish that fails **must not return 2xx**. The handler drops the now-stale
+    document (which forces the correct-but-slower database fallback) and then throws,
+    so the idempotency claim is rolled back and Stripe retries. Reporting success on a
+    failed publish would leave the CDN serving the *previous* entitlement — which is
+    exactly how a cancelled subscription keeps serving.
+  - The snapshot stores `current_period_end`, not a boolean verdict, so entitlement
+    still lapses on time even if no webhook arrives at all.
+- **Kill-switch latency: ~60s response cache + up to 60s of Blob propagation**, so
+  ~2 minutes worst case (it was ~1 minute when the view was read live).
 - **Idempotent:** each event id is claimed in `public.stripe_events` before
   processing; a duplicate returns 200 without reprocessing, and a handler failure
   rolls back the claim so Stripe's retry can reprocess.

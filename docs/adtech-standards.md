@@ -209,10 +209,12 @@ What we actually provide — *access control + raising the cost of copying*:
 1. **Dynamic VAST kill-switch** — the real lever. No active subscription → empty/
    fallback VAST, payload never served. (See [architecture.md](architecture.md).)
 2. **Short-TTL signed URLs** for the SIMID iframe / VPAID unit.
-3. **Domain / referer allow-listing** so the unit only runs where authorized.
-4. **Server-side config injection** — product data/links injected at serve time,
+3. **Server-side config injection** — product data/links injected at serve time,
    never baked into static bundles.
-5. **Minification / obfuscation** of the runtime.
+4. **Minification / obfuscation** of the runtime.
+
+Domain / referer allow-listing used to be listed here as a fifth layer. It was never
+built, and it is not planned — see [ADR-0003](decisions/0003-access-control-over-code-hiding.md).
 
 Full rationale: [ADR-0003](decisions/0003-access-control-over-code-hiding.md).
 

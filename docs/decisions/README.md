@@ -29,6 +29,9 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0012](0012-viewability-measurement.md) | Viewability measurement — OMID pass-through for SIMID, a custom module for VPAID | Accepted |
 | [0013](0013-public-free-tools-section.md) | A public free-tools section, and a nav for signed-out visitors | Accepted |
 | [0014](0014-vast-inspection-engine.md) | The VAST inspection engine — prose-derived rules, and dry-run by substitution | Accepted |
+| [0015](0015-serving-snapshots-on-cdn.md) | Serving snapshots on the CDN, not a live database read | Accepted |
+| [0016](0016-three-events-hourly-counters.md) | Three ingested events, counted into hourly buckets | Accepted |
+| [0017](0017-runtime-assets-on-public-cdn.md) | Creative runtime assets on a public, content-addressed CDN | Accepted |
 
 ## Template
 

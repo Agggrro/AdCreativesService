@@ -37,7 +37,7 @@ A user's configured instance of a template.
 | `name` | optional user label; the UI falls back to the template name. Without it two creatives from one template differ only by uuid |
 | `selected_format` | `simid` \| `vpaid` \| … — user's choice; must be in template's `supported_standards` |
 | `config_json` | jsonb — validated against the template's `config_schema`. Holds only the fields that were **active** at save time, so two creatives built from the same template can legitimately have different key sets, and a conditional field's absence is meaningful rather than a gap ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)). Nothing reading it may assume a fixed shape |
-| `status` | `draft` \| `active` \| `paused` \| `archived`. **Only `active` is reachable today** — it is hardcoded on insert and nothing updates it. The dashboard therefore shows a serving state derived from entitlement, not this column ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)). A per-creative kill switch still has no server action: what shipped instead is a **hard delete** (`deleteCreative`), which takes the row, its `creative_events`, and its uploaded media with it. Both `should_serve` expressions already gate on `status = 'active'`, so setting `archived` would silence a tag identically while keeping its history — the non-destructive option remains one `UPDATE` away and is worth revisiting |
+| `status` | `draft` \| `active` \| `paused` \| `archived`. **Only `active` is reachable today** — it is hardcoded on insert and nothing updates it. The dashboard therefore shows a serving state derived from entitlement, not this column ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)). A per-creative kill switch still has no server action: what shipped instead is a **hard delete** (`deleteCreative`), which takes the row, its delivery counters, and its uploaded media with it. Both `should_serve` expressions already gate on `status = 'active'`, so setting `archived` would silence a tag identically while keeping its history — the non-destructive option remains one `UPDATE` away and is worth revisiting |
 | `created_at`, `updated_at` | |
 
 ### `subscriptions`
@@ -55,46 +55,55 @@ Source-of-truth mirror of Stripe state. See [billing.md](billing.md).
 | `cancel_at_period_end` | bool |
 | `created_at`, `updated_at` | |
 
-### `creative_events` (analytics)
-Ingested ad events — the core value for media buyers. Append-only, but **not
-permanent**: the FK to `creatives` is `on delete cascade`, so deleting a creative
-destroys its entire delivery history with it. There is no export and no soft
-delete, which is why the confirmation dialog names the loss explicitly rather
-than saying only that the action cannot be undone.
+### `creative_event_counters` (analytics)
+Ingested ad delivery — the core value for media buyers. **Counts, not events**
+([ADR-0016](decisions/0016-three-events-hourly-counters.md)): one row per
+(creative, event, hour), not one row per beacon. Not permanent: the FK to
+`creatives` is `on delete cascade`, so deleting a creative destroys its entire
+delivery history with it. There is no export and no soft delete, which is why the
+confirmation dialog names the loss explicitly rather than saying only that the
+action cannot be undone.
 
 | Field | Notes |
 | --- | --- |
-| `id` | bigint PK |
-| `creative_id` | FK, `on delete cascade` — see above |
-| `event_type` | enum allows `impression` \| `start` \| `q25` \| `q50` \| `q75` \| `complete` \| `interaction` \| `click` \| `viewable`; **`interaction`/`click` are never produced. `viewable` is VPAID-only** — self-reported, non-OMID-accredited (ADR-0012); a SIMID creative never writes it, since its viewability is measured by the advertiser's own OMID vendor, which we don't ingest |
-| `meta` | jsonb — intended for device / geo bucket / interaction detail. Nothing writes it today; every row is `{}` |
-| `occurred_at` | ts |
+| `creative_id` | FK, `on delete cascade` — see above. Part of the PK |
+| `event_type` | Only three are ever written: `impression`, `viewable`, `click`. The enum still carries the retired video-progress values and `interaction`, none of which anything produces. **`viewable` is VPAID-only** — self-reported, non-OMID-accredited (ADR-0012); a SIMID creative never writes it, since its viewability is measured by the advertiser's own OMID vendor, which we don't ingest. **`click` fires only from the creative's final call-to-action**, the one that opens the advertiser's URL — never from an intermediate interaction such as a quiz answer, so it reads lower than a DSP's click count |
+| `bucket` | `date_trunc('hour', now())` at ingest. Collapsed to one bucket per day for data older than 30 days by `rollup_creative_events()`, called from the daily cron |
+| `count` | bigint, incremented in place |
 
-> Volume note: this table can grow fast. MVP may use plain Postgres; revisit
-> partitioning / a dedicated analytics store post-MVP.
+> Volume note: size is now a function of creatives × events × time, not of
+> traffic. Roughly 1000 creatives × 3 events × 24 h ≈ 26M rows/year before the
+> 30-day rollup, which is what the rollup exists to bound.
 
 Ingested by [`app/api/track/route.ts`](../app/api/track/route.ts) — a public,
-fire-and-forget beacon that maps VAST event names (start/firstQuartile/… plus
-impression/click) to the enum and inserts via the service role. Each beacon URL
-is HMAC-signed at VAST-build time with a 1-hour expiry
-([`lib/track-token.ts`](../lib/track-token.ts)) — a `creative_id` is visible in
-the VAST tag itself, so without a signature anyone holding a tag could forge
-hits for it, and these counts now feed a customer-facing dashboard. See
+fire-and-forget beacon that maps the three VAST/runtime event names to the enum and
+calls `public.increment_creative_event()` via the service role. The upsert lives in
+SQL because PostgREST cannot express `on conflict do update set count = count + 1`,
+and a read-then-write in app code would lose updates under the concurrency this
+path is built for. Each beacon URL is HMAC-signed at VAST-build time with a 1-hour
+expiry ([`lib/track-token.ts`](../lib/track-token.ts)) — a `creative_id` is visible
+in the VAST tag itself, so without a signature anyone holding a tag could forge hits
+for it, and these counts feed a customer-facing dashboard. See
 [security.md](security.md).
 
-**What is not collected**, so no screen may imply it: there is no `<ClickTracking>`
-element in the VAST builder, so `click` and `interaction` rows never appear and CTR is not
-computable; `error` beacons arrive but are dropped at ingest because the name is absent
-from the event map; and `/api/vast` writes nothing at all, so ad *requests* are uncounted
-and fill rate cannot be derived.
+**What is not collected**, so no screen may imply it: `start`, the quartiles and `complete` are no
+longer emitted into the VAST at all, so the completion funnel is gone; `error` beacons
+arrive but are dropped at ingest because the name is absent from the event map; and
+`/api/vast` writes nothing, so ad *requests* are uncounted and fill rate cannot be
+derived. **CTR is now computable** (impressions and clicks are both ingested) but is
+not displayed — see design-system.md §6 for why the denominator has to be stated.
+
+There is also no per-impression detail any more, by construction. Frequency, unique
+reach and session paths need a different store, not a different query.
 
 **Read path.** The table has RLS enabled with **no policies**, so the session client reads
 zero rows by design. The dashboard reads aggregates through
 `public.get_creative_overview()` — a parameterless `SECURITY DEFINER` function scoped to
-`auth.uid()` that returns six counts plus `is_entitled` per creative, granted to
-`authenticated` only. It works because the function owner is exempt from RLS; running
-`alter table public.creative_events force row level security` would make it silently
-return zeros.
+`auth.uid()` that returns three counts plus `is_entitled` and `should_serve` per
+creative, granted to `authenticated` only. Those last two are not analytics: the serving
+badge and the state rail depend on them. It works because the function owner is exempt
+from RLS; running `alter table public.creative_event_counters force row level security`
+would make it silently return zeros.
 
 ### `stripe_events` (webhook idempotency)
 Ledger of processed Stripe event ids. Service-role only; no client access.
@@ -110,7 +119,7 @@ Ledger of processed Stripe event ids. Service-role only; no client access.
 ```
 auth.users 1──* creatives *──1 templates
 auth.users 1──* subscriptions *──0..1 templates   (null template_id = all-access)
-creatives  1──* creative_events
+creatives  1──* creative_event_counters
 ```
 
 ## The serving read (hot path)
@@ -142,8 +151,28 @@ Two Supabase Storage buckets, deliberately different trust models:
 
 | Bucket | Access | Holds | Notes |
 | --- | --- | --- | --- |
-| `creatives` | **Private** — short-TTL (120s) `createSignedUrl` only | Runtime SIMID/VPAID units (code) | Signed so a stolen URL expires fast (ADR-0003). Uploaded manually via the Supabase dashboard/CLI (see `runtime/README.md`) |
+| `creatives` | **Private** — fallback only | Runtime SIMID/VPAID units (code) | No longer the primary home: the runtime lives in a public, content-addressed Vercel Blob store ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)), and this bucket is read only by `lib/runtime-bytes.ts` for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
 | `creative-media` | **Public-read** | Advertiser-uploaded images/gifs/video for `"image"`-typed config fields | Public because the URL is baked into `<AdParameters>` and must keep resolving for the creative's lifetime. Created declaratively in `supabase/schema.sql`. Uploads go straight from the browser, RLS-gated to the uploader's own `{auth.uid()}/...` path prefix. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
+
+## Serving snapshots (outside Postgres)
+
+The ad-serving path does not read any of the above at request time. It reads two JSON
+documents in a **private** Vercel Blob store, republished by the writers that change
+the underlying rows ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)):
+
+| Key | Projection of | Republished by |
+| --- | --- | --- |
+| `serving/creative/<creative_id>.json` | `private.creative_serving`, minus the two computed columns | `createCreative` / `updateCreative`; removed by `deleteCreative` **before** the row |
+| `serving/entitlement/<user_id>.json` | that user's `subscriptions` rows, as facts (`status`, `plan_type`, `template_id`, `current_period_end`) | the Stripe webhook's `upsertSubscription` |
+
+Postgres remains the source of truth; these are a projection of it, and
+`npm run snapshot:backfill` rebuilds them from it idempotently. Note that a creative
+snapshot copies `template_type`, `runtime_keys` and `supported_standards` from
+`templates` — so **`npm run db:seed` must be followed by a backfill**.
+
+`is_entitled` / `should_serve` are deliberately *not* stored. They depend on `now()`,
+and freezing them would keep a lapsed subscription serving whenever a Stripe webhook
+was missed or delayed.
 
 ## RLS intent
 
@@ -153,7 +182,7 @@ Two Supabase Storage buckets, deliberately different trust models:
 | `templates` | **published** templates readable by anon + authenticated (public showcase); drafts hidden; writes admin-only (service role) |
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
-| `creative_events` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
+| `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
 | `stripe_events` | **no direct client access**; written only by the webhook (service role) |
 | `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent |
 
