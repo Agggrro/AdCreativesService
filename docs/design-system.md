@@ -587,9 +587,21 @@ never two stacked captions.
   carry a word — least of all a countdown telling a buyer their preview tag is expiring.
   Dim-looking text in the well is `well-fg`; `well-fg-dim` draws lines, not language.
 - The warm marker is allowed **at most once** on dark, on a progress indicator — the
-  scrub bar. Today the scrub lives in third-party player chrome we do not style, so
-  `--color-well-accent` is declared and deliberately unused; it becomes live the day the
-  Sandbox harness draws its own progress bar. Machine data down there (URLs, timecodes)
+  scrub bar. There is no scrub in the well today: the Sandbox harness draws none, and the
+  Fluid tab's has been hidden along with the rest of its transport controls (below), so
+  `--color-well-accent` is declared and deliberately unused. It becomes live the day a
+  harness draws its own progress bar.
+- **A third-party player's transport controls do not belong in the well.** The Fluid tab
+  runs as an ad-only outstream player — the `<video>` it wraps has no content — so its
+  play button, scrub bar and `00:00 / 00:00` readout drive a video that does not exist,
+  and a timecode frozen at zero under a running creative is a false readout, not merely
+  clutter. The skin is ours rather than the publisher's; no DSP ships it, so it is not
+  part of what the tab proves. Play, scrub, timecode, fullscreen, theatre and the mini
+  player are off; **volume stays**, because audio state is a real property of a creative
+  and the preview starts muted. The rules live next to the component
+  (`components/players/fluid-preview.css`), not in the token file — vendor chrome is not
+  a design token. The creative's own close control (ADR-0009) is drawn inside the ad slot
+  and is untouched by any of this. Machine data down there (URLs, timecodes)
   is `well-fg`, never warm.
 
 ## 8. Language and copy

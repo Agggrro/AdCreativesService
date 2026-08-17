@@ -1,6 +1,7 @@
 "use client";
 
 import "fluid-player/src/css/fluidplayer.css";
+import "./fluid-preview.css";
 
 import { useEffect, useRef } from "react";
 import fluidPlayer from "fluid-player";
@@ -55,6 +56,22 @@ export function FluidPlayer({ mint, onStatus }: PreviewPlayerProps) {
         posterImage: false,
         playButtonShowing: false,
         mute: true,
+        // Chrome that has no job on an ad-only preview. What has an option is
+        // turned off here; what does not is hidden in fluid-preview.css, which
+        // explains the whole decision in one place.
+        allowTheatre: false,
+        miniPlayer: { enabled: false },
+        // Our creatives are clickable by design, and a stray double-click
+        // should not throw the dashboard into fullscreen.
+        doubleclickFullscreen: false,
+        // Off because it is both useless and harmful here. Useless: there is no
+        // content to seek. Harmful: Fluid binds this on `document` in the
+        // capture phase after the first click inside the player, and its
+        // handler calls preventDefault() for space, Enter, m, f, the arrows and
+        // every digit, with no exemption for form fields. Click the creative,
+        // Tab into the configurator, and spaces and digits stop reaching the
+        // input you are typing in.
+        keyboardControl: false,
       },
       vastOptions: {
         adList: [{ roll: "preRoll", vastTag: mint.previewTagUrl }],
@@ -95,5 +112,8 @@ export function FluidPlayer({ mint, onStatus }: PreviewPlayerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div ref={slotRef} className="absolute inset-0" />;
+  // `fluid-preview` scopes the chrome overrides in fluid-preview.css. Fluid
+  // builds its wrapper and control bar inside this slot, so an ancestor class
+  // is enough and no vendor markup has to be reached into.
+  return <div ref={slotRef} className="fluid-preview absolute inset-0" />;
 }
