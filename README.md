@@ -19,7 +19,7 @@ Auth, RLS) · Stripe · Vercel.
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Next.js dev server |
+| `npm run dev` | Next.js dev server, bound to `127.0.0.1` (see [docs/security.md](docs/security.md)) |
 | `npm run lint` / `npm run typecheck` / `npm run build` | The pre-push gates |
 | `npm run build:runtime` | Build the VPAID units into `runtime/dist/` (wipes it first) |
 | `npm run runtime:push [prefix]` | Upload the built units to the `creatives` Storage bucket |

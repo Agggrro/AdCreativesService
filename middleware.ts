@@ -49,12 +49,21 @@ export const config = {
   // "api/cron" is invoked by Vercel's scheduler with a bearer token, never a
   // session cookie; the route does its own authorization.
   //
+  // "api/dev" is the local-only developer surface. Excluded for both reasons
+  // already given above. `/api/dev/session` writes the session cookie itself
+  // after signing in, so letting updateSession() rotate the *pre-login* cookies
+  // onto the same response makes two independent writers of one chunked cookie
+  // set, and which one wins comes down to merge order rather than to logic.
+  // `/api/dev/unit/*` is the `api/creative` case again: a static asset fetched
+  // once per run — cache-busted, so every time — on a request that has no
+  // session by construction.
+  //
   // "v", "t" and "c" are the neutral public paths from next.config.ts. They must
   // be listed by those names, not by what they rewrite to: middleware runs
   // before beforeFiles/afterFiles rewrites, so it sees `/v`, and the `api/vast`
   // exclusion above would not cover it. Without them every impression would pay
   // an edge invocation and an auth round trip.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|v$|t$|c/|api/vast(?!/preview)|api/vast/preview/|api/track|api/stripe|api/creative|api/cron|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|v$|t$|c/|api/vast(?!/preview)|api/vast/preview/|api/track|api/stripe|api/creative|api/cron|api/dev|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

@@ -258,6 +258,87 @@ viewer's ad player fetches the URL with no session), so `public = true` bypassin
 RLS for GETs is correct here, not a gap. The same class of exception as
 `templates_select_published`. Writes stay RLS-gated to the uploader's own path.
 
+## Developer-only surfaces (`isDevOnlyEnabled()`)
+
+Three routes exist for local creative work and **must not be reachable anywhere else**:
+`GET /api/dev/session` (signs in a local test account), `GET /api/dev/unit/[template]`
+(serves a unit off local disk), and the `/dev/harness` page.
+
+The gate is `lib/dev-only.ts`. `isDevOnlyEnabled()` answers *"is this a development
+build"* — `NODE_ENV !== "production"` and no `VERCEL` env var, which excludes preview
+deployments too (they run with `NODE_ENV=production` but are publicly reachable URLs).
+
+**That question is not the same as "can anyone else reach this", and the difference is
+the one that bites.** `next dev` binds `0.0.0.0` by default and prints a LAN address on
+startup, and this product routinely needs a public tunnel so a third-party player or DSP
+can fetch a tag. In all of those the build is still "development" while the port is open
+to the network — and `/api/dev/session` hands out a real session.
+
+**The control is the listener, not a header.** `npm run dev` and `npm run dev:https` both
+pass `-H 127.0.0.1`, so the dev server accepts nothing but loopback connections and there
+is no request from anywhere else to judge.
+
+`isLocalHeaders()` / `isLocalRequest()` — a loopback `Host`, plus loopback values in
+`x-forwarded-host` and `x-forwarded-for` where present — is the **second** lock, and its
+limit is worth stating plainly because it is easy to over-trust: every value it reads is a
+request header, and Next passes a client-supplied `Host` and `X-Forwarded-For` through
+rather than overwriting them. Verified against the running server —
+`curl -H "Host: localhost:3000" -H "X-Forwarded-For: ::1"` satisfies every check no matter
+where it originated. It stops the accidental case (a browser opened at the LAN address, a
+proxy or tunnel in front, which send honest headers), not a deliberate one.
+
+**So never re-expose the dev server to a network on the strength of that check.** Running
+`next dev -H 0.0.0.0` for cross-device testing makes `/api/dev/session` reachable by
+anyone who can route to the port; clear `DEV_LOGIN_*` from `.env.local` before doing it,
+which 404s the route outright.
+
+A gate failure answers **404, not 403**: these should not exist even as something to probe
+for. (A *credential* failure on the session route is a different thing and answers 401 with
+a hint naming the missing account — the gate has already passed, and that response only
+ever renders on loopback.)
+
+Notes that bind any change here:
+
+- **`/api/dev/session` is not an auth bypass.** It calls the same `signInWithPassword` the
+  login form calls, against an account a developer created themselves, and yields an
+  ordinary session — same cookie, same RLS, same expiry. Minting a session another way
+  would let bugs in the real login path go unnoticed. `DEV_LOGIN_*` must never be set in
+  Vercel and must never name a real user's account.
+- **It is a state-changing GET, so it checks `Sec-Fetch-Site`.** Reachable by plain
+  navigation means any page can send a developer's browser here and silently swap the
+  session they are testing under — a top-level navigation carries cookies whatever
+  `SameSite=Lax` says. `same-origin` and `none` (a typed or bookmarked URL) are allowed;
+  `cross-site` 404s.
+- **Its `next` parameter is resolved, not pattern-matched.** Prefix checks are the wrong
+  tool for an open redirect: `//host` is protocol-relative, and so is `/\host`, because
+  WHATWG treats `\` as `/` in a special scheme. Resolve against a base and compare
+  origins. This endpoint hands out a session *and* a redirect, so an open redirect here is
+  a login-and-bounce in one URL.
+- **`/api/dev/unit/[template]` cannot traverse.** The path segment goes through
+  `isPreviewUnitKey()` — `hasOwnProperty` against a closed allow-list — before it is used.
+  A bare `TABLE[key]` index is not sufficient: an object literal answers `constructor`,
+  `toString` and `__proto__` from its prototype chain, so the guarantee would rest on
+  there happening to be no strings on `Object.prototype`. Never resolve a filesystem path
+  from the URL directly.
+- **`/api/dev/*` is excluded from the middleware matcher**, so `updateSession()` does not
+  write session cookies on the same response the session route writes its own.
+- **Adding a fourth dev surface means using the same gate**, not a new ad-hoc check.
+
+## Creative telemetry channel (ADR-0019)
+
+The VPAID runtime posts its lifecycle to `postMessage` with `targetOrigin` set to the
+origin it was served from. **That argument is the entire access control**: in production
+the top frame is the publisher's page, the origin does not match, and the browser drops
+the message before delivery — so a creative cannot leak its state to the page hosting it.
+
+- **Never widen it to `"*"`.** A need to reach a genuinely different origin is a new
+  decision, not a parameter change.
+- **Receivers check `event.origin` as well.** The sender's argument stops our records
+  reaching the wrong page; only the receiver's check stops someone else's messages being
+  taken for ours. `subscribeToCreativeTelemetry` does both.
+- **Nothing is collected server-side**, and adding an endpoint that did would be a
+  privacy decision in its own right — the records originate in a third-party context.
+
 ## Pre-push checklist (security-sensitive changes)
 
 - [ ] No secret in client bundle / `NEXT_PUBLIC_*`.
@@ -266,4 +347,6 @@ RLS for GETs is correct here, not a gap. The same class of exception as
 - [ ] RLS policies cover new tables/columns (or explicit, documented exception).
 - [ ] Any new outbound fetch of a user-supplied URL goes through
       `lib/vast-inspect/fetch-tag.ts` — not a bare `fetch()`.
+- [ ] Any new developer-only route is behind `isDevOnlyEnabled()` and answers 404.
+- [ ] No `postMessage` from the creative runtime with a widened `targetOrigin`.
 - [ ] `/security-review` run and findings addressed.
