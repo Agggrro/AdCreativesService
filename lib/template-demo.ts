@@ -52,9 +52,11 @@ const OVERRIDES: Record<string, string> = {
  * `"photo"` — seeded-photographic imagery — is what both live demo surfaces
  * (the landing hero and each template's own detail page) use, so a demo unit
  * never shows an empty gray well (docs/design-system.md §6, "Landing hero").
- * `"placeholder"` is the neutral, self-hosted `public/demo/` fallback; it has
- * no caller today but stays available for a demo surface that wants to stay
- * off the third-party image service.
+ * `"placeholder"` is the neutral, self-hosted `public/demo/` fallback, for a
+ * surface that must not depend on the third-party image service. The creative
+ * harness (`/dev/harness`) uses it: a tool for judging whether a template
+ * rendered correctly cannot have its imagery fail independently of the code
+ * under test.
  */
 export type DemoImageStyle = "placeholder" | "photo";
 

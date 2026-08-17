@@ -86,10 +86,16 @@ export function Segmented<T extends string>({
             className={`${chipType} border-r border-hairline px-2.5 py-1.5 transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 ${
               fill ? "flex-1" : ""
             } ${
-              option.disabled
-                ? "cursor-not-allowed text-fg-disabled"
-                : current
-                  ? "bg-fill text-fg"
+              // `current` is checked before `disabled`, not after. A disabled
+              // strip still has a current segment, and dropping `bg-fill` from
+              // it leaves the choice shown in neither colour nor form while
+              // `aria-pressed` below still says which one it is — visual and
+              // accessible state disagreeing about the same fact (§9, "state
+              // encoded in form as well as colour").
+              current
+                ? `bg-fill text-fg${option.disabled ? " cursor-not-allowed" : ""}`
+                : option.disabled
+                  ? "cursor-not-allowed text-fg-disabled"
                   : "text-fg-secondary hover:bg-fill"
             }`}
           >

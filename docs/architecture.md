@@ -50,6 +50,7 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 | `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
 | `/dashboard/subscriptions` | session | All billing; Stripe checkout returns here |
 | `/tools/vast-validator`, `/tools/vast-generator` | public | Free tools ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read; the generator is a placeholder |
+| `/dev/harness` | **local only** | The creative harness: runs a built VPAID unit against schema-derived config at four slot sizes and judges it against the mandatory lifecycle. 404 outside local development ([security.md](security.md)) |
 
 The public catalog reads `templates` as `anon` — `templates_select_published` already
 allows it — and its demo runs a built unit straight from `/api/preview-unit/<key>`, with
@@ -387,3 +388,4 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | `GET /api/creative/simid/[token]` | Node | Service-role Storage download; must be Node for supabase-js storage support, same as `/api/vast` |
 | `/api/tools/vast/*` | Node | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). Node is required, not incidental: the SSRF guard installs its own `lookup` on the socket via `node:http`/`node:dns`, which has no edge equivalent. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |
 | Creative runtime assets | Supabase Storage (free tier, CDN) | Static-ish, signed URLs, geo-distributed |
+| `/api/dev/*`, `/dev/harness` | Node, **loopback only** | Developer surfaces: a password-less sign-in for a local test account, and a unit served off local `runtime/dist/` so the harness shows the working copy rather than the published object. Kept off the network by the *listener* — `npm run dev` binds `127.0.0.1` — with [`lib/dev-only.ts`](../lib/dev-only.ts) (not production, not Vercel, loopback headers) as a second lock that answers 404. See [security.md](security.md) for why the header check alone would not be enough |

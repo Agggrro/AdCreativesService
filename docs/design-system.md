@@ -636,6 +636,18 @@ never two stacked captions.
   [architecture.md](architecture.md) and [security.md](security.md)).
 - Every user-visible string goes through the i18n layer with both locales supplied. A
   hardcoded human-readable string in a component is a defect.
+- **A developer-only surface is exempt from the bilingual requirement above, and from
+  nothing else.** The creative harness (`/dev/harness`) and the `/api/dev/*` routes under
+  the same gate answer 404 unless the request came from the developer's own machine, so
+  no user reaches them in either language; routing their labels through
+  `dictionaries.ts` would bury the shipping copy that file exists to police — the same
+  reasoning this section already applies to `lib/vast-inspect/`'s rule catalogue. The
+  copy rules below still bind (sentence case, controls name what happens, errors say what
+  to do), and so does everything else in Instrument: tokens, the human/machine type
+  split, the state-rail tables, one well, the accent budget of one. A dev tool that
+  drifts is how a pattern gets re-invented and then copied back into the product. Scope
+  is exactly "surfaces gated by `isLocalHeaders()`"; nothing reachable in production may
+  cite it.
 - **A domain dataset may carry its own bilingual payload instead**, provided a type makes
   both locales mandatory. The VAST validator's rule and feature catalogue
   (`lib/vast-inspect/`) is the case this exists for: roughly eighty rules, each keyed to an
@@ -665,7 +677,7 @@ never two stacked captions.
 | ✕ | Flags for language, or a second theme. |
 | ✓ | Density as respect: 44px rows, spacing in multiples of 4. |
 | ✓ | State encoded in form as well as colour. |
-| ✓ | Both locales supplied for every new string. |
+| ✓ | Both locales supplied for every new string — except on a developer-only surface, which no user reaches in either language (§8, and that carve-out only). |
 
 ## 10. Implementation
 
