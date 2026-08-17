@@ -1,5 +1,5 @@
 /*
- * Fluid Player's control bar, trimmed for the configurator preview.
+ * Fluid Player's control bar, removed for the configurator preview.
  *
  * The Fluid tab runs as an ad-only outstream player: the <video> it wraps has
  * no <source> and no content (see FluidPlayer.tsx). Its transport controls
@@ -9,29 +9,30 @@
  * The chrome is also ours, not the publisher's: no DSP ships this skin, so
  * inviting anyone to judge it is inviting them to judge the wrong thing.
  *
- * Volume stays. Audio state is a real property of a creative — a base video
- * plays muted here by default and a buyer has to be able to hear it.
+ * The whole bar goes, volume included. The players here are for showing a
+ * creative, not for operating one, and a lone volume control left in an
+ * otherwise empty bar reads as a stray mark floating over the creative rather
+ * than as a control — which is exactly how it looked. The cost is stated
+ * plainly: the preview starts muted (`layoutControls.mute`) and there is now no
+ * way to unmute it in this tab, so a template with a base video is judged
+ * silently here. Hiding the container rather than its children also takes the
+ * 53px gradient scrim with it, and that scrim sat over the bottom of the
+ * creative.
  *
  * Not touched, and must not be: the "×" at the top right. That is the
  * creative's own mandatory close control from runtime/lib/vpaid-base.js
  * (ADR-0009), drawn inside the ad slot rather than by the player.
  *
- * `!important` rather than a longer selector: the vendor sheet qualifies these
- * with four classes including its skin name (`fluid_player_layout_default`).
+ * Hidden, never removed: Fluid queries `.fluid_controls_container` during
+ * `initialPlay()` and elsewhere without null-checking it, so the element has to
+ * stay in the document.
+ *
+ * `!important` rather than a longer selector: the vendor sheet qualifies this
+ * with three classes including its skin name (`fluid_player_layout_default`).
  * Out-specifying it would hard-code that skin name into our stylesheet and
  * break silently the day Fluid renames it; a flat override does not.
  */
 
-/* Play/pause. The whole group — it is absolutely positioned, so an emptied
-   container would still hold its 24px box at the left of the bar. */
-.fluid-preview .fluid_controls_left,
-/* Scrub bar, buffered indicator and ad markers. */
-.fluid-preview .fluid_controls_progress_container,
-/* `00:00 / 00:00` — the empty content timeline. */
-.fluid-preview .fluid_control_duration,
-/* Fullscreen. Theatre and the mini player are switched off by option instead;
-   fullscreen has no option, and a preview pane is not a place to go fullscreen
-   from. */
-.fluid-preview .fluid_control_fullscreen {
+.fluid-preview .fluid_controls_container {
   display: none !important;
 }

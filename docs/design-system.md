@@ -591,17 +591,20 @@ never two stacked captions.
   Fluid tab's has been hidden along with the rest of its transport controls (below), so
   `--color-well-accent` is declared and deliberately unused. It becomes live the day a
   harness draws its own progress bar.
-- **A third-party player's transport controls do not belong in the well.** The Fluid tab
-  runs as an ad-only outstream player — the `<video>` it wraps has no content — so its
-  play button, scrub bar and `00:00 / 00:00` readout drive a video that does not exist,
-  and a timecode frozen at zero under a running creative is a false readout, not merely
-  clutter. The skin is ours rather than the publisher's; no DSP ships it, so it is not
-  part of what the tab proves. Play, scrub, timecode, fullscreen, theatre and the mini
-  player are off; **volume stays**, because audio state is a real property of a creative
-  and the preview starts muted. The rules live next to the component
-  (`components/players/fluid-preview.css`), not in the token file — vendor chrome is not
-  a design token. The creative's own close control (ADR-0009) is drawn inside the ad slot
-  and is untouched by any of this. Machine data down there (URLs, timecodes)
+- **A third-party player's chrome does not belong in the well.** The Fluid tab runs as an
+  ad-only outstream player — the `<video>` it wraps has no content — so its play button,
+  scrub bar and `00:00 / 00:00` readout drive a video that does not exist, and a timecode
+  frozen at zero under a running creative is a false readout, not merely clutter. The skin
+  is ours rather than the publisher's; no DSP ships it, so it is not part of what the tab
+  proves. **The whole control bar is hidden**, its 53px gradient scrim along with it. The
+  players in this product are for *showing* a creative, not for operating one: a lone
+  volume control surviving in an otherwise empty bar read as a stray mark floating over
+  the creative rather than as a control, which is what settled it. Stated cost — the
+  preview starts muted and nothing in this tab can unmute it, so a template with a base
+  video is judged silently here. The rules live next to the component
+  (`components/players/fluid-preview.css`), not in the token file — vendor chrome is not a
+  design token. The creative's own close control (ADR-0009) is drawn inside the ad slot and
+  is untouched by any of this. Machine data down there (URLs, timecodes)
   is `well-fg`, never warm.
 
 ## 8. Language and copy

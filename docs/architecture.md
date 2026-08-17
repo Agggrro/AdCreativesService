@@ -237,8 +237,8 @@ plays, so there's no native `ended` event to key off of) — the status line can
 on "Playing" after a VPAID creative's own internal timer completes; the ad itself
 renders and behaves correctly regardless.
 
-Its transport controls are switched off (`components/players/fluid-preview.css`,
-docs/design-system.md §7) — they steer content this configuration does not have.
+Its control bar is hidden entirely (`components/players/fluid-preview.css`,
+docs/design-system.md §7) — it steers content this configuration does not have.
 `keyboardControl` is off with them, and that one is a correctness fix rather than a
 cosmetic one: Fluid binds it on `document` in the **capture** phase after the first
 click inside the player, and the handler calls `preventDefault()` for space, Enter,

@@ -56,9 +56,11 @@ export function FluidPlayer({ mint, onStatus }: PreviewPlayerProps) {
         posterImage: false,
         playButtonShowing: false,
         mute: true,
-        // Chrome that has no job on an ad-only preview. What has an option is
-        // turned off here; what does not is hidden in fluid-preview.css, which
-        // explains the whole decision in one place.
+        // Chrome that has no job on an ad-only preview. The control bar itself
+        // is hidden in fluid-preview.css, which explains the whole decision in
+        // one place; these two are kept as a statement of intent, so unhiding
+        // the bar some day does not silently bring a theatre button and a
+        // mini player back with it.
         allowTheatre: false,
         miniPlayer: { enabled: false },
         // Our creatives are clickable by design, and a stray double-click
