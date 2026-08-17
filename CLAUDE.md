@@ -80,6 +80,11 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
 
 ## Quality gates (when to call which agent/skill)
 
+- Before **and** after any creative-template work — a new or changed render module in
+  `runtime/templates/`, the shared base in `runtime/lib/vpaid-base.js`, a template's
+  `config_schema`, or the runtime build — run the **`creative-check`** skill. It is
+  mandatory: a template is verified by running it in `/dev/harness`, never by reasoning
+  that it should work.
 - After writing/changing VAST/SIMID/VPAID output → **`vast-spec-reviewer`** subagent.
 - After changing the VAST **inspection** rules (`lib/vast-inspect/`) → `npm run check:vast`
   against a running dev server. It pins the fixture corpus and the dry-run guarantee;
@@ -97,6 +102,48 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
 - Before pushing anything touching payments, auth, or the public VAST endpoint →
   run **`/security-review`**.
 - After a unit of work → run **`/code-review`** and **`doc-sync`**.
+
+## Local creative debugging
+
+Building and fixing templates should not require a human in devtools. Three things make
+the loop self-contained; all three are local-only and return **404** in production and on
+every Vercel deployment (`lib/dev-only.ts`). What actually keeps them off the network is
+that `npm run dev` binds `127.0.0.1` — the header check beside it is a second lock, not
+the control, because request headers are spoofable. See [docs/security.md](docs/security.md).
+
+- **`GET /api/dev/session`** — signs in the account named by `DEV_LOGIN_EMAIL` /
+  `DEV_LOGIN_PASSWORD` in `.env.local` and redirects to the dashboard, so authenticated
+  surfaces are reachable without typing into the login form. It calls the same
+  `signInWithPassword` a real visitor does — an ordinary session, same cookie, same RLS,
+  not a bypass. Create that account yourself; nothing here creates one.
+- **`/dev/harness`** — runs a built VPAID unit against config derived from its template
+  schema, at four slot sizes, and judges it against the mandatory lifecycle plus the
+  ADR-0009 close control. `Run all` sweeps every template **sequentially**, which is
+  forced rather than stylistic: VPAID units share the `window.getVPAIDAd` global, so two
+  live units on a page render as one. It serves the unit from `runtime/dist/` off disk,
+  so **run `npm run build:runtime` before looking** — `/api/preview-unit/*` deliberately
+  serves the *published* unit instead and would hide a local edit.
+- **The telemetry channel ([ADR-0019](docs/decisions/0019-creative-telemetry-channel.md))**
+  — every VPAID lifecycle event, plus whatever a template declares through
+  `api.debug(name, data)`, posted to our own origin and readable on any of our pages as
+  `window.__creosmith` (and through `onEvent` in all three preview players). This is the
+  only thing that sees inside IMA's cross-origin iframe. Two rules bind it: **never widen
+  `targetOrigin`** — that one argument is the whole reason a creative cannot leak state to
+  a publisher's page — and **nothing is collected server-side**.
+
+When adding a template, give it an `api.debug("mount", { w, h, … })` and a record for each
+state transition that has no VPAID event of its own. That is what makes it debuggable
+without a human reading it out — and the mandatory
+[`creative-check`](.claude/skills/creative-check/SKILL.md) skill checks that it did.
+
+**The configurator's own preview does not show your local build.** It resolves the unit
+through `runtime/manifest.ts` — the *published* object — so an edit appears there only
+after `npm run runtime:push`. `/dev/harness` reads `runtime/dist/` off disk and is the one
+surface that shows the working copy.
+
+Bugs that reproduce **only** with an ad blocker, or only inside the user's own signed-in
+session, are the exception this cannot cover — the in-app browser has neither. Use **Claude
+in Chrome** for those, which drives the user's real browser with its real extensions.
 
 ## Conventions
 
