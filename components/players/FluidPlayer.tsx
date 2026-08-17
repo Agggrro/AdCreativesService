@@ -6,6 +6,7 @@ import "./fluid-preview.css";
 import { useEffect, useRef } from "react";
 import fluidPlayer from "fluid-player";
 import type { PreviewPlayerProps } from "./types";
+import { subscribeToCreativeTelemetry, toPlayerEvent } from "./telemetry";
 
 /**
  * Fluid Player — a free, MIT-licensed, actively maintained HTML5 player with
@@ -31,15 +32,32 @@ import type { PreviewPlayerProps } from "./types";
  * an ad-click event, and adClickable is left off so testing never navigates
  * the dashboard tab away to the advertiser's URL.
  */
-export function FluidPlayer({ mint, onStatus }: PreviewPlayerProps) {
+export function FluidPlayer({ mint, onStatus, onEvent }: PreviewPlayerProps) {
   const slotRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<ReturnType<typeof fluidPlayer> | null>(null);
+
+  // The effect below runs once per mount by design, so `onEvent` is read
+  // through a ref rather than captured — see ValidatorStage for the same shape.
+  const onEventRef = useRef(onEvent);
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  });
 
   useEffect(() => {
     const slot = slotRef.current;
     if (!slot) return;
     let cancelled = false;
     slot.innerHTML = "";
+
+    // Fluid runs the VPAID unit inside its own iframe, where none of its DOM or
+    // state is reachable from here. This is the only channel that crosses that
+    // boundary: the unit posts to our origin and the record arrives here
+    // (ADR-0019). Subscribed before the player is constructed, since the ad
+    // starts loading the moment it is.
+    const unsubscribe = subscribeToCreativeTelemetry((record) => {
+      if (cancelled) return;
+      onEventRef.current?.(toPlayerEvent(record));
+    });
 
     const video = document.createElement("video");
     video.className = "h-full w-full";
@@ -101,6 +119,7 @@ export function FluidPlayer({ mint, onStatus }: PreviewPlayerProps) {
 
     return () => {
       cancelled = true;
+      unsubscribe();
       try {
         player.destroy();
       } catch {

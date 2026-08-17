@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { PreviewPlayerProps } from "./types";
+import { subscribeToCreativeTelemetry, toPlayerEvent } from "./telemetry";
 import { IMA_SDK_SRC, loadImaSdk } from "./load-ima-sdk";
 import { useDict } from "@/components/i18n/LocaleProvider";
 
@@ -11,15 +12,37 @@ import { useDict } from "@/components/i18n/LocaleProvider";
  * INSECURE because our units draw directly into the DOM slot rather than
  * running sandboxed (ADR-0003: access control, not code hiding).
  */
-export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps) {
+export function ImaPlayer({
+  mint,
+  onStatus,
+  onClickThrough,
+  onEvent,
+}: PreviewPlayerProps) {
   const dict = useDict();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // The effect below runs once per mount by design, so `onEvent` is read
+  // through a ref rather than captured — see ValidatorStage for the same shape.
+  const onEventRef = useRef(onEvent);
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  });
 
   useEffect(() => {
     let cancelled = false;
     let adsLoader: google.ima.AdsLoader | undefined;
     let adsManager: google.ima.AdsManager | undefined;
+
+    // IMA runs the VPAID unit inside its own iframe on imasdk.googleapis.com —
+    // a genuinely cross-origin document, where nothing about the creative can
+    // be read from this side at all. This channel is the only thing that
+    // crosses it: the unit posts to the origin it was served from, which is
+    // ours, and the browser delivers it here (ADR-0019).
+    const unsubscribe = subscribeToCreativeTelemetry((record) => {
+      if (cancelled) return;
+      onEventRef.current?.(toPlayerEvent(record));
+    });
 
     const clickThroughUrl =
       typeof mint.sandbox.adParameters.clickThroughUrl === "string"
@@ -180,6 +203,7 @@ export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps
 
     return () => {
       cancelled = true;
+      unsubscribe();
       try {
         adsManager?.destroy();
       } catch {

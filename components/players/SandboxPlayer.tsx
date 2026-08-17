@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { PreviewPlayerProps } from "./types";
+import { subscribeToCreativeTelemetry, toPlayerEvent } from "./telemetry";
 import { useDict } from "@/components/i18n/LocaleProvider";
 
 type Vpaid = {
@@ -26,9 +27,22 @@ type Vpaid = {
  * PreviewPanel only mounts this after "Launch Ad" is clicked and remounts it
  * (new key) on every Launch/Restart, so mounting here doubles as launching.
  */
-export function SandboxPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps) {
+export function SandboxPlayer({
+  mint,
+  onStatus,
+  onClickThrough,
+  onEvent,
+}: PreviewPlayerProps) {
   const dict = useDict();
   const slotRef = useRef<HTMLDivElement>(null);
+
+  // Same reason ValidatorStage keeps one: the effect below deliberately runs
+  // once per mount, so reading `onEvent` from the closure would pin whichever
+  // identity the first render happened to produce.
+  const onEventRef = useRef(onEvent);
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  });
 
   useEffect(() => {
     const slot = slotRef.current;
@@ -43,6 +57,14 @@ export function SandboxPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerP
       onStatus(dict.preview.sandboxVpaidOnly);
       return;
     }
+
+    // Below the format check so the early return above cannot leave a listener
+    // behind, and above the <script> append so nothing is listening too late:
+    // the unit loads into this very document, so AdLoaded is posted during the
+    // same task that runs the script.
+    const unsubscribe = subscribeToCreativeTelemetry((record) => {
+      onEventRef.current?.(toPlayerEvent(record));
+    });
 
     onStatus(dict.preview.loadingUnit);
 
@@ -93,6 +115,7 @@ export function SandboxPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerP
     document.body.appendChild(script);
 
     return () => {
+      unsubscribe();
       try {
         ad?.stopAd?.();
       } catch {
