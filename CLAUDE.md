@@ -152,6 +152,11 @@ in Chrome** for those, which drives the user's real browser with its real extens
   server-only and must never reach the client bundle.
 - Validate all external input (VAST query params, Stripe webhook signatures).
 - Conventional Commits. Push to GitHub only after a case is built **and verified locally**.
+- **Trunk-based: commit straight to `main`.** There are no feature branches and no PR
+  review step in this pipeline — a push to `main` is what Vercel deploys to production, so
+  "ship it" means commit to `main` and push. Local verification is the gate that replaces
+  the review, which is why the quality gates above are not optional. Do not create a
+  branch unless explicitly asked for one.
 
 ## Project docs map
 
