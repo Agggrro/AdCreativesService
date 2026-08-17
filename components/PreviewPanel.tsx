@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Loader2, Play, RotateCcw } from "lucide-react";
-import type { PreviewMint } from "@/components/players/types";
+import type { PreviewMint, StatusTone } from "@/components/players/types";
+import { Notice } from "@/components/ui/Field";
 import { SandboxPlayer } from "@/components/players/SandboxPlayer";
 import { ImaPlayer } from "@/components/players/ImaPlayer";
 import { FluidPlayer } from "@/components/players/FluidPlayer";
@@ -44,14 +45,30 @@ export function PreviewPanel({
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  // A status a player marked with a tone is a condition to act on, not the next
+  // word of playback commentary, so it is rendered as a notice rather than as
+  // the muted line. `detail` is the machine value that goes with it.
+  const [statusTone, setStatusTone] = useState<StatusTone | null>(null);
+  const [statusDetail, setStatusDetail] = useState<string | null>(null);
   const [clickThrough, setClickThrough] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<number | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
+
+  const report = useCallback(
+    (text: string, tone?: StatusTone, detail?: string) => {
+      setStatus(text);
+      setStatusTone(tone ?? null);
+      setStatusDetail(detail ?? null);
+    },
+    [],
+  );
 
   async function launch() {
     setMinting(true);
     setError(null);
     setStatus(null);
+    setStatusTone(null);
+    setStatusDetail(null);
     setClickThrough(null);
     setLatencyMs(null);
     const startedAt = performance.now();
@@ -83,7 +100,7 @@ export function PreviewPanel({
 
   const launched = mint !== null;
   const commonProps = mint
-    ? { mint, onStatus: setStatus, onClickThrough: setClickThrough }
+    ? { mint, onStatus: report, onClickThrough: setClickThrough }
     : null;
 
   return (
@@ -161,6 +178,18 @@ export function PreviewPanel({
         )}
       </div>
 
+      {/*
+        A toned status gets the full width under the well rather than the shared
+        status line: it is prose the viewer has to read and act on, and the line
+        beside the Restart button is sized for three words. The line goes quiet
+        while it shows, so the same sentence is never in two places at once.
+      */}
+      {statusTone && !error && status && (
+        <Notice tone={statusTone} live detail={statusDetail ?? undefined}>
+          {status}
+        </Notice>
+      )}
+
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-[11px] leading-4 text-fg-muted">
           {error ? (
@@ -178,7 +207,7 @@ export function PreviewPanel({
                 {clickThrough}
               </code>
             </>
-          ) : (
+          ) : statusTone ? null : (
             status ?? dict.preview.idleHint
           )}
         </p>

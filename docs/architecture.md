@@ -277,6 +277,19 @@ failure in one is not automatically a defect in the creative:
   entries). Either way, confirm whether the request reached the server before touching
   ad-serving code: the endpoint's output can be verified independently of any browser
   by minting a token with `PREVIEW_TOKEN_SECRET` and fetching the URL from a shell.
+- **The SDK failing to load is a different failure from the ad failing to serve.**
+  `loadImaSdk()` ([`components/players/load-ima-sdk.ts`](../components/players/load-ima-sdk.ts)),
+  shared by the IMA tab and the VAST validator, rejects with a typed `ImaSdkLoadError`
+  — `blocked` (refused, or answered with something that is not the SDK) or `timeout`
+  (12s, so a request nobody will answer stops presenting as a spinner). A script that
+  loads without leaving `google.ima.AdsLoader` callable counts as `blocked`: a blocker
+  answering with an empty 200 or a stub fires `onload` exactly like a real load, and
+  the failure would otherwise resurface as a `ReferenceError` from whichever line
+  touched `google.ima` first. Callers catch the load and everything after it
+  **separately**, so a throw while setting the ad up is reported as its own failure and
+  never as "could not load the SDK". `ima3.js` is a third-party script from an
+  ad-serving domain: when it does not arrive, the browser blocked it, and no change on
+  our side makes it arrive.
 
 ### Stripe webhook `/api/stripe/webhook`
 

@@ -23,6 +23,17 @@ import type { Placement, Playback } from "@/lib/vast-inspect/model";
 
 export type VpaidMode = "enabled" | "insecure" | "disabled";
 
+/**
+ * The timeline name for "the SDK never arrived".
+ *
+ * Exported because the page reads it back off the event stream to raise its
+ * own notice: an ad blocker is the one stage failure with a fix the visitor can
+ * apply, and a machine name in a timeline is not where you explain that. A
+ * shared constant rather than the literal in two files — a timeline row and the
+ * notice about it must never drift apart.
+ */
+export const SDK_LOAD_FAILED = "sdkLoadFailed";
+
 interface ValidatorStageProps {
   playback: Playback;
   placement: Placement;
@@ -145,173 +156,199 @@ export function ValidatorStage({
       });
     };
 
-    loadImaSdk()
-      .then(() => {
-        // Nothing is emitted before this point on purpose. React StrictMode
-        // mounts an effect twice in development, and an emit in the effect body
-        // would append two identical opening rows to a timeline whose whole
-        // value is being an accurate record. Past the `cancelled` check only the
-        // surviving mount speaks.
-        if (cancelled) return;
-        const container = containerRef.current;
-        const video = videoRef.current;
-        if (!container || !video) return;
+    const run = () => {
+      // Nothing is emitted before this point on purpose. React StrictMode
+      // mounts an effect twice in development, and an emit in the effect body
+      // would append two identical opening rows to a timeline whose whole
+      // value is being an accurate record. Past the `cancelled` check only the
+      // surviving mount speaks.
+      if (cancelled) return;
+      const container = containerRef.current;
+      const video = videoRef.current;
+      if (!container || !video) return;
 
-        emit("sdkReady", "info", undefined, "validator");
+      emit("sdkReady", "info", undefined, "validator");
 
-        google.ima.settings.setVpaidMode(VPAID_MODE_VALUES[vpaidMode]());
-        // IMA renders its own UI strings; matching the page keeps a Russian
-        // reader from meeting an English "Skip ad" button mid-report.
-        google.ima.settings.setLocale(document.documentElement.lang || "en");
+      google.ima.settings.setVpaidMode(VPAID_MODE_VALUES[vpaidMode]());
+      // IMA renders its own UI strings; matching the page keeps a Russian
+      // reader from meeting an English "Skip ad" button mid-report.
+      google.ima.settings.setLocale(document.documentElement.lang || "en");
 
-        const displayContainer = new google.ima.AdDisplayContainer(container, video);
-        // Must happen inside the user gesture that started the run, which is why
-        // the whole stage mounts on click rather than on page load.
-        displayContainer.initialize();
+      const displayContainer = new google.ima.AdDisplayContainer(container, video);
+      // Must happen inside the user gesture that started the run, which is why
+      // the whole stage mounts on click rather than on page load.
+      displayContainer.initialize();
 
-        adsLoader = new google.ima.AdsLoader(displayContainer);
+      adsLoader = new google.ima.AdsLoader(displayContainer);
 
-        const reportError = (event: google.ima.AdErrorEvent) => {
-          const error = event.getError?.();
-          if (!error) {
-            emit("adError", "dead");
-            return;
-          }
-          // Both codes are worth having: getErrorCode() is IMA's own, while
-          // getVastErrorCode() is the IAB number the report already speaks in.
-          const vast = error.getVastErrorCode?.();
-          const detail = [
-            error.getMessage(),
-            `IMA ${error.getErrorCode()}`,
-            vast ? `VAST ${vast}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          emit("adError", "dead", detail);
-        };
-
-        adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (event) => {
-          reportError(event as google.ima.AdErrorEvent);
-        }, false);
-
-        adsLoader.addEventListener(
-          google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-          (event) => {
-            if (cancelled) return;
-            const settings = new google.ima.AdsRenderingSettings();
-            settings.restoreCustomPlaybackStateOnAdBreakComplete = true;
-            adsManager = (event as google.ima.AdsManagerLoadedEvent).getAdsManager(
-              video,
-              settings,
-            );
-
-            adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (e) => {
-              reportError(e as google.ima.AdErrorEvent);
-            });
-
-            // IMA's own non-fatal diagnostics. Nothing else on the market
-            // surfaces these, and they are frequently the only clue when a tag
-            // "works" but silently drops a creative.
-            adsManager.addEventListener(google.ima.AdEvent.Type.LOG, (e) => {
-              const data = (e as google.ima.AdEvent).getAdData?.();
-              const message =
-                data && typeof data === "object" && "adError" in data
-                  ? String((data as { adError?: unknown }).adError)
-                  : JSON.stringify(data ?? {});
-              emit("log", "warn", message);
-            });
-
-            for (const { key, name, tone } of TRACKED) {
-              const type = google.ima.AdEvent.Type[key];
-              if (!type) continue;
-              adsManager.addEventListener(type, (e) => {
-                const adEvent = e as google.ima.AdEvent;
-                if (name === "loaded") {
-                  const ad = adEvent.getAd?.();
-                  if (ad) {
-                    onAdResolvedRef.current({
-                      adId: ad.getAdId(),
-                      adSystem: ad.getAdSystem(),
-                      title: ad.getTitle(),
-                      duration: ad.getDuration(),
-                      width: ad.getVastMediaWidth() || ad.getWidth(),
-                      height: ad.getVastMediaHeight() || ad.getHeight(),
-                      contentType: ad.getContentType(),
-                      apiFramework: ad.getApiFramework(),
-                      universalAdIdRegistry: ad.getUniversalAdIdRegistry(),
-                      universalAdIdValue: ad.getUniversalAdIdValue(),
-                      wrapperAdSystems: ad.getWrapperAdSystems() ?? [],
-                      skipTimeOffset: ad.getSkipTimeOffset(),
-                      linear: ad.isLinear(),
-                      mediaUrl: ad.getMediaUrl(),
-                    });
-                  }
-                }
-                emit(name, tone);
-              });
-            }
-
-            try {
-              adsManager.init(
-                container.clientWidth || 640,
-                container.clientHeight || 360,
-                google.ima.ViewMode.NORMAL,
-              );
-              if (placement === "outstream") {
-                // Outstream starts on visibility, muted, the way a real in-page
-                // renderer does — starting it off-screen would make the
-                // viewability events in the timeline meaningless.
-                //
-                // Announced in the timeline rather than left implicit: an ad
-                // that is deliberately waiting and an ad that has silently
-                // failed look identical in an empty player, and telling those
-                // two apart is the entire job of this tool.
-                adsManager.setVolume(0);
-                emit("waitingForViewability", "info", undefined, "validator");
-                observer = new IntersectionObserver(
-                  (entries) => {
-                    if (entries.some((entry) => entry.intersectionRatio >= 0.5)) {
-                      observer?.disconnect();
-                      emit("inView", "info", undefined, "validator");
-                      adsManager?.start();
-                    }
-                  },
-                  { threshold: [0, 0.5] },
-                );
-                observer.observe(container);
-              } else {
-                adsManager.start();
-              }
-            } catch (cause) {
-              emit("startFailed", "dead", cause instanceof Error ? cause.message : undefined);
-            }
-          },
-          false,
-        );
-
-        const request = new google.ima.AdsRequest();
-        if (playback.adsResponse !== undefined) {
-          request.adsResponse = playback.adsResponse;
-          emit("adsResponse", "info", undefined, "validator");
-        } else if (playback.adTagUrl !== undefined) {
-          request.adTagUrl = playback.adTagUrl;
-          emit("adTagUrl", "info", undefined, "validator");
-        } else {
-          emit("noPlayableDocument", "dead", undefined, "validator");
+      const reportError = (event: google.ima.AdErrorEvent) => {
+        const error = event.getError?.();
+        if (!error) {
+          emit("adError", "dead");
           return;
         }
-        request.linearAdSlotWidth = container.clientWidth || 640;
-        request.linearAdSlotHeight = container.clientHeight || 360;
-        request.nonLinearAdSlotWidth = container.clientWidth || 640;
-        request.nonLinearAdSlotHeight = Math.floor((container.clientHeight || 360) / 3);
-        request.setAdWillAutoPlay(true);
-        request.setAdWillPlayMuted(placement === "outstream");
+        // Both codes are worth having: getErrorCode() is IMA's own, while
+        // getVastErrorCode() is the IAB number the report already speaks in.
+        const vast = error.getVastErrorCode?.();
+        const detail = [
+          error.getMessage(),
+          `IMA ${error.getErrorCode()}`,
+          vast ? `VAST ${vast}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        emit("adError", "dead", detail);
+      };
 
-        adsLoader.requestAds(request);
-      })
-      .catch(() => {
-        if (!cancelled) emit("sdkLoadFailed", "dead", undefined, "validator");
-      });
+      adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (event) => {
+        reportError(event as google.ima.AdErrorEvent);
+      }, false);
+
+      adsLoader.addEventListener(
+        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+        (event) => {
+          if (cancelled) return;
+          const settings = new google.ima.AdsRenderingSettings();
+          settings.restoreCustomPlaybackStateOnAdBreakComplete = true;
+          adsManager = (event as google.ima.AdsManagerLoadedEvent).getAdsManager(
+            video,
+            settings,
+          );
+
+          adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (e) => {
+            reportError(e as google.ima.AdErrorEvent);
+          });
+
+          // IMA's own non-fatal diagnostics. Nothing else on the market
+          // surfaces these, and they are frequently the only clue when a tag
+          // "works" but silently drops a creative.
+          adsManager.addEventListener(google.ima.AdEvent.Type.LOG, (e) => {
+            const data = (e as google.ima.AdEvent).getAdData?.();
+            const message =
+              data && typeof data === "object" && "adError" in data
+                ? String((data as { adError?: unknown }).adError)
+                : JSON.stringify(data ?? {});
+            emit("log", "warn", message);
+          });
+
+          for (const { key, name, tone } of TRACKED) {
+            const type = google.ima.AdEvent.Type[key];
+            if (!type) continue;
+            adsManager.addEventListener(type, (e) => {
+              const adEvent = e as google.ima.AdEvent;
+              if (name === "loaded") {
+                const ad = adEvent.getAd?.();
+                if (ad) {
+                  onAdResolvedRef.current({
+                    adId: ad.getAdId(),
+                    adSystem: ad.getAdSystem(),
+                    title: ad.getTitle(),
+                    duration: ad.getDuration(),
+                    width: ad.getVastMediaWidth() || ad.getWidth(),
+                    height: ad.getVastMediaHeight() || ad.getHeight(),
+                    contentType: ad.getContentType(),
+                    apiFramework: ad.getApiFramework(),
+                    universalAdIdRegistry: ad.getUniversalAdIdRegistry(),
+                    universalAdIdValue: ad.getUniversalAdIdValue(),
+                    wrapperAdSystems: ad.getWrapperAdSystems() ?? [],
+                    skipTimeOffset: ad.getSkipTimeOffset(),
+                    linear: ad.isLinear(),
+                    mediaUrl: ad.getMediaUrl(),
+                  });
+                }
+              }
+              emit(name, tone);
+            });
+          }
+
+          try {
+            adsManager.init(
+              container.clientWidth || 640,
+              container.clientHeight || 360,
+              google.ima.ViewMode.NORMAL,
+            );
+            if (placement === "outstream") {
+              // Outstream starts on visibility, muted, the way a real in-page
+              // renderer does — starting it off-screen would make the
+              // viewability events in the timeline meaningless.
+              //
+              // Announced in the timeline rather than left implicit: an ad
+              // that is deliberately waiting and an ad that has silently
+              // failed look identical in an empty player, and telling those
+              // two apart is the entire job of this tool.
+              adsManager.setVolume(0);
+              emit("waitingForViewability", "info", undefined, "validator");
+              observer = new IntersectionObserver(
+                (entries) => {
+                  if (entries.some((entry) => entry.intersectionRatio >= 0.5)) {
+                    observer?.disconnect();
+                    emit("inView", "info", undefined, "validator");
+                    adsManager?.start();
+                  }
+                },
+                { threshold: [0, 0.5] },
+              );
+              observer.observe(container);
+            } else {
+              adsManager.start();
+            }
+          } catch (cause) {
+            emit("startFailed", "dead", cause instanceof Error ? cause.message : undefined);
+          }
+        },
+        false,
+      );
+
+      const request = new google.ima.AdsRequest();
+      if (playback.adsResponse !== undefined) {
+        request.adsResponse = playback.adsResponse;
+        emit("adsResponse", "info", undefined, "validator");
+      } else if (playback.adTagUrl !== undefined) {
+        request.adTagUrl = playback.adTagUrl;
+        emit("adTagUrl", "info", undefined, "validator");
+      } else {
+        emit("noPlayableDocument", "dead", undefined, "validator");
+        return;
+      }
+      request.linearAdSlotWidth = container.clientWidth || 640;
+      request.linearAdSlotHeight = container.clientHeight || 360;
+      request.nonLinearAdSlotWidth = container.clientWidth || 640;
+      request.nonLinearAdSlotHeight = Math.floor((container.clientHeight || 360) / 3);
+      request.setAdWillAutoPlay(true);
+      request.setAdWillPlayMuted(placement === "outstream");
+
+      adsLoader.requestAds(request);
+    };
+
+    // The two halves are caught separately. A throw from `run()` is a fault in
+    // this stage, not a missing SDK, and reporting it as `sdkLoadFailed` would
+    // put a wrong row in a timeline whose whole value is being an accurate
+    // record of what happened.
+    loadImaSdk().then(
+      () => {
+        if (cancelled) return;
+        try {
+          run();
+        } catch (cause) {
+          emit(
+            "stageFailed",
+            "dead",
+            cause instanceof Error ? cause.message : undefined,
+            "validator",
+          );
+        }
+      },
+      (cause) => {
+        if (!cancelled) {
+          emit(
+            SDK_LOAD_FAILED,
+            "dead",
+            cause instanceof Error ? cause.message : undefined,
+            "validator",
+          );
+        }
+      },
+    );
 
     return () => {
       cancelled = true;

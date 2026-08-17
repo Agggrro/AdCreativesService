@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import type { PreviewPlayerProps } from "./types";
-import { loadImaSdk } from "./load-ima-sdk";
+import { IMA_SDK_SRC, loadImaSdk } from "./load-ima-sdk";
+import { useDict } from "@/components/i18n/LocaleProvider";
 
 /**
  * Google IMA SDK — the industry-standard VAST/VPAID SDK, requesting the exact
@@ -11,6 +12,7 @@ import { loadImaSdk } from "./load-ima-sdk";
  * running sandboxed (ADR-0003: access control, not code hiding).
  */
 export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps) {
+  const dict = useDict();
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -24,7 +26,7 @@ export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps
         ? mint.sandbox.adParameters.clickThroughUrl
         : "(click-through)";
 
-    onStatus("Loading Google IMA SDK…");
+    onStatus(dict.preview.loadingIma);
 
     // IMA issues its ad request from a bridge iframe on imasdk.googleapis.com —
     // a *public* address space. When the tag lives on localhost (any local dev
@@ -41,99 +43,140 @@ export function ImaPlayer({ mint, onStatus, onClickThrough }: PreviewPlayerProps
     const tagUrl = new URL(mint.previewTagUrl);
     const isLoopback = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(tagUrl.hostname);
 
-    loadImaSdk()
-      .then(async () => {
+    /**
+     * Everything that happens once the SDK is on the page. Split out from the
+     * load so its failures are reported as its own: a throw in here used to
+     * land in the loader's `.catch()` and announce that the SDK had not
+     * loaded, which points every diagnosis at the wrong half of the problem.
+     */
+    const run = async () => {
+      const container = containerRef.current;
+      const video = videoRef.current;
+      if (!container || !video) return;
+
+      let adsResponse: string | null = null;
+      if (isLoopback) {
+        try {
+          adsResponse = await (await fetch(mint.previewTagUrl)).text();
+        } catch {
+          onStatus(dict.preview.tagFetchFailed);
+          return;
+        }
         if (cancelled) return;
-        const container = containerRef.current;
-        const video = videoRef.current;
-        if (!container || !video) return;
+      }
 
-        let adsResponse: string | null = null;
-        if (isLoopback) {
+      // VPAID-only: our units draw directly into the DOM slot rather than
+      // running sandboxed (ADR-0003). Scoped to the VPAID format specifically —
+      // under investigation for whether this setting also perturbs IMA's SIMID
+      // handshake, which never fires SIMID:Player:init for this ad despite
+      // sending it ongoing SIMID:Media:* notifications.
+      if (mint.sandbox.format === "vpaid") {
+        google.ima.settings.setVpaidMode(google.ima.ImaSdkSettings.VpaidMode.INSECURE);
+      }
+
+      // IMA renders its own UI strings and error messages; matching the page
+      // keeps a Russian reader from meeting an English "Skip ad" button inside
+      // an otherwise Russian panel. Same call, same reason, as ValidatorStage.
+      google.ima.settings.setLocale(document.documentElement.lang || "en");
+
+      const adDisplayContainer = new google.ima.AdDisplayContainer(container, video);
+      adDisplayContainer.initialize();
+
+      adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+
+      const reportAdError = (event: google.ima.AdErrorEvent) => {
+        const err = event.getError?.();
+        onStatus(
+          err
+            ? `${dict.preview.adError}: ${err.getMessage()} · IMA ${err.getErrorCode()}`
+            : `${dict.preview.adError}.`,
+        );
+      };
+
+      adsLoader.addEventListener(
+        google.ima.AdErrorEvent.Type.AD_ERROR,
+        (event) => reportAdError(event as google.ima.AdErrorEvent),
+        false,
+      );
+
+      adsLoader.addEventListener(
+        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+        (event) => {
+          if (cancelled || !video) return;
+          adsManager = (event as google.ima.AdsManagerLoadedEvent).getAdsManager(video);
+
+          adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (e) =>
+            reportAdError(e as google.ima.AdErrorEvent),
+          );
+          adsManager.addEventListener(google.ima.AdEvent.Type.STARTED, () =>
+            onStatus(dict.preview.playing),
+          );
+          adsManager.addEventListener(google.ima.AdEvent.Type.CLICK, () =>
+            onClickThrough(clickThroughUrl),
+          );
+          adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, () =>
+            onStatus(dict.preview.complete),
+          );
+
           try {
-            adsResponse = await (await fetch(mint.previewTagUrl)).text();
+            adsManager.init(
+              container.clientWidth || 640,
+              container.clientHeight || 360,
+              google.ima.ViewMode.NORMAL,
+            );
+            adsManager.start();
           } catch {
-            onStatus("Could not fetch the preview VAST tag.");
-            return;
+            onStatus(dict.preview.imaStartFailed);
           }
-          if (cancelled) return;
+        },
+        false,
+      );
+
+      const adsRequest = new google.ima.AdsRequest();
+      if (adsResponse !== null) {
+        adsRequest.adsResponse = adsResponse;
+      } else {
+        adsRequest.adTagUrl = mint.previewTagUrl;
+      }
+      adsRequest.linearAdSlotWidth = container.clientWidth || 640;
+      adsRequest.linearAdSlotHeight = container.clientHeight || 360;
+      adsRequest.nonLinearAdSlotWidth = container.clientWidth || 640;
+      adsRequest.nonLinearAdSlotHeight = Math.floor(
+        (container.clientHeight || 360) / 3,
+      );
+
+      adsLoader.requestAds(adsRequest);
+    };
+
+    void (async () => {
+      try {
+        await loadImaSdk();
+      } catch {
+        // Only a genuine load failure reaches here, so the message can name a
+        // cause instead of hedging: the SDK is a third-party script from an
+        // ad-serving domain, and the thing that stops it is almost always a
+        // blocker on this browser rather than anything the app did.
+        //
+        // `info`, not `dead`: nothing about the account, the tag or the
+        // creative is failing, and red is the vocabulary a buyer reads as "my
+        // ad is dead" (docs/design-system.md §3). The condition is on this
+        // browser and the notice says what to do about it.
+        if (!cancelled) onStatus(dict.preview.imaSdkBlocked, "info", IMA_SDK_SRC);
+        return;
+      }
+      if (cancelled) return;
+      try {
+        await run();
+      } catch (cause) {
+        if (!cancelled) {
+          onStatus(
+            cause instanceof Error
+              ? `${dict.preview.imaRunFailed} ${cause.message}`
+              : dict.preview.imaRunFailed,
+          );
         }
-
-        // VPAID-only: our units draw directly into the DOM slot rather than
-        // running sandboxed (ADR-0003). Scoped to the VPAID format specifically —
-        // under investigation for whether this setting also perturbs IMA's SIMID
-        // handshake, which never fires SIMID:Player:init for this ad despite
-        // sending it ongoing SIMID:Media:* notifications.
-        if (mint.sandbox.format === "vpaid") {
-          google.ima.settings.setVpaidMode(google.ima.ImaSdkSettings.VpaidMode.INSECURE);
-        }
-
-        const adDisplayContainer = new google.ima.AdDisplayContainer(container, video);
-        adDisplayContainer.initialize();
-
-        adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-
-        adsLoader.addEventListener(
-          google.ima.AdErrorEvent.Type.AD_ERROR,
-          (event) => {
-            const err = (event as google.ima.AdErrorEvent).getError?.();
-            onStatus(err ? `Ad error: ${err.getMessage()} (code ${err.getErrorCode()})` : "Ad error.");
-          },
-          false,
-        );
-
-        adsLoader.addEventListener(
-          google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-          (event) => {
-            if (cancelled || !video) return;
-            adsManager = (event as google.ima.AdsManagerLoadedEvent).getAdsManager(video);
-
-            adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (e) => {
-              const err = (e as google.ima.AdErrorEvent).getError?.();
-              onStatus(err ? `Ad error: ${err.getMessage()} (code ${err.getErrorCode()})` : "Ad error.");
-            });
-            adsManager.addEventListener(google.ima.AdEvent.Type.STARTED, () =>
-              onStatus("Playing"),
-            );
-            adsManager.addEventListener(google.ima.AdEvent.Type.CLICK, () =>
-              onClickThrough(clickThroughUrl),
-            );
-            adsManager.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, () =>
-              onStatus("Complete"),
-            );
-
-            try {
-              adsManager.init(
-                container.clientWidth || 640,
-                container.clientHeight || 360,
-                google.ima.ViewMode.NORMAL,
-              );
-              adsManager.start();
-            } catch {
-              onStatus("The IMA SDK failed to start the ad.");
-            }
-          },
-          false,
-        );
-
-        const adsRequest = new google.ima.AdsRequest();
-        if (adsResponse !== null) {
-          adsRequest.adsResponse = adsResponse;
-        } else {
-          adsRequest.adTagUrl = mint.previewTagUrl;
-        }
-        adsRequest.linearAdSlotWidth = container.clientWidth || 640;
-        adsRequest.linearAdSlotHeight = container.clientHeight || 360;
-        adsRequest.nonLinearAdSlotWidth = container.clientWidth || 640;
-        adsRequest.nonLinearAdSlotHeight = Math.floor(
-          (container.clientHeight || 360) / 3,
-        );
-
-        adsLoader.requestAds(adsRequest);
-      })
-      .catch(() => {
-        if (!cancelled) onStatus("Could not load the Google IMA SDK.");
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;

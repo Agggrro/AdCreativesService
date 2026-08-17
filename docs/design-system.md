@@ -559,6 +559,21 @@ server's response time on the right once an ad has been served. Player status an
 expiry countdown sit below the viewport rather than in the strip, because they change
 during playback while the strip states the fixed facts of the request.
 
+A player may mark a status with a **tone**, which raises it out of that line into a
+full-width `Notice` (§6) under the well; the line goes quiet meanwhile, so one sentence is
+never in two places. The line is sized for three words, and a condition the viewer has to
+*act* on is prose. The case this exists for is the IMA tab meeting an ad blocker: the SDK
+is a third-party script from an ad-serving domain, and the notice has to say so plainly,
+name the address to allow, and state that the creative is not the problem. It is `info`,
+not `dead` — nothing about the account, the tag or the creative is failing, and red is the
+vocabulary a buyer reads as "my ad is dead". The address rides along as the notice's mono
+`detail`: it is a value to copy, not prose.
+
+The validator (§6) raises the same notice under its own well, but reads the condition off
+its **timeline** rather than from a status line, because that surface already records every
+stage event and a second source for one fact could disagree with the first. Both quote the
+address from the one constant the loader actually requests.
+
 **Demo well** — the template detail page in the catalog. The unit runs straight from
 Storage with sample config; there is no ad request, no tag, and no latency, **so it gets
 no instrument strip.** Fabricating a response time here is forbidden — it would be a

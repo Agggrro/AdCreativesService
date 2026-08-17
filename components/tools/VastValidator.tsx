@@ -8,7 +8,13 @@ import { inputClass, Notice } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
 import { ValidatorReport } from "@/components/tools/ValidatorReport";
 import { ParserVsPlayer, ValidatorTimeline } from "@/components/tools/ValidatorTimeline";
-import { ValidatorStage, type ResolvedAd, type VpaidMode } from "@/components/validator/ValidatorStage";
+import {
+  SDK_LOAD_FAILED,
+  ValidatorStage,
+  type ResolvedAd,
+  type VpaidMode,
+} from "@/components/validator/ValidatorStage";
+import { IMA_SDK_SRC } from "@/components/players/load-ima-sdk";
 import type { PlayerEvent } from "@/components/players/types";
 // Per-module imports: the @/lib/vast-inspect barrel reaches node:dns via the
 // fetcher and cannot be bundled for the browser. These two modules are pure.
@@ -90,6 +96,12 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
   const appendEvent = useCallback((event: PlayerEvent) => {
     setEvents((current) => [...current, event]);
   }, []);
+
+  // The one stage failure with a fix the visitor can apply, so it gets said in
+  // prose instead of only as a machine name in the timeline. Read off the event
+  // stream rather than tracked separately: the timeline is already the record
+  // of what happened, and a second source for the same fact could disagree.
+  const sdkBlocked = events.some((event) => event.name === SDK_LOAD_FAILED);
 
   function startPlayback() {
     setEvents([]);
@@ -395,6 +407,16 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
                 </div>
               )}
             </div>
+
+            {/* Under the well, because it explains the black rectangle above it.
+                `info`, not `dead`: the tag is not at fault and neither is the
+                report — the condition is this browser, and the notice names the
+                address to allow (§3, §7). */}
+            {sdkBlocked && (
+              <Notice tone="info" live detail={IMA_SDK_SRC}>
+                {t.sdkBlocked}
+              </Notice>
+            )}
           </section>
 
           <section className="flex flex-col gap-3 border-t border-hairline pt-6">

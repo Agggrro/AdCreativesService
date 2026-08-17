@@ -231,6 +231,13 @@ const ru = {
     loadingUnit: "Загружаем интерактивный блок…",
     unitLoadFailed: "Не удалось загрузить интерактивный блок.",
     unitStartFailed: "Интерактивный блок не запустился.",
+    loadingIma: "Загружаем Google IMA SDK…",
+    imaSdkBlocked:
+      "Google IMA SDK заблокирован браузером — так делают блокировщики рекламы и расширения приватности. Креатив при этом исправен: вкладка Sandbox не обращается к IMA. Разрешите адрес для этого сайта и перезапустите:",
+    imaRunFailed: "Google IMA SDK загрузился, но реклама не запустилась:",
+    imaStartFailed: "Google IMA SDK не смог запустить рекламу.",
+    tagFetchFailed: "Не удалось получить VAST-тег превью.",
+    adError: "Ошибка рекламы",
     playing: "Идёт показ",
     complete: "Досмотрено",
     sandboxVpaidOnly:
@@ -396,6 +403,8 @@ const ru = {
         "Показ невозможен: из тега не удалось получить документ, пригодный для плеера.",
       pixelModeChanged:
         "Режим трекинг-пикселей изменён после проверки. Документ для плеера готовится в момент проверки, поэтому запустите её заново — иначе показ пошёл бы по прежним настройкам.",
+      sdkBlocked:
+        "Google IMA SDK заблокирован браузером — так делают блокировщики рекламы и расширения приватности. Это мешает только показу: отчёт выше собран на сервере и остаётся верным. Разрешите адрес для этого сайта и запустите показ заново:",
       degradedNotice:
         "Анализ неполный: часть правил завершилась с ошибкой и не отработала. Отсутствие находок по ним не означает, что нарушений нет.",
       dryRunNotice:
@@ -599,6 +608,13 @@ const en: Dict = {
     loadingUnit: "Loading interactive unit…",
     unitLoadFailed: "Could not load the interactive unit.",
     unitStartFailed: "The interactive unit failed to start.",
+    loadingIma: "Loading the Google IMA SDK…",
+    imaSdkBlocked:
+      "The Google IMA SDK was blocked by the browser — ad blockers and privacy extensions do this. The creative itself is fine: the Sandbox tab never reaches for IMA. Allow the address for this site and restart:",
+    imaRunFailed: "The Google IMA SDK loaded, but the ad did not start:",
+    imaStartFailed: "The Google IMA SDK failed to start the ad.",
+    tagFetchFailed: "Could not fetch the preview VAST tag.",
+    adError: "Ad error",
     playing: "Playing",
     complete: "Complete",
     sandboxVpaidOnly:
@@ -755,6 +771,8 @@ const en: Dict = {
         "Playback is not possible: the tag yielded no document a player could use.",
       pixelModeChanged:
         "The tracking-pixel mode changed after the check. The document handed to the player is prepared at check time, so run the check again — otherwise playback would use the previous setting.",
+      sdkBlocked:
+        "The Google IMA SDK was blocked by the browser — ad blockers and privacy extensions do this. Only playback is affected: the report above was built on the server and still stands. Allow the address for this site and start playback again:",
       degradedNotice:
         "The analysis is incomplete: some rules threw and did not run. No finding from them does not mean there is no violation.",
       dryRunNotice:

@@ -70,10 +70,18 @@ export function Panel({
 export function Notice({
   tone,
   live,
+  detail,
   children,
 }: {
   tone: "info" | "warn" | "dead";
   live?: boolean;
+  /**
+   * A machine value the notice is about — an address to allow, an id to quote.
+   * Mono on its own line, because it is a value to copy rather than a word in
+   * the sentence (docs/design-system.md §4). Part of the component so the two
+   * surfaces that show one cannot drift into two different treatments.
+   */
+  detail?: string;
   children: React.ReactNode;
 }) {
   const styles = `${TINT[tone]} ${TEXT[tone]}`;
@@ -83,6 +91,9 @@ export function Notice({
       className={`rounded-ctl px-3 py-2 text-[13px] leading-5 ${styles}`}
     >
       {children}
+      {detail && (
+        <span className="data-instr mt-1 block text-[12px] break-all">{detail}</span>
+      )}
     </p>
   );
 }

@@ -30,11 +30,26 @@ export interface PlayerEvent {
   tone: "live" | "info" | "warn" | "dead";
 }
 
+/**
+ * Severity of a status line, when a player has one to declare.
+ *
+ * The cold half of the state vocabulary (docs/design-system.md §3) — the warm
+ * accent means action and can never mean alarm. Omitted for the ordinary
+ * running commentary ("Playing", "Complete"), which is not a state.
+ */
+export type StatusTone = "info" | "warn" | "dead";
+
 /** Shared contract every player backend implements. */
 export interface PreviewPlayerProps {
   mint: PreviewMint;
-  /** Human-readable status line shown under the player frame. */
-  onStatus: (status: string) => void;
+  /**
+   * Human-readable status line shown under the player frame. Pass a `tone` to
+   * raise the line into a notice — for a condition the viewer has to act on,
+   * rather than the next word in the playback commentary. `detail` is a machine
+   * value that belongs with it (an address to allow, an id to quote); it is
+   * rendered in mono, apart from the prose, the way `PlayerEvent.detail` is.
+   */
+  onStatus: (status: string, tone?: StatusTone, detail?: string) => void;
   /** Fired when the creative's click-through is triggered. */
   onClickThrough: (url: string) => void;
   /**
