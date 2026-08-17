@@ -7,6 +7,14 @@ var TEMPLATE = {
   duration: 30,
   onStart: function (slot, params, api) {
     if (!slot) return;
+    // This is the one template that draws over a playing base video, so whether
+    // the slot has a size at all is the first thing to check when the overlay
+    // appears in the wrong corner or not at all.
+    api.debug("mount", {
+      w: slot.clientWidth,
+      h: slot.clientHeight,
+      hasVideo: typeof params.videoUrl === "string" && !!params.videoUrl,
+    });
     var btn = document.createElement("button");
     btn.textContent = params.productName
       ? "Shop Now — " + params.productName

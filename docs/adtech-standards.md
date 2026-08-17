@@ -198,6 +198,34 @@ creatives and would break players that gate their own teardown on it. SIMID does
 different, postMessage-based runtime, not the VPAID base) — a known gap, not a design
 decision.
 
+## What a running unit reports about itself
+
+A VPAID unit is opaque from outside its iframe — cross-origin for Google IMA, vendor-owned
+for Fluid Player — so the only signal that ever escaped was whatever a player chose to
+re-expose. The shared base now posts every lifecycle event, plus whatever a template
+declares through `api.debug(name, data)`, using `postMessage` addressed to the origin the
+unit was served from ([ADR-0019](decisions/0019-creative-telemetry-channel.md)).
+
+Three things about it are load-bearing:
+
+- **It ships in every build, production included**, because a debug-only build would mean
+  the unit being debugged is not the unit in the DSP.
+- **`targetOrigin` is the access control.** In production the top frame is the publisher's
+  page; the origin does not match and the browser drops the message before delivery. A
+  creative cannot leak its state to the page hosting it. Widening that argument to `"*"`
+  would undo the entire guarantee.
+- **The unit checks reachability before posting at all**, because a *rejected* post is not
+  silent — browsers log a console error for a `targetOrigin` mismatch. A cross-origin
+  `location.origin` read throws instead, and is caught. In production nothing is posted
+  and the publisher's console stays clean.
+- **Nothing is collected.** There is no endpoint and no storage — it is read on our own
+  pages, live. This is not a measurement channel and must not become one without a
+  decision of its own; the three ingested events remain exactly those in
+  [ADR-0016](decisions/0016-three-events-hourly-counters.md).
+
+SIMID does not have this either — same gap as the close control above: it runs its own
+postMessage runtime rather than the VPAID base.
+
 ## The protection reality (do not oversell)
 
 A SIMID/VPAID creative **executes JavaScript on the client**. That JS is, by

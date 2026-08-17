@@ -13,6 +13,11 @@ var TEMPLATE = {
     var W = slot.clientWidth || 640,
       H = slot.clientHeight || 360;
 
+    // The canvas is sized in device pixels from these, and the erase radius is
+    // derived from W — a wrong slot measurement is the usual reason scratching
+    // feels wrong or the threshold never trips.
+    api.debug("mount", { w: W, h: H });
+
     // Reveal image (or gif/video) underneath.
     var img = document.createElement("div");
     img.style.cssText = "position:absolute;inset:0;overflow:hidden;";
@@ -57,6 +62,7 @@ var TEMPLATE = {
       if (e.preventDefault) e.preventDefault();
       checkReveal();
     }
+    var reportedCoverage = -1;
     function checkReveal() {
       if (revealed) return;
       var d = ctx.getImageData(0, 0, W, H).data;
@@ -67,10 +73,24 @@ var TEMPLATE = {
         total++;
         if (d[i] === 0) clear++;
       }
-      if (total && clear / total >= threshold) reveal();
+      if (!total) return;
+      var pct = clear / total;
+      // Every 10% rather than every erase call: coverage is the one number that
+      // explains "the reveal never fires", and it is worth watching climb —
+      // but checkReveal runs on each mousemove and would drown the timeline.
+      var bucket = Math.floor(pct * 10);
+      if (bucket > reportedCoverage) {
+        reportedCoverage = bucket;
+        api.debug("coverage", {
+          pct: Math.round(pct * 100),
+          threshold: Math.round(threshold * 100),
+        });
+      }
+      if (pct >= threshold) reveal();
     }
     function reveal() {
       revealed = true;
+      api.debug("reveal", { threshold: Math.round(threshold * 100) });
       canvas.style.transition = "opacity .4s";
       canvas.style.opacity = "0";
       setTimeout(function () {

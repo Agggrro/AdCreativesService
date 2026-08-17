@@ -11,6 +11,8 @@ var TEMPLATE = {
   onStart: function (slot, params, api) {
     if (!slot) return;
 
+    api.debug("mount", { w: slot.clientWidth, h: slot.clientHeight });
+
     var bg = document.createElement("div");
     bg.style.cssText =
       "position:absolute;inset:0;overflow:hidden;filter:blur(10px);transform:scale(1.1);";
@@ -46,6 +48,7 @@ var TEMPLATE = {
       "padding:12px 20px;border:0;border-radius:8px;background:#e11d48;color:#fff;" +
       "font:700 15px sans-serif;cursor:pointer";
     confirm.addEventListener("click", function () {
+      api.debug("gate", { choice: "confirm" });
       api.clickThrough();
     });
 
@@ -55,6 +58,7 @@ var TEMPLATE = {
       "padding:12px 20px;border:1px solid #888;border-radius:8px;background:transparent;" +
       "color:#ddd;font:600 15px sans-serif;cursor:pointer";
     deny.addEventListener("click", function () {
+      api.debug("gate", { choice: "deny" });
       panel.innerHTML =
         '<div style="font:600 18px sans-serif">You must be 18+ to view this content.</div>';
       api.stop();

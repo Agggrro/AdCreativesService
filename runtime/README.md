@@ -12,10 +12,10 @@ document.
 
 - `lib/vpaid-base.js` — the shared VPAID 2.0 base (lifecycle, quartile/click
   plumbing, the shared media-layer helper for image/gif/video URLs, the
-  mandatory close control — ADR-0005 / ADR-0009 — and a self-reported,
+  mandatory close control — ADR-0005 / ADR-0009 — a self-reported,
   non-OMID-accredited viewability observer that fires once the slot has been
-  ≥50% on-screen for a continuous 2s — ADR-0012). A template implements only
-  `onStart(slot, params, api)`.
+  ≥50% on-screen for a continuous 2s — ADR-0012 — and the telemetry channel,
+  below). A template implements only `onStart(slot, params, api)`.
 - `templates/<name>/vpaid.js` — one render module per template, defining `var
   TEMPLATE = { name, duration, onStart }`.
 - `build.mjs` concatenates each render module with the shared base, then
@@ -98,6 +98,39 @@ fields) is injected at serve time via the VAST `<AdParameters>` element — neve
 baked into these files. Both standards parse that JSON:
 - SIMID: from the `SIMID:Player:init` message's `creativeData.adParameters`.
 - VPAID: from `creativeData.AdParameters` in `initAd`.
+
+## What the unit reports about itself
+
+Every VPAID lifecycle event is posted out of the unit with `postMessage`, addressed to
+the origin the unit was served from
+([ADR-0019](../docs/decisions/0019-creative-telemetry-channel.md)). A template adds its
+own records through the `api.debug(name, data)` handed to `onStart` — namespaced `tpl:`,
+and the place to report anything with no VPAID event of its own:
+
+```js
+api.debug("mount", { w: slot.clientWidth, h: slot.clientHeight });
+api.debug("answer", { step: 1, picked: "B", path: "B" });
+```
+
+Compiled into every build, production included. `targetOrigin` is what keeps it safe: in
+production the top frame is the publisher's, the origin does not match, and the browser
+drops the message. **Never widen that argument.**
+
+The unit also checks each candidate window is ours *before* posting, because a rejected
+post is not silent — browsers log a console error for a mismatch. So in production it
+posts nothing at all. Never `console.log` from a unit either; the receiver does the
+logging, and a publisher's console stays clean.
+
+Read it back on any of our own pages as `window.__creosmith`, or watch it live on
+`/dev/harness`, which also judges a unit against the mandatory lifecycle. That page serves
+units from `dist/` off disk, so **`npm run build:runtime` before looking** — the
+configurator's own preview resolves the *published* object through `manifest.ts` and will
+not show a local edit until `npm run runtime:push`.
+
+**Every change in this directory goes through the
+[`creative-check`](../.claude/skills/creative-check/SKILL.md) skill, before and after.**
+It is a mandatory gate in [`CLAUDE.md`](../CLAUDE.md): a render module is verified by
+being run, never by reasoning that it should work.
 
 ## Status
 

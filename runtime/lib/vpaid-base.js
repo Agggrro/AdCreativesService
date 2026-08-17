@@ -62,8 +62,83 @@ function adInteractMediaLayer(url) {
   return el;
 }
 
+/**
+ * The origin this unit was served from.
+ *
+ * Captured here, at top level, because `document.currentScript` is only valid
+ * while the script is still executing — read it from inside a method later and
+ * it is null. The built unit is one concatenated file, so this runs in the same
+ * synchronous pass as everything else in it.
+ *
+ * Null when a player injects the unit some way that has no script element
+ * (`eval`, a fetched string). Telemetry then stays silent rather than guessing
+ * an origin, which is the only safe failure mode: a wrong guess would be a
+ * message sent somewhere we did not intend.
+ */
+var CREOSMITH_ORIGIN = (function () {
+  try {
+    var script = document.currentScript;
+    if (!script || !script.src) return null;
+    var origin = new URL(script.src, document.baseURI).origin;
+    // `origin` is the *string* "null" for a `data:` or `blob:null/...` src.
+    // That is not a parseable URL, so passing it to postMessage would throw a
+    // SyntaxError rather than fail the origin check — failing closed by
+    // accident instead of by design.
+    return origin && origin !== "null" ? origin : null;
+  } catch (e) {
+    return null;
+  }
+})();
+
+/**
+ * Whether `w` is a window we are allowed to talk to — i.e. one of our own pages.
+ *
+ * This exists because a mismatched `targetOrigin` is not silent. The delivery
+ * itself is: the HTML spec's post-message steps return without dispatching when
+ * the recipient's origin does not match. But Chromium and Firefox both write a
+ * console **error** for the attempt, so posting blindly would print one or two
+ * errors per lifecycle event on the publisher's page, on every impression —
+ * exactly the noise ADR-0019 promises never to make. In a player that runs the
+ * unit in the top-level document there is not even an iframe to attribute them
+ * to.
+ *
+ * Reading `w.location.origin` across origins throws a SecurityError, which is
+ * caught here and logs nothing. So this asks the question quietly, and a target
+ * that is not ours is simply never posted to: in production the channel makes
+ * zero postMessage calls and produces zero console output.
+ */
+function adInteractReachable(w) {
+  try {
+    return !!w && w.location.origin === CREOSMITH_ORIGIN;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Force a value into something `postMessage`'s structured clone can carry.
+ * A template calling `api.debug()` with a DOM node or anything cyclic would
+ * otherwise throw inside postMessage and silently drop the record.
+ */
+function adInteractCloneable(value) {
+  if (value === undefined) return null;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (e) {
+    return String(value);
+  }
+}
+
 function CreoSmithVpaid(template) {
   this._t = template || {};
+  // Start of this run, and an id for it. Only ever one unit is live per page —
+  // `getVPAIDAd` is a global, so a second would take over the first's factory —
+  // but records still have to be attributable to a run: a host that remounts to
+  // re-run (the harness, and React StrictMode's double mount) has the previous
+  // unit's teardown record still in flight when the next one starts.
+  this._epoch = Date.now();
+  this._runId = "r" + Math.random().toString(36).slice(2, 8);
+  this._seq = 0;
   this._slot = null;
   this._videoSlot = null;
   this._params = {};
@@ -153,6 +228,19 @@ CreoSmithVpaid.prototype._api = function () {
     stop: function () {
       self.stopAd();
     },
+    // A template's own state, reported on the same origin-locked channel as
+    // the VPAID lifecycle (ADR-0019). The lifecycle says an ad started; this
+    // says which quiz branch the viewer took, how much of the cover has been
+    // scratched, where the slider sits — the things that actually go wrong
+    // when a template is being built, and that no VPAID event can express.
+    // Namespaced `tpl:` so a template can never shadow a lifecycle event.
+    // `String(name)` because the concatenation happens outside `_report`'s own
+    // guard, and most api.debug calls sit in a template's event handlers rather
+    // than inside startAd's try — so a non-string name would throw a TypeError
+    // straight into a click handler.
+    debug: function (name, data) {
+      self._report("tpl:" + String(name), data);
+    },
   };
 };
 
@@ -160,10 +248,16 @@ CreoSmithVpaid.prototype.startAd = function () {
   if (this._slot && getComputedStyle(this._slot).position === "static") {
     this._slot.style.position = "relative";
   }
+  // These three stay swallowed — the ad lifecycle must survive all of them —
+  // but they are no longer swallowed *silently*. A template throwing in onStart
+  // is precisely the failure ADR-0019's channel exists to make legible, and
+  // without a record it is indistinguishable from the unit never having loaded:
+  // both leave a slot that drew nothing. `_report` is safe to call from a catch
+  // by construction.
   try {
     if (this._t.onStart) this._t.onStart(this._slot, this._params, this._api());
   } catch (e) {
-    /* never let template errors break the ad lifecycle */
+    this._report("error", { at: "onStart", message: String((e && e.message) || e) });
   }
   try {
     // Same guard as onStart above: this does real DOM/SVG work (including a
@@ -171,7 +265,10 @@ CreoSmithVpaid.prototype.startAd = function () {
     // firing if it throws in some unusual host.
     this._mountCloseControl();
   } catch (e) {
-    /* never let the close control break the ad lifecycle */
+    this._report("error", {
+      at: "closeControl",
+      message: String((e && e.message) || e),
+    });
   }
   try {
     // Self-reported viewability (ADR-0012), not OMID-accredited: never let a
@@ -179,7 +276,10 @@ CreoSmithVpaid.prototype.startAd = function () {
     // ad lifecycle either.
     this._startViewabilityObserver();
   } catch (e) {
-    /* never let the viewability observer break the ad lifecycle */
+    this._report("error", {
+      at: "viewability",
+      message: String((e && e.message) || e),
+    });
   }
   this._emit("AdStarted");
   this._emit("AdImpression");
@@ -529,7 +629,117 @@ CreoSmithVpaid.prototype.subscribe = function (callback, event, context) {
 CreoSmithVpaid.prototype.unsubscribe = function (event) {
   delete this._cb[event];
 };
+/**
+ * Post one telemetry record to whichever of OUR OWN pages is hosting this unit
+ * (ADR-0019). Always compiled in, in every build, production included.
+ *
+ * `targetOrigin` is the entire access-control mechanism here, not a formality.
+ * In production `window.top` is the publisher's page, its origin does not match
+ * `CREOSMITH_ORIGIN`, and the browser discards the message before delivering
+ * it. A creative therefore cannot leak its state to the page it runs on even if
+ * something there is listening — that is enforced by the browser, not by our
+ * discipline. On our own preview and harness pages the origins match and the
+ * record arrives. One binary everywhere: no debug build, no AdParameters flag,
+ * and so no chance of debugging something other than what ships.
+ *
+ * Both `parent` and `top` are addressed because the unit sits one frame deep in
+ * some players and two in others, and posting to both costs less than walking
+ * the ancestor chain — which cross-origin ancestors would not permit anyway.
+ * The collector de-duplicates on `runId` + sequence.
+ *
+ * Nothing here may throw: telemetry must never be able to break an ad, the same
+ * rule the onStart / close-control / viewability call sites already follow.
+ */
+/**
+ * The windows this unit may report to, resolved once and cached.
+ *
+ * `parent` and `top` are both considered because the unit sits one frame deep
+ * in some players and two in others; `window` itself covers the host that loads
+ * the unit straight into its own document (the Sandbox player and the harness),
+ * where there is no ancestor to post to at all. Each is kept only if
+ * `adInteractReachable` says it is ours, so nothing is ever posted at a window
+ * that would reject it — see that function for why that matters.
+ *
+ * The frame tree does not change under a running ad, so this is computed on
+ * first use rather than per event.
+ */
+CreoSmithVpaid.prototype._targets = function () {
+  if (this._tgt) return this._tgt;
+  var candidates = [];
+  try {
+    if (window.parent === window) candidates.push(window);
+    else {
+      candidates.push(window.parent);
+      if (window.top && window.top !== window.parent) candidates.push(window.top);
+    }
+  } catch (e) {
+    /* an environment that will not even let us look: report to nobody */
+  }
+  this._tgt = [];
+  for (var i = 0; i < candidates.length; i++) {
+    if (adInteractReachable(candidates[i])) this._tgt.push(candidates[i]);
+  }
+  return this._tgt;
+};
+
+/**
+ * Post one telemetry record to whichever of OUR OWN pages is hosting this unit
+ * (ADR-0019). Always compiled in, in every build, production included.
+ *
+ * `targetOrigin` is still passed on every call and is still the guarantee of
+ * record: even if the reachability probe above were ever wrong, the browser
+ * refuses to deliver to an origin that does not match. The probe is what keeps
+ * the attempt from being made at all, and so keeps a publisher's console clean.
+ *
+ * Nothing here may throw: telemetry must never be able to break an ad, the same
+ * rule the onStart / close-control / viewability call sites already follow. Each
+ * post is wrapped separately, so one failing target cannot cancel the others.
+ */
+CreoSmithVpaid.prototype._report = function (name, data) {
+  if (!CREOSMITH_ORIGIN) return;
+  var targets;
+  var message;
+  try {
+    targets = this._targets();
+    if (targets.length === 0) return;
+    message = {
+      __creosmith: 1,
+      v: 1,
+      runId: this._runId,
+      seq: ++this._seq,
+      template: this._t.name || null,
+      name: name,
+      at: Date.now() - this._epoch,
+      data: adInteractCloneable(data),
+    };
+  } catch (e) {
+    return;
+  }
+  for (var i = 0; i < targets.length; i++) {
+    try {
+      targets[i].postMessage(message, CREOSMITH_ORIGIN);
+    } catch (e) {
+      /* never let telemetry break the ad, and never let one target stop another */
+    }
+  }
+};
+
+/**
+ * Events the player drives at input frequency: a window-resize drag calls
+ * resizeAd continuously, a volume-slider drag calls setAdVolume the same way.
+ * Reporting them would turn one gesture into hundreds of records on the main
+ * thread while video decodes — the very thing the templates are careful about
+ * (slider reports on drag end, scratch-reveal buckets its coverage). Neither is
+ * a lifecycle event anyone debugs, so they are simply not on the channel.
+ */
+var ADINTERACT_UNREPORTED = { AdSizeChange: 1, AdVolumeChange: 1 };
+
 CreoSmithVpaid.prototype._emit = function (event, args) {
+  // Reported before dispatch, so the record reflects the order the unit decided
+  // things in rather than the order subscribers happened to finish in.
+  if (!ADINTERACT_UNREPORTED[event]) {
+    this._report(event, args && args.length ? { args: args } : undefined);
+  }
   var c = this._cb[event];
   if (c && typeof c.fn === "function") c.fn.apply(c.ctx || null, args || []);
 };

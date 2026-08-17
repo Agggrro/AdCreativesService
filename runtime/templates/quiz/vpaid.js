@@ -42,6 +42,17 @@ var TEMPLATE = {
     var path = "";
     var liveStep = 0;
 
+    // The two config values that decide the entire flow, resolved rather than
+    // raw: a quiz that renders the wrong number of questions or the wrong
+    // result screen is almost always one of these two landing differently than
+    // the configurator implied.
+    api.debug("mount", {
+      w: slot.clientWidth,
+      h: slot.clientHeight,
+      stepCount: stepCount,
+      resultMode: branching ? "branching" : "universal",
+    });
+
     var wrap = document.createElement("div");
     wrap.style.cssText =
       "position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;" +
@@ -116,6 +127,7 @@ var TEMPLATE = {
         // a path the viewer never chose. Only the live step may advance.
         if (step !== liveStep) return;
         path += letter;
+        api.debug("answer", { step: step, picked: letter, path: path });
         if (step < stepCount) renderStep(step + 1);
         else showResult();
       });
@@ -124,6 +136,7 @@ var TEMPLATE = {
 
     function renderStep(step) {
       liveStep = step;
+      api.debug("step", { step: step, of: stepCount });
       clearScreen();
 
       var q = document.createElement("div");
@@ -142,6 +155,15 @@ var TEMPLATE = {
 
     function showResult() {
       liveStep = 0;
+      // `resolved` distinguishes "this path has its own result screen" from
+      // "it fell back to the universal one" — invisible on screen, and the
+      // usual explanation for a branching quiz that looks like it ignored the
+      // answers.
+      api.debug("result", {
+        path: path,
+        mode: branching ? "branching" : "universal",
+        resolved: branching ? !!params["result" + path + "Heading"] : true,
+      });
       clearScreen();
 
       var msg = document.createElement("div");

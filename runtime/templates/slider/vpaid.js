@@ -11,6 +11,11 @@ var TEMPLATE = {
     if (!slot) return;
     var W = slot.clientWidth || 640;
 
+    // The slot's measured size decides the whole layout here (the "after" layer
+    // is pinned to W in pixels), so it is the first thing worth knowing when
+    // this template renders wrong at some size.
+    api.debug("mount", { w: slot.clientWidth, h: slot.clientHeight });
+
     function layer(url) {
       var d = document.createElement("div");
       d.style.cssText = "position:absolute;inset:0;overflow:hidden;";
@@ -57,22 +62,25 @@ var TEMPLATE = {
       setPct(((t.clientX - r.left) / r.width) * 100);
       if (e.preventDefault) e.preventDefault();
     }
+    // Reported when the drag ends, not from setPct: setPct runs on every
+    // mousemove and would turn one gesture into a hundred records.
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      api.debug("position", { pct: Math.round(parseFloat(top.style.width)) });
+    }
     slot.addEventListener("mousedown", function (e) {
       dragging = true;
       move(e);
     });
     slot.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", function () {
-      dragging = false;
-    });
+    window.addEventListener("mouseup", endDrag);
     slot.addEventListener("touchstart", function (e) {
       dragging = true;
       move(e);
     });
     slot.addEventListener("touchmove", move);
-    slot.addEventListener("touchend", function () {
-      dragging = false;
-    });
+    slot.addEventListener("touchend", endDrag);
 
     // CTA.
     var btn = document.createElement("button");
