@@ -350,13 +350,17 @@ what they are allowed to see:
   behind one gate on the request host — the same comparison
   [`middleware.ts`](../middleware.ts) makes before it declines to set a cookie
   ([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)). The host that appears inside
-  strangers' VAST tags loads no script and reports nothing; its catch-all rewrite would
-  swallow the `/_vercel/insights/*` and `/_vercel/speed-insights/*` beacons in any case.
+  strangers' VAST tags loads no script and reports nothing; its catch-all rewrite admits
+  the ad paths and nothing else, so it would swallow the beacons in any case.
 - **Never on the serving paths.** `/v`, `/t` and `/c/*` are API routes returning XML,
   JavaScript and beacons — no HTML, no layout, no script. A creative running inside a
   publisher's player cannot carry either of these onto their page.
 - **Cookie-less and first-party.** In production both scripts and both beacons are served
-  from our own origin under `/_vercel/*`; no request leaves for a third-party host.
+  from our own origin; no request leaves for a third-party host. Not from the fixed
+  `/_vercel/insights/*` and `/_vercel/speed-insights/*` routes, though — those answer, but
+  what the browser actually loads is a randomised first-party path on the same origin,
+  which is how these SDKs get past content blockers. Nothing in the host gate depends on
+  which of the two it picks, and no allow-list could pin a path that changes.
 - **The beacons carry the real path, not just the route pattern**, so a dashboard URL
   reaches Vercel with a creative id in it. That is the party already terminating every
   request to the app, not a new one — but it is why the mounts are gated by host rather
