@@ -358,9 +358,9 @@ what they are allowed to see:
 - **Cookie-less and first-party.** In production both scripts and both beacons are served
   from our own origin; no request leaves for a third-party host. Not from the fixed
   `/_vercel/insights/*` and `/_vercel/speed-insights/*` routes, though — those answer, but
-  what the browser actually loads is a randomised first-party path on the same origin,
-  which is how these SDKs get past content blockers. Nothing in the host gate depends on
-  which of the two it picks, and no allow-list could pin a path that changes.
+  what the browser actually loads is an opaque first-party path on the same origin, which
+  is how these SDKs get past content blockers. The host gate does not depend on which of
+  the two it picks: it removes the mount, so there is no request to route either way.
 - **The beacons carry the real path, not just the route pattern**, so a dashboard URL
   reaches Vercel with a creative id in it. That is the party already terminating every
   request to the app, not a new one — but it is why the mounts are gated by host rather

@@ -48,8 +48,8 @@ export default async function RootLayout({
   //  - that catch-all in next.config.ts admits the ad paths and nothing else, so
   //    whichever path a beacon picks answers with HTML instead of recording. In
   //    the browser these SDKs do not use the fixed `/_vercel/…` routes at all
-  //    but a randomised first-party path on the same origin, so no allow-list
-  //    could have carried them anyway;
+  //    but an opaque first-party path on the same origin, which the allow-list
+  //    has no reason to carry either;
   //  - every crawler and port-scanner that finds the hostname inside a VAST tag
   //    would otherwise spend page views and vitals samples out of the plan's
   //    monthly budget, on a host that has no product surface to measure.
