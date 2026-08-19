@@ -339,6 +339,29 @@ the message before delivery — so a creative cannot leak its state to the page 
 - **Nothing is collected server-side**, and adding an endpoint that did would be a
   privacy decision in its own right — the records originate in a third-party context.
 
+## Web analytics (Vercel)
+
+`@vercel/analytics` is mounted once, in the root layout, and is the only third-party
+script our own pages load. Where it may run, and what it is allowed to see:
+
+- **App domain only.** The ad domain renders through that same root layout (`/cdn`, plus
+  the `/cdn/blocked` catch-all every other path there rewrites to), so the mount is gated
+  on the request host — the same comparison [`middleware.ts`](../middleware.ts) makes
+  before it declines to set a cookie ([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)).
+  The host that appears inside strangers' VAST tags loads no script and reports nothing;
+  its catch-all rewrite would swallow the `/_vercel/insights/*` beacon in any case.
+- **Never on the serving paths.** `/v`, `/t` and `/c/*` are API routes returning XML,
+  JavaScript and beacons — no HTML, no layout, no script. A creative running inside a
+  publisher's player cannot carry our analytics onto their page.
+- **Cookie-less and first-party.** In production the script and its beacon are served from
+  our own origin under `/_vercel/insights/*`; no request leaves for a third-party host.
+- **The beacon carries the real path, not just the route pattern**, so a dashboard URL
+  reaches Vercel Analytics with a creative id in it. That is the party already terminating
+  every request to the app, not a new one — but it is why the mount is gated by host
+  rather than global.
+- **Page views only.** No `track()` custom event is sent today. Adding one is a decision
+  about what leaves the browser, not a call-site detail.
+
 ## Pre-push checklist (security-sensitive changes)
 
 - [ ] No secret in client bundle / `NEXT_PUBLIC_*`.
