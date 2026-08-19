@@ -26,6 +26,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.8.0",
     "@vercel/functions": "^3.9.3",
+    "@vercel/speed-insights": "^2.0.0",
     "fast-xml-parser": "^5.10.1",
     "fluid-player": "^3.59.0",
     "lucide-react": "^1.22.0",

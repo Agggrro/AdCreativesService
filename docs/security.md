@@ -339,28 +339,36 @@ the message before delivery — so a creative cannot leak its state to the page 
 - **Nothing is collected server-side**, and adding an endpoint that did would be a
   privacy decision in its own right — the records originate in a third-party context.
 
-## Web analytics (Vercel)
+## Web analytics and Speed Insights (Vercel)
 
-`@vercel/analytics` is mounted once, in the root layout, and is the only third-party
-script our own pages load. Where it may run, and what it is allowed to see:
+`@vercel/analytics` and `@vercel/speed-insights` are mounted together, once, in the root
+layout. They are the only third-party scripts our own pages load. Where they may run, and
+what they are allowed to see:
 
 - **App domain only.** The ad domain renders through that same root layout (`/cdn`, plus
-  the `/cdn/blocked` catch-all every other path there rewrites to), so the mount is gated
-  on the request host — the same comparison [`middleware.ts`](../middleware.ts) makes
-  before it declines to set a cookie ([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)).
-  The host that appears inside strangers' VAST tags loads no script and reports nothing;
-  its catch-all rewrite would swallow the `/_vercel/insights/*` beacon in any case.
+  the `/cdn/blocked` catch-all every other path there rewrites to), so both mounts sit
+  behind one gate on the request host — the same comparison
+  [`middleware.ts`](../middleware.ts) makes before it declines to set a cookie
+  ([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)). The host that appears inside
+  strangers' VAST tags loads no script and reports nothing; its catch-all rewrite would
+  swallow the `/_vercel/insights/*` and `/_vercel/speed-insights/*` beacons in any case.
 - **Never on the serving paths.** `/v`, `/t` and `/c/*` are API routes returning XML,
   JavaScript and beacons — no HTML, no layout, no script. A creative running inside a
-  publisher's player cannot carry our analytics onto their page.
-- **Cookie-less and first-party.** In production the script and its beacon are served from
-  our own origin under `/_vercel/insights/*`; no request leaves for a third-party host.
-- **The beacon carries the real path, not just the route pattern**, so a dashboard URL
-  reaches Vercel Analytics with a creative id in it. That is the party already terminating
-  every request to the app, not a new one — but it is why the mount is gated by host
-  rather than global.
-- **Page views only.** No `track()` custom event is sent today. Adding one is a decision
-  about what leaves the browser, not a call-site detail.
+  publisher's player cannot carry either of these onto their page.
+- **Cookie-less and first-party.** In production both scripts and both beacons are served
+  from our own origin under `/_vercel/*`; no request leaves for a third-party host.
+- **The beacons carry the real path, not just the route pattern**, so a dashboard URL
+  reaches Vercel with a creative id in it. That is the party already terminating every
+  request to the app, not a new one — but it is why the mounts are gated by host rather
+  than global.
+- **Page views and Web Vitals only.** No `track()` custom event is sent today. Adding one
+  is a decision about what leaves the browser, not a call-site detail.
+- **Speed Insights measures our pages, never a creative.** Vitals come from the app's own
+  documents; a VPAID unit runs in the player's cross-origin iframe, which this cannot see
+  and must not be extended to see. Creative-side measurement is the telemetry channel
+  above ([ADR-0019](decisions/0019-creative-telemetry-channel.md)) and viewability is
+  [ADR-0012](decisions/0012-viewability-measurement.md) — three separate mechanisms, on
+  purpose.
 
 ## Pre-push checklist (security-sensitive changes)
 
