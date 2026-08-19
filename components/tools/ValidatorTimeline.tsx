@@ -54,10 +54,13 @@ export function ValidatorTimeline({
 
   return (
     // Purpose-built rather than `TableFrame`: this is the one table in the
-    // report that also scrolls vertically, so it needs `overflow-auto` and a
-    // height cap rather than the shared horizontal-only frame.
-    <div className="max-h-[520px] overflow-auto rounded-ctl border border-hairline bg-surface">
-      <table className="w-full min-w-[520px] border-collapse">
+    // report that scrolls *vertically*, so it needs a height cap rather than the
+    // shared horizontal-only frame — and `overflow-y-auto`, not `overflow-auto`,
+    // because a run log you have to scroll sideways to read is not a log. The
+    // table carries no minimum width for the same reason: it fits the page and
+    // the address column truncates, rather than the page fitting the table.
+    <div className="max-h-[520px] overflow-y-auto rounded-ctl border border-hairline bg-surface">
+      <table className="w-full border-collapse">
         <thead className="sticky top-0 z-10">
           <tr className="border-b border-hairline bg-surface-sunken">
             <th className={NUM_HEAD_TIGHT}>{t.colTime}</th>
@@ -106,7 +109,7 @@ export function ValidatorTimeline({
                 {hits.map((hit, position) => (
                   <code
                     key={`${hit.path}-${position}`}
-                    className="data-instr block max-w-[56ch] truncate text-[13px] text-fg-secondary"
+                    className="data-instr block max-w-[72ch] truncate text-[13px] text-fg-secondary"
                   >
                     {hit.url}
                   </code>
@@ -142,7 +145,7 @@ export function ValidatorTimeline({
                     {hit.event ? `${hit.kind}:${hit.event}` : hit.kind}
                   </td>
                   <td className={CELL_TIGHT}>
-                    <code className="data-instr block max-w-[56ch] truncate text-[13px] text-fg-secondary">
+                    <code className="data-instr block max-w-[72ch] truncate text-[13px] text-fg-secondary">
                       {hit.url}
                     </code>
                   </td>

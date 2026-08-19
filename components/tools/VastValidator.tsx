@@ -323,16 +323,19 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
         </section>
       </div>
 
+      {/* Full width and stacked, not a second two-column row. The timeline is a
+          four-column table carrying URLs: in half the page it could not fit its
+          own tracker column and grew a horizontal scrollbar, which is the one
+          thing a readout must not need (§5 — wide content scrolls in its own
+          box, but a box this shape should not be narrow in the first place). */}
       {started && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <section className="flex flex-col gap-2">
-            <h2 className="text-[15px] font-semibold leading-[22px]">{t.sectionTimeline}</h2>
-            <ValidatorTimeline events={events} trackers={report?.trackers ?? []} />
-          </section>
-
-          {report && <Recommendations findings={report.findings} />}
-        </div>
+        <section className="flex flex-col gap-2">
+          <h2 className="text-[15px] font-semibold leading-[22px]">{t.sectionTimeline}</h2>
+          <ValidatorTimeline events={events} trackers={report?.trackers ?? []} />
+        </section>
       )}
+
+      {report && <Recommendations findings={report.findings} />}
 
       {report && <ReferenceSections report={report} resolvedAd={resolvedAd} />}
     </div>

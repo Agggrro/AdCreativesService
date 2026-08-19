@@ -476,12 +476,18 @@ surface.
   mechanisms, not two steps the visitor performs, and a tool that makes you press a
   second button to see the thing you asked for has mistaken its internals for a workflow.
 
-The validator is two columns from `lg` up and one below it: the well and the run timeline
-on the left, the settings, the verdict strip and the recommendations on the right.
+The validator's top row is two columns from `lg` up and one below it: the well on the
+left, the settings and the verdict strip on the right. **Everything below that row is
+full width**, stacked — the run timeline, then the recommendations. Two columns were
+tried there and withdrawn: the timeline is a four-column table carrying URLs, and in
+half a page it could not fit its own tracker column and grew a horizontal scrollbar. A
+run log you have to scroll sideways to read is not a log. Splitting a row into columns
+is only compaction when both halves still fit.
+
 Reference tables — interactive standards, the feature matrix, the wrapper chain,
-parser-versus-player — sit under both columns as collapsed `<details>`, because they
-answer a follow-up rather than the question the visitor arrived with. A report that runs
-as one 4,000px column is not thorough, only tall.
+parser-versus-player — sit at the bottom as collapsed `<details>`, because they answer
+a follow-up rather than the question the visitor arrived with. A report that runs as
+one 4,000px column is not thorough, only tall.
 
 Rows take a state rail where they carry state and none where they do not. The
 recommendations list rails on severity (`dead` / `warn` / `info`, §3) **and is grouped by
