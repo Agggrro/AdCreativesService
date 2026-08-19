@@ -58,9 +58,10 @@ export default async function RootLayout({
   // cookie, so this render was dynamic before we got here. It is the same
   // host comparison middleware.ts makes, for the same domain split (ADR-0018).
   //
-  // Both are cookie-less, and neither can load on the ad-serving paths (`/v`,
-  // `/t`, `/c/*` are API routes with no HTML), so nothing about this reaches a
-  // publisher's page.
+  // Both are cookie-less, and neither reaches a publisher's page: `/v`, `/t` and
+  // the `/c/*` asset paths are API routes with no HTML at all, and the one HTML
+  // page under that prefix — `/c/player`, the validator's isolated player
+  // (ADR-0021) — renders on the ad domain, where this same check excludes both.
   const cdnHost = getCdnHost();
   const onAdDomain =
     cdnHost !== null && (await headers()).get("host") === cdnHost;

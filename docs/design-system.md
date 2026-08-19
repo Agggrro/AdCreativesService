@@ -46,7 +46,8 @@ Three consequences follow, and they override any local styling preference:
   single `shadow-overlay` token (`--shadow-overlay` in `app/globals.css`) and nothing
   else. A modal's backdrop is `bg-fg/40` — the existing `fg` token at 40% opacity, not a
   new colour.
-- **Row height 44px** in data tables (12px vertical padding on 13px/20px text).
+- **Row height 44px** in data tables (12px vertical padding on 13px/20px text). One
+  narrower density exists, and only for machine readouts — see §6, "Readout density".
 
 ## 3. Colour
 
@@ -349,6 +350,77 @@ on its own page, reachable from this panel or directly — a search engine, a bo
   Portal a nav dropdown the day either check stops holding — a different header, or a need
   to escape a clipping ancestor.
 
+### Help tooltip
+
+Explanation a fluent user does not need belongs *behind* a trigger, not in a paragraph
+under the control. The VAST validator forced this: every setting carried two or three
+lines of `fg-muted` prose, and the result was a form you had to read past rather than
+operate. An expert tool earns the right to be terse — it does not earn the right to be
+unexplained.
+
+`ui/Tooltip.tsx` exports `HelpLabel`, and it is the one implementation.
+
+**The label is the trigger.** Not a `?` button beside the label — the label and the
+icon are one `<button>`, rendering as `Tracking pixels ?`. This is the whole design of
+the component and it is settled, not open: a bare `?` is an icon-only control, §9
+forbids those without qualification, and
+[ADR-0007](decisions/0007-design-system-instrument.md) records four iterations of
+carving an exception out of that rule — three of them narrowing the exception instead
+of questioning it — before retracting it entirely. Making the word the trigger needs no
+exception: the word is visible, it *is* the accessible name, and the icon accompanies
+it, which is exactly what §9 asks for. It also produces a touch target the size of the
+label rather than of a 14px glyph.
+
+It attaches to **any visible label that names something** — a field's `label-instr`, a
+table column header, a section heading — and never floats free of one. `className`
+carries the type role of whichever it is.
+
+- **It opens on hover, on keyboard focus, and on click** — all three, never hover
+  alone. Hover does not exist on a touch device, and once the inline paragraph is gone
+  the panel holds the only copy of that sentence. A pointer leaving the trigger closes
+  it after a short grace period, so the gap between trigger and panel can be crossed to
+  read it; a click pins it open until clicked again.
+- Panel: `bg-surface`, `border border-hairline`, `rounded-ctl`, `shadow-overlay` (§2),
+  `small` sans, `max-w-[44ch]`. Portalled to `<body>` per the overlay rule above — it
+  opens from inside table headers and grid cells, which is precisely the inheritance
+  hazard that rule exists for, and a `<th>`'s `white-space: nowrap` demonstrably reaches
+  it otherwise.
+- Association is `role="tooltip"` plus `aria-describedby`. Not `aria-expanded`, which
+  describes an expandable widget; a tooltip is not one.
+- `Escape` closes and returns focus to the trigger; an outside click closes.
+- It holds explanation only: never a control, never an error, never a value to copy.
+  Nothing the user must act on may live behind a hover.
+
+### Readout density
+
+44px stays the default, and stays mandatory wherever a row represents **a thing the user
+owns** — a creative, a template, a subscription. A second, narrower density exists for
+**machine readouts**: tables whose rows the system emits rather than the user authors,
+and which are read as a stream rather than acted on. The validator's run timeline,
+feature matrix, wrapper chain and parser-versus-player comparison are the entire list
+today.
+
+- Row height **32px** — `px-3 py-1.5` on `data` 13/20 type, which the cell class sets
+  itself rather than leaving to each call site. The rail stays 3px, so the left padding
+  drops to 9px exactly as the 44px cell's drops to 13px. Header row is 28px, the same
+  `px-3 py-1.5` on the 11/16 `label` role.
+- **No row in this density carries a row-level action.** A row you can act on is not a
+  readout and takes 44px. That is what stops the density becoming a way to cram, and it
+  is why the validator's findings list — whose rows expand — is *not* in it.
+- The density is a property of the table, not of a cell: a table is entirely one or
+  entirely the other, and a cell never mixes the readout cell class with a second type
+  utility that fights it.
+- 32px is the height of a single-line row, not a promise. A cell that stacks a value
+  over a qualifier is taller, and that is correct — the density sets the floor and the
+  rhythm, not a cap.
+- That list of four tables is illustrative, not exhaustive: the distinction above —
+  system-emitted and scanned, versus user-owned and acted on — decides every case.
+
+The justification is legibility of the whole, not fitting more in. A sixty-row event
+timeline at 44px is 2,640px of scrolling, and the reader loses the shape of the run —
+which is the only thing a timeline is for. Ten creatives at 32px would just look cramped,
+which is why the default does not move.
+
 ### Segmented controls
 
 Language, delivery format, player backend, and the landing hero's template switcher all
@@ -400,15 +472,38 @@ surface.
 - **Accent budget is one**, spent on the single primary that starts a run. A tool page is
   a workbench: everything else on it is secondary or a link.
 
-The validator's report is a stack of hairline-separated sections, each a table with a
-state rail where the rows carry state and none where they do not. The findings table rails
-on severity (`dead` / `warn` / `info`, §3); the wrapper-chain table rails on HTTP outcome,
-dropping to transparent when the status is unknown, because an unreachable hop has nothing
-to encode; the feature matrix does **not** rail, because "this tag does not use Mezzanine"
-is an absence, not a state — a rail on every row would be exactly the decorative rail this
-system forbids. The interactive-standards table, the run timeline, the parser-versus-player
-comparison and the recommendations list all rail too, each on a state of its own. That list
-is illustrative, not exhaustive: the general rule above decides every case.
+- **One click starts a run.** The page has a single verb. Analysis and playback are two
+  mechanisms, not two steps the visitor performs, and a tool that makes you press a
+  second button to see the thing you asked for has mistaken its internals for a workflow.
+
+The validator is two columns from `lg` up and one below it: the well and the run timeline
+on the left, the settings, the verdict strip and the recommendations on the right.
+Reference tables — interactive standards, the feature matrix, the wrapper chain,
+parser-versus-player — sit under both columns as collapsed `<details>`, because they
+answer a follow-up rather than the question the visitor arrived with. A report that runs
+as one 4,000px column is not thorough, only tall.
+
+Rows take a state rail where they carry state and none where they do not. The
+recommendations list rails on severity (`dead` / `warn` / `info`, §3) **and is grouped by
+it**, one group per level, so severity is legible from the shape of the page rather than
+only from a word. The wrapper-chain table rails on HTTP outcome, dropping to transparent
+when the status is unknown, because an unreachable hop has nothing to encode; the feature
+matrix does **not** rail, because "this tag does not use Mezzanine" is an absence, not a
+state — a rail on every row would be exactly the decorative rail this system forbids. The
+interactive-standards table, the run timeline and the parser-versus-player comparison all
+rail too, each on a state of its own. That list is illustrative, not exhaustive: the
+general rule above decides every case.
+
+**There is exactly one findings list.** An earlier version shipped a per-rule "Findings"
+table *and* a curated "Recommendations" list beneath it, saying the same things twice at
+two altitudes; a reader who notices that once learns to skim both. Advice a rule already
+carries in its own `hint` does not get a second home.
+
+The run timeline carries the tracking URL each event would fire, in its own column, rather
+than repeating the event list as a separate tracker table. The join is by event name, not
+by observation — no player reports which URL it actually requested — and the column's
+tooltip says so. A tool that presents an inference as a measurement is worse than one that
+omits it.
 
 The pasted-XML input is the one place the mono rule is load-bearing rather than aesthetic:
 it holds a VAST document, and a proportional face makes indentation unreadable.
@@ -675,7 +770,7 @@ never two stacked captions.
 | ✕ | Rounded pills as a default shape. 3px radius; `50%` only for the status dot. |
 | ✕ | Icon-only actions, no exceptions. Verbs label actions; an icon accompanies a word. Tried once as a data-table space-saving device (a copy/edit/delete action cell) and retracted: even a spec-correct 18px icon with a proper stroke read as an indistinguishable speck once it had no word to lean on, confirmed twice from live screenshots and a DevTools inspection that ruled out a rendering bug — the icon was never the problem, having no label was. If a row's action cell is too narrow for labelled buttons, the fix is narrower *other* columns or a taller cell, not a smaller word. |
 | ✕ | Flags for language, or a second theme. |
-| ✓ | Density as respect: 44px rows, spacing in multiples of 4. |
+| ✓ | Density as respect: 44px rows, spacing in multiples of 4 — and the 32px readout density (§6) for system-emitted tables that are read rather than acted on. |
 | ✓ | State encoded in form as well as colour. |
 | ✓ | Both locales supplied for every new string — except on a developer-only surface, which no user reaches in either language (§8, and that carve-out only). |
 

@@ -1,6 +1,43 @@
 import { atLeast } from "../model";
-import { all, attr, descendants, first } from "../xml-tree";
-import { hit, isInsideWrapper, vast, type Rule } from "./kit";
+import { all, attr, descendants, first, type VNode } from "../xml-tree";
+import { hit, isInsideWrapper, isPlayableVideoType, vast, vpaidNodes, type Rule } from "./kit";
+
+/**
+ * Advice a VPAID creative has already answered its own way (ADR-0020).
+ *
+ * Both predicates take the **creative's own subtree**, never `ctx.root`. An
+ * earlier version gated these rules through `appliesTo`, which runs once per
+ * document while both rules report once per `InLine` — so a single VPAID node
+ * anywhere silenced the advice for every other ad in the response. A pod mixing
+ * a VPAID ad with a plain linear one is the ordinary case that broke, and a
+ * `<Wrapper>` merely mentioning VPAID was enough to trigger it.
+ */
+
+/**
+ * ViewableImpression asks the *player* to measure viewability. A VPAID unit
+ * measures its own and reports it over its own channel (ADR-0012), so the
+ * element is answered for this creative however its media is authored.
+ */
+function measuresItsOwnViewability(inline: VNode): boolean {
+  return vpaidNodes(inline).length > 0;
+}
+
+/**
+ * Mezzanine is a high-quality source an SSAI platform transcodes its own
+ * renditions from. A VPAID unit is executable JavaScript — but only a
+ * VPAID-*only* creative has nothing to hand over. One that also carries a plain
+ * video does, and the advice stands there, which is also what keeps a
+ * SIMID-plus-VPAID document (guaranteed a base video by SIMID-base-video-required)
+ * hearing it.
+ */
+function hasNoVideoToTranscode(creative: VNode): boolean {
+  if (vpaidNodes(creative).length === 0) return false;
+  return !descendants(creative, "MediaFile").some(
+    (file) =>
+      (attr(file, "apiFramework") ?? "").toLowerCase() !== "vpaid" &&
+      isPlayableVideoType(attr(file, "type")),
+  );
+}
 
 /**
  * The VAST 4.x elements that exist for programmatic buying, SSAI and CTV.
@@ -140,7 +177,9 @@ export const modernRules: Rule[] = [
     spec: vast("§3.13.3 Mezzanine"),
     appliesTo: (ctx) => atLeast(ctx.declared, "4.1"),
     check: (ctx) => {
-      const linears = descendants(ctx.root, "Linear").filter((linear) => !isInsideWrapper(linear));
+      const linears = descendants(ctx.root, "Linear")
+        .filter((linear) => !isInsideWrapper(linear))
+        .filter((linear) => !hasNoVideoToTranscode(linear));
       if (linears.length === 0) return [];
       if (descendants(ctx.root, "Mezzanine").length > 0) return [];
       return [
@@ -192,6 +231,7 @@ export const modernRules: Rule[] = [
       all(ctx.root, "Ad")
         .map((ad) => first(ad, "InLine"))
         .filter((inline): inline is NonNullable<typeof inline> => Boolean(inline))
+        .filter((inline) => !measuresItsOwnViewability(inline))
         .filter((inline) => !first(inline, "ViewableImpression"))
         .map((inline) =>
           hit(

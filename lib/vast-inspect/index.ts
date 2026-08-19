@@ -19,9 +19,7 @@ export type {
   InteractiveHit,
   Msg,
   PixelMode,
-  Placement,
   Playback,
-  Recommendation,
   Severity,
   TrackerHit,
   VastVersion,
@@ -29,7 +27,6 @@ export type {
 } from "./model";
 export { SEVERITY_ORDER, VAST_VERSIONS, normalizeVersion } from "./model";
 export { describeIabError, lookupIabError, IAB_ERRORS } from "./errors-iab";
-export { renderReportText } from "./render-text";
 export { ALL_RULES } from "./rules";
 export { MAX_HOPS } from "./chain";
 export { MAX_BYTES, TIMEOUT_MS } from "./fetch-tag";

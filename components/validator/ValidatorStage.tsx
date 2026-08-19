@@ -1,392 +1,172 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { loadImaSdk } from "@/components/players/load-ima-sdk";
+import { useEffect, useRef, useState } from "react";
 import type { PlayerEvent } from "@/components/players/types";
-import type { Placement, Playback } from "@/lib/vast-inspect/model";
+import type { Playback } from "@/lib/vast-inspect/model";
+import { getSandboxUrl } from "@/lib/site";
+import {
+  isSandboxMessage,
+  SANDBOX_CHANNEL,
+  type ResolvedAd,
+} from "@/components/validator/sandbox-protocol";
+
+export { SDK_LOAD_FAILED } from "@/components/validator/sandbox-protocol";
+export type { ResolvedAd } from "@/components/validator/sandbox-protocol";
 
 /**
- * The validator's player.
+ * The validator's player, as the app page sees it.
  *
- * A sibling of ImaPlayer rather than a fork of it. ImaPlayer keeps its
- * `PreviewMint` contract, which is exactly right for the configurator and
- * exactly wrong here: the validator plays a stranger's tag, needs raw XML as an
- * input, and cares about every lifecycle event rather than a status line. The
- * two share what genuinely is shared — `loadImaSdk()`.
+ * There is no SDK here and no ad code here. This mounts an iframe on a
+ * **different origin** and speaks to it, because the thing on the other side
+ * executes a stranger's VPAID JavaScript with whatever privileges its document
+ * has — and on the app origin those privileges are the visitor's session, our
+ * API routes, and `localStorage`. `getSandboxUrl()` decides where that frame
+ * lives; `app/c/player/page.tsx` is what it loads.
  *
- * Google IMA is the backend because it is the reference implementation of the
- * market: a tag that fails here fails nearly everywhere, it is the only player
- * we host that reports numeric error codes, and it exposes both `adsResponse`
- * (which is how pasted XML gets played at all) and the full AdEvent set the
- * timeline is built from.
+ * **It fails closed.** With no cross-origin home configured, `sandboxOrigin` is
+ * null and this renders a refusal rather than quietly running the creative in
+ * the app's own page. A security control whose absence looks like success is
+ * worse than not having it.
+ *
+ * The iframe carries `allow="autoplay"` deliberately: transient user activation
+ * does not cross into a cross-origin frame, so the click that started the run
+ * has to be delegated explicitly or the ad cannot start itself.
  */
-
-export type VpaidMode = "enabled" | "insecure" | "disabled";
-
-/**
- * The timeline name for "the SDK never arrived".
- *
- * Exported because the page reads it back off the event stream to raise its
- * own notice: an ad blocker is the one stage failure with a fix the visitor can
- * apply, and a machine name in a timeline is not where you explain that. A
- * shared constant rather than the literal in two files — a timeline row and the
- * notice about it must never drift apart.
- */
-export const SDK_LOAD_FAILED = "sdkLoadFailed";
 
 interface ValidatorStageProps {
-  playback: Playback;
-  placement: Placement;
-  vpaidMode: VpaidMode;
-  /** Content clip for instream. Absent means the ad plays with no content around it. */
+  /** `null` until the inspection returns; the frame sets IMA up and waits. */
+  playback: Playback | null;
+  /** Content clip the ad break interrupts. Resolved to an absolute URL before it crosses. */
   contentSrc?: string;
   onEvent: (event: PlayerEvent) => void;
   /** Metadata IMA resolved, for the parser-versus-player cross-check. */
   onAdResolved: (ad: ResolvedAd) => void;
   /** Bumping this remounts the component, which is how a re-run starts clean. */
   runToken: number;
+  /** Raised when no isolated origin exists, so the page can say why nothing plays. */
+  onUnavailable?: () => void;
 }
-
-/** What the SDK says the tag actually resolved to. */
-export interface ResolvedAd {
-  adId: string;
-  adSystem: string;
-  title: string;
-  duration: number;
-  width: number;
-  height: number;
-  contentType: string;
-  apiFramework: string | null;
-  universalAdIdRegistry: string;
-  universalAdIdValue: string;
-  wrapperAdSystems: string[];
-  skipTimeOffset: number;
-  linear: boolean;
-  mediaUrl: string;
-}
-
-/**
- * Which AdEvent types the timeline records, and how each one reads.
- *
- * Left out on purpose: AD_PROGRESS, which fires several times a second and
- * would bury every other row. Its information is already in the quartiles.
- */
-const TRACKED: ReadonlyArray<{
-  key: keyof typeof google.ima.AdEvent.Type;
-  name: string;
-  tone: PlayerEvent["tone"];
-}> = [
-  { key: "LOADED", name: "loaded", tone: "info" },
-  { key: "AD_CAN_PLAY", name: "canPlay", tone: "info" },
-  { key: "CONTENT_PAUSE_REQUESTED", name: "contentPauseRequested", tone: "info" },
-  { key: "IMPRESSION", name: "impression", tone: "live" },
-  { key: "STARTED", name: "start", tone: "live" },
-  { key: "FIRST_QUARTILE", name: "firstQuartile", tone: "live" },
-  { key: "MIDPOINT", name: "midpoint", tone: "live" },
-  { key: "THIRD_QUARTILE", name: "thirdQuartile", tone: "live" },
-  { key: "COMPLETE", name: "complete", tone: "live" },
-  { key: "ALL_ADS_COMPLETED", name: "allAdsCompleted", tone: "live" },
-  { key: "CONTENT_RESUME_REQUESTED", name: "contentResumeRequested", tone: "info" },
-  { key: "CLICK", name: "click", tone: "info" },
-  { key: "VIDEO_CLICKED", name: "videoClicked", tone: "info" },
-  { key: "VIDEO_ICON_CLICKED", name: "iconClicked", tone: "info" },
-  { key: "INTERACTION", name: "interaction", tone: "info" },
-  { key: "PAUSED", name: "paused", tone: "info" },
-  { key: "RESUMED", name: "resumed", tone: "info" },
-  { key: "SKIPPED", name: "skipped", tone: "warn" },
-  { key: "SKIPPABLE_STATE_CHANGED", name: "skippableStateChanged", tone: "info" },
-  { key: "USER_CLOSE", name: "userClose", tone: "warn" },
-  { key: "VOLUME_CHANGED", name: "volumeChanged", tone: "info" },
-  { key: "VOLUME_MUTED", name: "volumeMuted", tone: "info" },
-  { key: "AD_BUFFERING", name: "buffering", tone: "warn" },
-  { key: "DURATION_CHANGE", name: "durationChange", tone: "info" },
-  { key: "LINEAR_CHANGED", name: "linearChanged", tone: "info" },
-  { key: "VIEWABLE_IMPRESSION", name: "viewableImpression", tone: "live" },
-  { key: "AD_METADATA", name: "adMetadata", tone: "info" },
-] as const;
-
-const VPAID_MODE_VALUES: Record<VpaidMode, () => number> = {
-  enabled: () => google.ima.ImaSdkSettings.VpaidMode.ENABLED,
-  insecure: () => google.ima.ImaSdkSettings.VpaidMode.INSECURE,
-  disabled: () => google.ima.ImaSdkSettings.VpaidMode.DISABLED,
-};
 
 export function ValidatorStage({
   playback,
-  placement,
-  vpaidMode,
   contentSrc,
   onEvent,
   onAdResolved,
   runToken,
+  onUnavailable,
 }: ValidatorStageProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const readyRef = useRef(false);
+  const playbackRef = useRef(playback);
 
-  // Held in refs so the effect below can stay a mount-once effect: it tears the
-  // whole SDK down on cleanup, and re-running it because a callback identity
-  // changed would restart the ad mid-play. Assigned in an effect rather than
-  // during render — a ref written while rendering is not a stable value.
+  // Held in refs so the effect below stays a mount-once effect: re-running it
+  // because a callback identity changed would reload the frame mid-play.
   const onEventRef = useRef(onEvent);
   const onAdResolvedRef = useRef(onAdResolved);
+  const onUnavailableRef = useRef(onUnavailable);
   useEffect(() => {
     onEventRef.current = onEvent;
     onAdResolvedRef.current = onAdResolved;
+    onUnavailableRef.current = onUnavailable;
+    playbackRef.current = playback;
   });
 
+  // Resolved on the client from the origin the page is actually on, not from the
+  // env var: under `dev:https` those disagree, and the wrong one either disables
+  // the sandbox or points it at a scheme the browser will not frame.
+  // Read during render rather than from an effect: this component only ever
+  // mounts after a click, so it is never server-rendered and there is no
+  // hydration pass for the two answers to disagree across.
+  const [sandboxOrigin] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : getSandboxUrl(window.location.origin),
+  );
   useEffect(() => {
-    let cancelled = false;
-    let adsLoader: google.ima.AdsLoader | undefined;
-    let adsManager: google.ima.AdsManager | undefined;
-    let observer: IntersectionObserver | undefined;
-    const startedAt = performance.now();
+    if (!sandboxOrigin) onUnavailableRef.current?.();
+  }, [sandboxOrigin]);
 
-    const emit = (
-      name: string,
-      tone: PlayerEvent["tone"],
-      detail?: string,
-      source: PlayerEvent["source"] = "player",
-    ) => {
-      onEventRef.current({
-        at: Math.round(performance.now() - startedAt),
-        source,
-        name,
-        detail,
-        tone,
-      });
+  useEffect(() => {
+    if (!sandboxOrigin) return;
+
+    /** Everything the frame needs, sent whenever we have something new to say. */
+    const send = () => {
+      const frame = frameRef.current?.contentWindow;
+      if (!frame || !readyRef.current) return;
+      frame.postMessage(
+        {
+          channel: SANDBOX_CHANNEL,
+          type: "init",
+          playback: playbackRef.current,
+          // Absolute: the frame is on another origin, so a root-relative path
+          // there would resolve against the sandbox host, which does not serve it.
+          contentSrc: contentSrc ? new URL(contentSrc, window.location.origin).href : undefined,
+          locale: document.documentElement.lang || "en",
+        },
+        sandboxOrigin,
+      );
     };
 
-    const run = () => {
-      // Nothing is emitted before this point on purpose. React StrictMode
-      // mounts an effect twice in development, and an emit in the effect body
-      // would append two identical opening rows to a timeline whose whole
-      // value is being an accurate record. Past the `cancelled` check only the
-      // surviving mount speaks.
-      if (cancelled) return;
-      const container = containerRef.current;
-      const video = videoRef.current;
-      if (!container || !video) return;
+    const onMessage = (event: MessageEvent) => {
+      // Origin, then window. Origin alone is not enough — the page hosts other
+      // frames, and a timeline whose rows anyone can inject is not a record.
+      if (event.origin !== sandboxOrigin) return;
+      if (event.source !== frameRef.current?.contentWindow) return;
+      if (!isSandboxMessage(event.data)) return;
 
-      emit("sdkReady", "info", undefined, "validator");
-
-      google.ima.settings.setVpaidMode(VPAID_MODE_VALUES[vpaidMode]());
-      // IMA renders its own UI strings; matching the page keeps a Russian
-      // reader from meeting an English "Skip ad" button mid-report.
-      google.ima.settings.setLocale(document.documentElement.lang || "en");
-
-      const displayContainer = new google.ima.AdDisplayContainer(container, video);
-      // Must happen inside the user gesture that started the run, which is why
-      // the whole stage mounts on click rather than on page load.
-      displayContainer.initialize();
-
-      adsLoader = new google.ima.AdsLoader(displayContainer);
-
-      const reportError = (event: google.ima.AdErrorEvent) => {
-        const error = event.getError?.();
-        if (!error) {
-          emit("adError", "dead");
-          return;
-        }
-        // Both codes are worth having: getErrorCode() is IMA's own, while
-        // getVastErrorCode() is the IAB number the report already speaks in.
-        const vast = error.getVastErrorCode?.();
-        const detail = [
-          error.getMessage(),
-          `IMA ${error.getErrorCode()}`,
-          vast ? `VAST ${vast}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ");
-        emit("adError", "dead", detail);
-      };
-
-      adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (event) => {
-        reportError(event as google.ima.AdErrorEvent);
-      }, false);
-
-      adsLoader.addEventListener(
-        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-        (event) => {
-          if (cancelled) return;
-          const settings = new google.ima.AdsRenderingSettings();
-          settings.restoreCustomPlaybackStateOnAdBreakComplete = true;
-          adsManager = (event as google.ima.AdsManagerLoadedEvent).getAdsManager(
-            video,
-            settings,
-          );
-
-          adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, (e) => {
-            reportError(e as google.ima.AdErrorEvent);
-          });
-
-          // IMA's own non-fatal diagnostics. Nothing else on the market
-          // surfaces these, and they are frequently the only clue when a tag
-          // "works" but silently drops a creative.
-          adsManager.addEventListener(google.ima.AdEvent.Type.LOG, (e) => {
-            const data = (e as google.ima.AdEvent).getAdData?.();
-            const message =
-              data && typeof data === "object" && "adError" in data
-                ? String((data as { adError?: unknown }).adError)
-                : JSON.stringify(data ?? {});
-            emit("log", "warn", message);
-          });
-
-          for (const { key, name, tone } of TRACKED) {
-            const type = google.ima.AdEvent.Type[key];
-            if (!type) continue;
-            adsManager.addEventListener(type, (e) => {
-              const adEvent = e as google.ima.AdEvent;
-              if (name === "loaded") {
-                const ad = adEvent.getAd?.();
-                if (ad) {
-                  onAdResolvedRef.current({
-                    adId: ad.getAdId(),
-                    adSystem: ad.getAdSystem(),
-                    title: ad.getTitle(),
-                    duration: ad.getDuration(),
-                    width: ad.getVastMediaWidth() || ad.getWidth(),
-                    height: ad.getVastMediaHeight() || ad.getHeight(),
-                    contentType: ad.getContentType(),
-                    apiFramework: ad.getApiFramework(),
-                    universalAdIdRegistry: ad.getUniversalAdIdRegistry(),
-                    universalAdIdValue: ad.getUniversalAdIdValue(),
-                    wrapperAdSystems: ad.getWrapperAdSystems() ?? [],
-                    skipTimeOffset: ad.getSkipTimeOffset(),
-                    linear: ad.isLinear(),
-                    mediaUrl: ad.getMediaUrl(),
-                  });
-                }
-              }
-              emit(name, tone);
-            });
-          }
-
-          try {
-            adsManager.init(
-              container.clientWidth || 640,
-              container.clientHeight || 360,
-              google.ima.ViewMode.NORMAL,
-            );
-            if (placement === "outstream") {
-              // Outstream starts on visibility, muted, the way a real in-page
-              // renderer does — starting it off-screen would make the
-              // viewability events in the timeline meaningless.
-              //
-              // Announced in the timeline rather than left implicit: an ad
-              // that is deliberately waiting and an ad that has silently
-              // failed look identical in an empty player, and telling those
-              // two apart is the entire job of this tool.
-              adsManager.setVolume(0);
-              emit("waitingForViewability", "info", undefined, "validator");
-              observer = new IntersectionObserver(
-                (entries) => {
-                  if (entries.some((entry) => entry.intersectionRatio >= 0.5)) {
-                    observer?.disconnect();
-                    emit("inView", "info", undefined, "validator");
-                    adsManager?.start();
-                  }
-                },
-                { threshold: [0, 0.5] },
-              );
-              observer.observe(container);
-            } else {
-              adsManager.start();
-            }
-          } catch (cause) {
-            emit("startFailed", "dead", cause instanceof Error ? cause.message : undefined);
-          }
-        },
-        false,
-      );
-
-      const request = new google.ima.AdsRequest();
-      if (playback.adsResponse !== undefined) {
-        request.adsResponse = playback.adsResponse;
-        emit("adsResponse", "info", undefined, "validator");
-      } else if (playback.adTagUrl !== undefined) {
-        request.adTagUrl = playback.adTagUrl;
-        emit("adTagUrl", "info", undefined, "validator");
-      } else {
-        emit("noPlayableDocument", "dead", undefined, "validator");
+      const message = event.data;
+      if (message.type === "ready") {
+        readyRef.current = true;
+        send();
         return;
       }
-      request.linearAdSlotWidth = container.clientWidth || 640;
-      request.linearAdSlotHeight = container.clientHeight || 360;
-      request.nonLinearAdSlotWidth = container.clientWidth || 640;
-      request.nonLinearAdSlotHeight = Math.floor((container.clientHeight || 360) / 3);
-      request.setAdWillAutoPlay(true);
-      request.setAdWillPlayMuted(placement === "outstream");
-
-      adsLoader.requestAds(request);
+      if (message.type === "event") {
+        onEventRef.current(message.event);
+        return;
+      }
+      if (message.type === "resolved") {
+        onAdResolvedRef.current(message.ad);
+      }
     };
 
-    // The two halves are caught separately. A throw from `run()` is a fault in
-    // this stage, not a missing SDK, and reporting it as `sdkLoadFailed` would
-    // put a wrong row in a timeline whose whole value is being an accurate
-    // record of what happened.
-    loadImaSdk().then(
-      () => {
-        if (cancelled) return;
-        try {
-          run();
-        } catch (cause) {
-          emit(
-            "stageFailed",
-            "dead",
-            cause instanceof Error ? cause.message : undefined,
-            "validator",
-          );
-        }
+    window.addEventListener("message", onMessage);
+    // The frame may already have announced itself before this listener existed
+    // — on a warm cache that race is real — so speak once unprompted too.
+    send();
+    return () => window.removeEventListener("message", onMessage);
+    // `playback` is read through a ref; the effect below pushes it when it lands.
+  }, [sandboxOrigin, contentSrc]);
+
+  // The document half of the handshake: whenever the inspection lands, tell the
+  // frame. Harmless before `ready` — `send()` is a no-op then, and the `ready`
+  // handler sends the current value.
+  useEffect(() => {
+    const frame = frameRef.current?.contentWindow;
+    if (!sandboxOrigin || !frame || !readyRef.current || !playback) return;
+    frame.postMessage(
+      {
+        channel: SANDBOX_CHANNEL,
+        type: "init",
+        playback,
+        contentSrc: contentSrc ? new URL(contentSrc, window.location.origin).href : undefined,
+        locale: document.documentElement.lang || "en",
       },
-      (cause) => {
-        if (!cancelled) {
-          emit(
-            SDK_LOAD_FAILED,
-            "dead",
-            cause instanceof Error ? cause.message : undefined,
-            "validator",
-          );
-        }
-      },
+      sandboxOrigin,
     );
+  }, [playback, sandboxOrigin, contentSrc]);
 
-    return () => {
-      cancelled = true;
-      observer?.disconnect();
-      try {
-        adsManager?.destroy();
-      } catch {
-        /* noop */
-      }
-      try {
-        adsLoader?.destroy();
-      } catch {
-        /* noop */
-      }
-    };
-    // Mount-once: a re-run remounts via `runToken` rather than re-running this
-    // effect in place, matching how PreviewPanel restarts its players.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runToken]);
+  if (!sandboxOrigin) return null;
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-ctl bg-well-screen">
-      <div ref={containerRef} className="absolute inset-0" />
-      <video
-        ref={videoRef}
-        // Instream plays a content clip that IMA pauses for the break, which is
-        // what makes CONTENT_PAUSE_REQUESTED/RESUME_REQUESTED real rather than
-        // theoretical. Outstream has no content, so the element stays hidden and
-        // exists only because IMA requires one.
-        className={placement === "instream" && contentSrc ? "size-full object-contain" : "hidden"}
-        src={placement === "instream" ? contentSrc : undefined}
-        muted
-        playsInline
-        // Not `auto`: IMA pauses the content for the whole ad break, so a run
-        // plays only a few seconds of it. Preloading the file in full would
-        // spend the visitor's bandwidth on video nobody watches.
-        preload="metadata"
-      />
-    </div>
+    <iframe
+      ref={frameRef}
+      // Cache-busted per run so a re-run gets a genuinely fresh document rather
+      // than a frame holding a dead AdsManager — the remount `runToken` gives
+      // this component is only worth having if the frame honours it too.
+      src={`${sandboxOrigin}/c/player?r=${runToken}`}
+      title="VAST player"
+      // Autoplay is delegated across the origin boundary; user activation is not
+      // inherited by a cross-origin frame.
+      allow="autoplay; fullscreen"
+      className="aspect-video w-full rounded-ctl border-0 bg-well-screen"
+    />
   );
 }

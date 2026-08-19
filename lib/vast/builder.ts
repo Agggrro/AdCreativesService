@@ -143,14 +143,28 @@ export function buildInlineVast(ctx: VastBuildContext): string {
   // [ERRORCODE] is a VAST macro the player substitutes; it must stay literal.
   const errorUrl = `${trackingUrl(ctx.siteUrl, cid, "error")}&code=[ERRORCODE]`;
 
+  // The child order below is the XSD's xs:sequence for InLine, not house style:
+  //   AdSystem, Error, Extensions, Impression, Pricing, ViewableImpression,
+  //   AdServingId, AdTitle, AdVerifications, Advertiser, Category, Creatives, …
+  // Base type first, which is why Error precedes AdTitle and reads inverted.
+  // A strict parser rejects a mis-ordered document outright while a lenient one
+  // accepts it, so getting this wrong ships a tag that works on the player you
+  // happened to test and fails elsewhere. Our own inspector holds the same
+  // sequence in lib/vast-inspect/rules/ordering.ts — change both or neither.
+  //
+  // AdServingId is required and non-empty from 4.1 (§3.4). An SSP that wraps
+  // this tag mints its own at its own level, which does not satisfy the
+  // InLine's: strict ingest parsers validate this element here.
+
   return `${XML_DECL}
 <VAST version="4.2">
   <Ad id="${escapeXml(cid)}">
     <InLine>
       <AdSystem version="1.0">CreoSmith</AdSystem>
-      <AdTitle><![CDATA[CreoSmith Interactive Creative]]></AdTitle>
       <Error>${cdata(errorUrl)}</Error>
       <Impression>${cdata(trackingUrl(ctx.siteUrl, cid, "impression"))}</Impression>
+      <AdServingId>${escapeXml(cid)}</AdServingId>
+      <AdTitle><![CDATA[CreoSmith Interactive Creative]]></AdTitle>
 ${adVerifications}      <Creatives>
         <Creative id="${escapeXml(cid)}" sequence="1">
           <UniversalAdId idRegistry="creosmith">${escapeXml(cid)}</UniversalAdId>

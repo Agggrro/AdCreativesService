@@ -311,25 +311,9 @@ const ru = {
       inputLabelXml: "Тело документа VAST",
       placeholderUrl: "https://adserver.example.com/vast?id=…",
       placeholderXml: "<VAST version=\"4.2\"> …",
-      settings: "Параметры прогона",
-      placement: "Формат показа",
-      placementInstream: "Instream",
-      placementOutstream: "Outstream",
-      placementHint:
-        "Instream — преролл перед контентным видео. Outstream — блок в потоке страницы, стартует при попадании в зону видимости.",
       pixels: "Трекинг-пиксели",
       pixelsDry: "Не отправлять",
       pixelsLive: "Отправлять",
-      pixelsHintDry:
-        "Пиксели подменяются на наш адрес и наружу не уходят: чужая статистика не сдвинется, бюджет не тратится. Скрипты верификации в этом режиме тоже не загружаются.",
-      pixelsHintLive:
-        "Тег проигрывается как есть — показы, квартили и клики засчитываются по-настоящему в тех системах, что указаны в теге.",
-      vpaidMode: "Режим VPAID",
-      vpaidEnabled: "Обычный",
-      vpaidInsecure: "Небезопасный",
-      vpaidDisabled: "Выключен",
-      vpaidHint:
-        "Плеер запускает VPAID-юниты в песочнице. Небезопасный режим даёт юниту доступ к странице — так его запускают многие продакшен-плееры.",
       run: "Проверить",
       running: "Проверяем",
       errEmptyUrl: "Вставьте ссылку на VAST-тег.",
@@ -337,7 +321,6 @@ const ru = {
       errBadUrl: "Это не похоже на абсолютный адрес. Ожидается http:// или https://.",
       errTooLarge: "Документ больше 256 КБ — столько мы не разбираем.",
       errRequest: "Не удалось выполнить проверку. Попробуйте ещё раз.",
-      verdict: "Вердикт",
       verdictPass: "Пройдено",
       verdictWarn: "С замечаниями",
       verdictFail: "Не пройдено",
@@ -352,7 +335,6 @@ const ru = {
       severityError: "Ошибка",
       severityWarning: "Внимание",
       severityAdvisory: "Совет",
-      summary: "Сводка",
       version: "Версия VAST",
       versionUnknown: "не объявлена",
       ads: "Объявлений",
@@ -360,12 +342,9 @@ const ru = {
       downloaded: "Загружено",
       sectionInteractive: "Интерактивные стандарты",
       sectionFeatures: "Возможности",
-      sectionFindings: "Находки",
-      sectionTrackers: "Трекинг",
       sectionChain: "Цепочка обёрток",
       sectionRecommendations: "Рекомендации",
       sectionTimeline: "Ход проверки",
-      sectionPlayer: "Показ",
       standard: "Стандарт",
       responded: "Ответ получен",
       ms: "мс",
@@ -373,7 +352,6 @@ const ru = {
       colSince: "С версии",
       colFound: "В вашем теге",
       colWhere: "Где",
-      colMessage: "Что не так",
       colEvent: "Событие",
       colUrl: "Адрес",
       colHop: "Хоп",
@@ -388,28 +366,37 @@ const ru = {
       deprecatedIn: "устарело с",
       removedIn: "исключено в",
       noFindings: "Нарушений спецификации не найдено.",
-      noTrackers: "Трекинговых адресов в теге нет.",
       noTimeline: "События появятся после запуска показа.",
       iabCode: "Код IAB",
-      copyReport: "Скопировать отчёт",
-      copiedReport: "Отчёт скопирован",
-      downloadReport: "Скачать отчёт",
-      downloadJson: "Скачать JSON",
-      shareHint:
-        "Отчёт существует только на этой странице — исходники мы не сохраняем. Скопируйте или скачайте его, чтобы передать коллеге.",
-      startPlayback: "Запустить показ",
-      restartPlayback: "Запустить заново",
       playerUnavailable:
         "Показ невозможен: из тега не удалось получить документ, пригодный для плеера.",
-      pixelModeChanged:
-        "Режим трекинг-пикселей изменён после проверки. Документ для плеера готовится в момент проверки, поэтому запустите её заново — иначе показ пошёл бы по прежним настройкам.",
+      pixelsHelp:
+        "«Не отправлять» — пиксели подменяются на наш адрес: чужая статистика не сдвинется и бюджет не потратится, скрипты верификации не загрузятся. «Отправлять» — тег играет как есть, показы, квартили и клики засчитываются по-настоящему в тех системах, что указаны в теге.",
+      inputHelp:
+        "Отчёт живёт только на этой странице — ни ссылку, ни тело документа мы не сохраняем. Проверенная ссылка попадает в адресную строку, так что страницу можно передать коллеге или положить в закладки.",
+      recommendationsHelp:
+        "Ошибка — нарушение объявленной версии спецификации. Внимание — формально допустимо, но ломается у части плееров и площадок. Совет — возможность, которой тег не пользуется.",
+      colTracker: "Трекер",
+      trackerHelp:
+        "Адрес из самого тега — то, что ушло бы в бою. Плеер не сообщает, какой именно URL он дёрнул, поэтому строка сопоставлена с событием по имени, а не по факту запроса.",
+      trackersUnfired: "Объявлены, но не сработали",
+      sectionReference: "Разбор документа",
+      wellIdle:
+        "Плеер запустится сразу после нажатия «Проверить».",
+      inputMode: "Способ ввода",
+      sectionComparison: "XML против плеера",
+      // Units are interface text, not machine values: `256 КБ` in an error message and
+      // `256 KB` in the table beside it is the same screen speaking two languages.
+      unitSeconds: "с",
+      unitBytes: "Б",
+      unitKb: "КБ",
+      unitMb: "МБ",
+      sandboxUnavailable:
+        "Показ отключён: не настроен отдельный домен для плеера. Тег исполняет чужой JavaScript, поэтому мы запускаем его только в изолированном origin — иначе креатив получил бы доступ к этой странице и к вашей сессии. Отчёт выше собран на сервере и остаётся верным.",
       sdkBlocked:
         "Google IMA SDK заблокирован браузером — так делают блокировщики рекламы и расширения приватности. Это мешает только показу: отчёт выше собран на сервере и остаётся верным. Разрешите адрес для этого сайта и запустите показ заново:",
       degradedNotice:
         "Анализ неполный: часть правил завершилась с ошибкой и не отработала. Отсутствие находок по ним не означает, что нарушений нет.",
-      dryRunNotice:
-        "Пиксели подменены — наружу ничего не уходит. В этом режиме документ отдаётся плееру с нашего домена, поэтому ошибка CORS, которая проявилась бы в бою, здесь не возникнет.",
-      liveNotice: "Тег проигрывается как есть: все пиксели срабатывают по-настоящему.",
     },
   },
 };
@@ -684,25 +671,9 @@ const en: Dict = {
       inputLabelXml: "VAST document body",
       placeholderUrl: "https://adserver.example.com/vast?id=…",
       placeholderXml: "<VAST version=\"4.2\"> …",
-      settings: "Run settings",
-      placement: "Placement",
-      placementInstream: "Instream",
-      placementOutstream: "Outstream",
-      placementHint:
-        "Instream is a preroll before content video. Outstream is an in-page slot that starts when it scrolls into view.",
       pixels: "Tracking pixels",
       pixelsDry: "Do not fire",
       pixelsLive: "Fire",
-      pixelsHintDry:
-        "Pixels are rewritten to our own address and never leave: nobody else's numbers move and no budget is spent. Verification scripts are not loaded in this mode either.",
-      pixelsHintLive:
-        "The tag plays as authored — impressions, quartiles and clicks are counted for real in whatever systems the tag names.",
-      vpaidMode: "VPAID mode",
-      vpaidEnabled: "Standard",
-      vpaidInsecure: "Insecure",
-      vpaidDisabled: "Disabled",
-      vpaidHint:
-        "The player sandboxes VPAID units by default. Insecure mode gives the unit access to the page, which is how many production players run it.",
       run: "Check",
       running: "Checking",
       errEmptyUrl: "Paste a VAST tag URL.",
@@ -710,7 +681,6 @@ const en: Dict = {
       errBadUrl: "That does not look like an absolute address. http:// or https:// is expected.",
       errTooLarge: "The document is larger than 256 KB, which is more than we parse.",
       errRequest: "The check could not be completed. Try again.",
-      verdict: "Verdict",
       verdictPass: "Pass",
       verdictWarn: "Pass with warnings",
       verdictFail: "Fail",
@@ -720,7 +690,6 @@ const en: Dict = {
       severityError: "Error",
       severityWarning: "Warning",
       severityAdvisory: "Advisory",
-      summary: "Summary",
       version: "VAST version",
       versionUnknown: "not declared",
       ads: "Ads",
@@ -728,12 +697,9 @@ const en: Dict = {
       downloaded: "Downloaded",
       sectionInteractive: "Interactive standards",
       sectionFeatures: "Capabilities",
-      sectionFindings: "Findings",
-      sectionTrackers: "Tracking",
       sectionChain: "Wrapper chain",
       sectionRecommendations: "Recommendations",
       sectionTimeline: "Run timeline",
-      sectionPlayer: "Playback",
       standard: "Standard",
       responded: "Responded",
       ms: "ms",
@@ -741,7 +707,6 @@ const en: Dict = {
       colSince: "Since",
       colFound: "In your tag",
       colWhere: "Where",
-      colMessage: "What is wrong",
       colEvent: "Event",
       colUrl: "Address",
       colHop: "Hop",
@@ -756,28 +721,35 @@ const en: Dict = {
       deprecatedIn: "deprecated in",
       removedIn: "removed in",
       noFindings: "No specification violations found.",
-      noTrackers: "The tag carries no tracking addresses.",
       noTimeline: "Events appear once playback starts.",
       iabCode: "IAB code",
-      copyReport: "Copy report",
-      copiedReport: "Report copied",
-      downloadReport: "Download report",
-      downloadJson: "Download JSON",
-      shareHint:
-        "The report exists only on this page — we keep no copy of what you checked. Copy or download it to pass it on.",
-      startPlayback: "Start playback",
-      restartPlayback: "Play again",
       playerUnavailable:
         "Playback is not possible: the tag yielded no document a player could use.",
-      pixelModeChanged:
-        "The tracking-pixel mode changed after the check. The document handed to the player is prepared at check time, so run the check again — otherwise playback would use the previous setting.",
+      pixelsHelp:
+        "“Do not fire” rewrites every pixel to our own address: nobody else’s numbers move, no budget is spent, and verification scripts are not loaded. “Fire” plays the tag as authored — impressions, quartiles and clicks are counted for real in whatever systems the tag names.",
+      inputHelp:
+        "The report lives only on this page — we keep no copy of the URL or the document. A checked URL goes into the address bar, so the page can be passed to a colleague or bookmarked.",
+      recommendationsHelp:
+        "Error — a violation of the declared specification. Warning — formally allowed, but broken on part of the market. Advisory — a capability the tag does not use.",
+      colTracker: "Tracker",
+      trackerHelp:
+        "The address from the tag itself — what would fire in production. No player reports which URL it actually requested, so the row is matched to the event by name rather than by observation.",
+      trackersUnfired: "Declared but never fired",
+      sectionReference: "Document detail",
+      wellIdle:
+        "The player starts as soon as you press Check.",
+      inputMode: "Input mode",
+      sectionComparison: "XML versus player",
+      unitSeconds: "s",
+      unitBytes: "B",
+      unitKb: "KB",
+      unitMb: "MB",
+      sandboxUnavailable:
+        "Playback is off: no separate origin is configured for the player. A tag executes someone else's JavaScript, so we only run it in an isolated origin — otherwise the creative would reach this page and your session. The report above was built on the server and still stands.",
       sdkBlocked:
         "The Google IMA SDK was blocked by the browser — ad blockers and privacy extensions do this. Only playback is affected: the report above was built on the server and still stands. Allow the address for this site and start playback again:",
       degradedNotice:
         "The analysis is incomplete: some rules threw and did not run. No finding from them does not mean there is no violation.",
-      dryRunNotice:
-        "Pixels are rewritten and nothing leaves. In this mode the document is served to the player from our own domain, so a CORS fault that would break the live run cannot appear here.",
-      liveNotice: "The tag plays as authored: every pixel fires for real.",
     },
   },
 };

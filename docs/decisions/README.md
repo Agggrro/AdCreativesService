@@ -34,6 +34,8 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0017](0017-runtime-assets-on-public-cdn.md) | Creative runtime assets on a public, content-addressed CDN | Accepted |
 | [0018](0018-dedicated-ad-serving-domain.md) | A dedicated ad-serving domain, with neutral paths | Accepted |
 | [0019](0019-creative-telemetry-channel.md) | Creative telemetry over an origin-locked postMessage channel | Accepted |
+| [0020](0020-validator-reports-faults-not-opinions.md) | The validator reports faults, not opinions | Accepted |
+| [0021](0021-validator-player-on-an-isolated-origin.md) | The validator's player runs on an isolated origin | Accepted |
 
 ## Template
 

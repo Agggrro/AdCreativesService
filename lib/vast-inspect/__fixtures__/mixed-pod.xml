@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A pod: one VPAID ad, one ordinary linear video ad.
+
+  The regression this pins down is a scoping bug, not a rule. The VPAID advisory
+  suppression (ADR-0020) was first written into `appliesTo`, which the runner
+  evaluates once per document — while the rules it gated report once per InLine.
+  One VPAID node anywhere therefore silenced the advice for every other ad in the
+  response, and a pod is the ordinary shape that breaks under that.
+
+  Ad 2 is a plain video creative with no ViewableImpression: the advisory must
+  still fire for it. Ad 1 is VPAID-only and must not draw one of its own — but an
+  id-based corpus cannot tell the two apart, so `maxAdvisories` bounds the count
+  instead. Both ads are otherwise clean, and both are in the XSD child order, so
+  nothing else should be reported.
+-->
+<VAST version="4.2">
+  <Ad id="pod-1" sequence="1">
+    <InLine>
+      <AdSystem>Fixture</AdSystem>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://tracking.example.com/impression-1]]></Impression>
+      <AdServingId>fixture-pod-vpaid</AdServingId>
+      <AdTitle>Interactive unit</AdTitle>
+      <Advertiser>Example Brand</Advertiser>
+      <Creatives>
+        <Creative id="creative-pod-vpaid">
+          <UniversalAdId idRegistry="Ad-ID">EXMP0004000</UniversalAdId>
+          <Linear>
+            <Duration>00:00:15</Duration>
+            <AdParameters><![CDATA[{"clickThroughUrl":"https://www.example.com/landing"}]]></AdParameters>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="application/javascript" apiFramework="VPAID" width="640" height="360"><![CDATA[https://cdn.example.com/unit.js]]></MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+  <Ad id="pod-2" sequence="2">
+    <InLine>
+      <AdSystem>Fixture</AdSystem>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://tracking.example.com/impression-2]]></Impression>
+      <AdServingId>fixture-pod-linear</AdServingId>
+      <AdTitle>Ordinary linear preroll</AdTitle>
+      <Advertiser>Example Brand</Advertiser>
+      <Creatives>
+        <Creative id="creative-pod-linear">
+          <UniversalAdId idRegistry="Ad-ID">EXMP0005000</UniversalAdId>
+          <Linear>
+            <Duration>00:00:10</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracking.example.com/start]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://tracking.example.com/complete]]></Tracking>
+            </TrackingEvents>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360" bitrate="600"><![CDATA[https://cdn.example.com/spot.mp4]]></MediaFile>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://www.example.com/landing]]></ClickThrough>
+            </VideoClicks>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

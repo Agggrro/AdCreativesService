@@ -167,17 +167,7 @@ export interface InteractiveHit {
   notes: Msg[];
 }
 
-export interface Recommendation {
-  id: string;
-  severity: Severity;
-  title: Msg;
-  body: Msg;
-  /** Findings this recommendation answers, so the UI can link them. */
-  relatedRuleIds: string[];
-}
-
 export type PixelMode = "dryRun" | "live";
-export type Placement = "instream" | "outstream";
 
 /**
  * What the client should hand the player. In dry-run this is a rewritten
@@ -239,7 +229,6 @@ export interface InspectReport {
   interactive: InteractiveHit[];
   findings: Finding[];
   trackers: TrackerHit[];
-  recommendations: Recommendation[];
   /**
    * Rules that threw during analysis. Non-empty means the report is partial,
    * and saying so is the difference between "no violation" and "never checked".

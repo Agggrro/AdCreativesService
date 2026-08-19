@@ -53,6 +53,49 @@ export function railRow(tone: Tone | null): string {
   } first:rounded-t-ctl last:rounded-b-ctl`;
 }
 
+/* ---------- readout density (docs/design-system.md §6) ---------- */
+
+/**
+ * 32px row, for machine readouts only.
+ *
+ * A readout is a table the system emits and the reader scans — the validator's
+ * run timeline, feature matrix, wrapper chain and parser-versus-player table.
+ * A list of things the user owns stays at 44px, always.
+ *
+ * The bar this density has to clear is legibility of the whole run, not fitting
+ * more in: a sixty-row timeline at 44px is 2,640px of scrolling and the reader
+ * loses the shape of it, which is the only thing a timeline is for. Ten
+ * creatives at 32px would just be cramped, which is why the default does not
+ * move.
+ *
+ * **No row in this density carries a row-level action.** A row you can act on is
+ * not a readout and takes the full height — that constraint is what stops this
+ * from becoming a general-purpose way to cram.
+ *
+ * The type is part of the cell rather than left to each call site. Without it the
+ * cell inherits the 16px/24px body strut, and a 20px inline-block sitting on that
+ * baseline pushes the line box to 40px — a 52px row wearing 32px padding. A cell
+ * whose only content is a chip or another inline-block should wrap it in a
+ * `flex` span, which has no line box at all.
+ */
+export const CELL_TIGHT = "px-3 py-1.5 align-middle text-[13px] leading-5";
+
+/** Header cell at the readout density. */
+export const HEAD_TIGHT = "label-instr whitespace-nowrap px-3 py-1.5 text-left";
+
+/** Right-aligned readout header, for numeric columns. */
+export const NUM_HEAD_TIGHT = `${HEAD_TIGHT} text-right`;
+
+/**
+ * First cell of a readout row, carrying the 3px state rail.
+ *
+ * Left padding drops to 9px so rail plus padding still sum to the 12px cell
+ * inset — the same arithmetic as `railCell`, one step down.
+ */
+export function railCellTight(tone: Tone | null, extra = ""): string {
+  return `${CELL_TIGHT} border-l-[3px] pl-[9px] ${tone ? RAIL[tone] : "border-l-transparent"} ${extra}`;
+}
+
 /**
  * Scroll frame for a table.
  *

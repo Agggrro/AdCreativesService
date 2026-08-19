@@ -1,5 +1,5 @@
 import type { Msg, RuleGroup, Severity, SpecRef, VastVersion } from "../model";
-import type { VNode } from "../xml-tree";
+import { attr, descendants, type VNode } from "../xml-tree";
 
 /**
  * Shared vocabulary for the rule catalogue.
@@ -216,4 +216,18 @@ export function isInsideWrapper(node: VNode): boolean {
     current = current.parent;
   }
   return false;
+}
+
+/**
+ * Every node that declares VPAID, on either a MediaFile or a Creative.
+ *
+ * Lives here rather than in the interactive group because two groups now ask
+ * the question: `interactive` to check how the unit is authored, and `modern`
+ * to stay quiet about VAST elements a VPAID creative replaces with its own
+ * machinery. A second copy of this predicate would be a second answer.
+ */
+export function vpaidNodes(root: VNode): VNode[] {
+  return [...descendants(root, "MediaFile"), ...descendants(root, "Creative")].filter(
+    (node) => (attr(node, "apiFramework") ?? "").toLowerCase() === "vpaid",
+  );
 }

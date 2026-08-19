@@ -40,7 +40,6 @@ const EXPECTATIONS = [
     maxWarnings: 0,
     absent: [
       "VAST-adserving-id-required",
-      "VPAID-deprecated",
       // The fixture used to be out of order while claiming to be clean, which
       // is what motivated the ordering rule at all.
       "VAST-child-order-inline",
@@ -69,14 +68,44 @@ const EXPECTATIONS = [
   {
     file: "vpaid-in-43.xml",
     // VPAID is deprecated, never invalid — 4.3 did not remove it. A hard error
-    // here would be a fabricated spec violation on a conformant tag.
+    // here would be a fabricated spec violation on a conformant tag. We no
+    // longer report the deprecation at all: choosing VPAID is the buyer’s
+    // decision, and a validator that editorialises about it gets skimmed past.
     verdict: "warn",
     // `maxErrors: 0` is the guard that matters, and it is deliberately not an
     // `absent` entry naming the deleted rule id: an id-based assertion goes
     // green the moment someone re-introduces the same mistake under a different
     // name, which is exactly the regression it was supposed to pin.
     maxErrors: 0,
-    rules: ["VPAID-deprecated", "VPAID-no-video-fallback", "VAST-universal-ad-id-unknown"],
+    // Bounded, not open: with the deprecation gone and the fallback advisory now
+    // out of the verdict, `warn` rests on VAST-universal-ad-id-unknown alone. An
+    // unbounded `warn` would have quietly absorbed the child-order violation this
+    // fixture used to carry while calling itself conformant.
+    maxWarnings: 1,
+    rules: ["VPAID-no-video-fallback", "VAST-universal-ad-id-unknown"],
+    // A VPAID unit has no video asset for an SSAI platform to transcode and
+    // measures its own viewability (ADR-0012), so neither advisory can be
+    // acted on here. Pinned as `absent` because both fired on our own
+    // templates and were the noise that motivated the suppression.
+    absent: ["VAST-mezzanine-recommended", "VAST-viewable-impression"],
+  },
+  {
+    // A pod, and the reason it exists: the VPAID advisory suppression is scoped
+    // per creative, not per document. Ad 2 is a plain linear video with no
+    // ViewableImpression and must still be advised, even though Ad 1 is VPAID.
+    // `maxAdvisories` is what keeps Ad 1 from silently drawing one too — an
+    // id-based assertion cannot tell the two ads apart.
+    file: "mixed-pod.xml",
+    verdict: "pass",
+    maxErrors: 0,
+    maxWarnings: 0,
+    // Four: closed-captions and the VPAID fallback once each, plus BOTH advisories
+    // for Ad 2 — it has a real video asset, so Mezzanine is transcodable and
+    // viewability is the player’s to measure. That both fire here while neither
+    // fires on the all-VPAID fixture is the whole scoping guarantee.
+    maxAdvisories: 4,
+    rules: ["VAST-viewable-impression", "VAST-mezzanine-recommended"],
+    absent: ["VAST-child-order-inline"],
   },
   {
     file: "simid-omid-misplaced.xml",
@@ -89,6 +118,9 @@ const EXPECTATIONS = [
     verdict: "pass",
     maxErrors: 0,
     maxWarnings: 0,
+    // The positive side of the VPAID suppression above. Without this a bug
+    // that disabled the two advisories outright would still pass the corpus.
+    rules: ["VAST-mezzanine-recommended", "VAST-viewable-impression"],
   },
   {
     file: "out-of-order.xml",
@@ -156,6 +188,12 @@ for (const expected of EXPECTATIONS) {
     note(
       `${expected.file}: ${report.counts.warning} warnings, expected at most ${expected.maxWarnings} — ` +
         report.findings.filter((f) => f.severity === "warning").map((f) => f.ruleId).join(", "),
+    );
+  }
+  if (expected.maxAdvisories !== undefined && report.counts.advisory > expected.maxAdvisories) {
+    note(
+      `${expected.file}: ${report.counts.advisory} advisories, expected at most ${expected.maxAdvisories} — ` +
+        report.findings.filter((f) => f.severity === "advisory").map((f) => f.ruleId).join(", "),
     );
   }
   for (const rule of expected.rules ?? []) {

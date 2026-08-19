@@ -11,6 +11,7 @@
 | `GET /api/vast` | The open internet / ad players | Public, unauthenticated, **fail closed** |
 | `POST /api/vast/preview` | Signed-in dashboard users | Authenticated (no subscription check); never touches Stripe or the entitlement gate |
 | `GET /api/vast/preview/[token]` | Third-party player SDKs (Google IMA, Fluid Player), fetched with no session | Public by necessity; self-authorizing via HMAC signature + 120s expiry, **fail closed** like `/api/vast` |
+| `/c/player` (browser) | Whoever pastes a tag into the validator — the creative it names is executed here | Runs `VpaidMode.INSECURE` on an **isolated origin** with no session, no storage and no API of ours; fails closed when none is configured (ADR-0021) |
 | `POST /api/stripe/webhook` | Stripe | Signature-verified; treat unsigned/invalid as hostile |
 | Creative runtime assets, via `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 120s token that names one Storage path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
 | Serving snapshots (Vercel Blob) | Read only by our own functions, never by a player | **Private store, not public.** Keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md) |
@@ -187,6 +188,49 @@ inspection report lives in the caller's page and the state a hop needs travels i
 its signed token. `/void` records nothing on purpose: logging would mean holding
 fragments of other companies' ad tags.
 
+## Running a stranger's creative (`/tools/vast-validator`)
+
+The section above is the validator's *server* surface. This is its client one, and it
+is the larger of the two.
+
+The validator does not merely parse a tag — it plays it, through Google IMA, with
+`VpaidMode.INSECURE`. That is not a lapse: **every production player that runs VPAID at
+all runs it this way**, and a validator that sandboxed the unit would report a success
+the tag will never actually have. Fidelity is the entire product.
+
+INSECURE means IMA executes the VPAID JavaScript in the **hosting document's own
+origin**. So the hosting document is not the app.
+
+**The player runs in an iframe on an isolated origin**
+([ADR-0021](decisions/0021-validator-player-on-an-isolated-origin.md)). `app/c/player`
+is that page; `getSandboxUrl()` in [`lib/site.ts`](../lib/site.ts) resolves where it
+lives — `NEXT_PUBLIC_SANDBOX_URL`, else the ad domain of
+[ADR-0018](decisions/0018-dedicated-ad-serving-domain.md), else, in local development
+only, the loopback twin (`localhost` ↔ `127.0.0.1`). A hostile unit therefore reaches
+an origin that carries no session of ours, no `localStorage` of ours, and no API of
+ours. Dry-run is not what protects here and never could be: `neutralize.ts`
+deliberately leaves `MediaFile` intact, because rewriting the ad itself would mean not
+testing the ad.
+
+- **It fails closed.** With no cross-origin home configured the stage refuses to run and
+  the page says why. Falling back to the app origin would be a control whose absence
+  looks like success, which is the one failure mode a boundary may not have.
+- **The channel is origin-pinned both ways.** `targetOrigin` is never `*` once the peer
+  is known, and every inbound message is checked against the expected origin *and* the
+  expected `source` window — origin alone is not enough, because the page hosts IMA's
+  own frames. The single exception is the frame's opening `ready` ping, which carries no
+  data and exists because a frame cannot know its parent's origin before being told.
+  Same discipline as the creative telemetry channel (ADR-0019), one boundary out.
+- **`frame-ancestors` on `/c/player`** (next.config.ts) stops anyone else embedding it
+  and inheriting a ready-made VPAID execution surface pointed at our domain.
+- **`allow="autoplay"` is deliberate.** Transient user activation does not cross into a
+  cross-origin frame, so the click that starts a run is delegated explicitly.
+
+The trade this makes: the app page can no longer instrument the player, because the
+same-origin policy that stops a creative reading our page stops our tooling reading the
+frame. The frame therefore reports what it *did* — `contentPlaying`, `contentPaused`,
+`contentBlocked`, source `validator` — beside what IMA asked for. A timeline showing
+only the request is what made the original content-resume fault look like a mystery.
 ## Creative payload protection (see ADR-0003)
 
 We provide **access control, not secrecy of client code**. Layers: dynamic VAST

@@ -7,7 +7,6 @@ import {
   isPlayableVideoType,
   simid,
   vast,
-  vast43,
   type Rule,
 } from "./kit";
 
@@ -20,37 +19,6 @@ import {
  * SIMID is strict and easy to mis-author in ways that surface only at runtime.
  */
 export const interactiveRules: Rule[] = [
-  {
-    // Deprecation starts at 4.1, and VPAID is deprecated — never invalid.
-    //
-    // VAST 4.1 §1.8: "with VAST 4.1 we are taking the first steps to officially
-    // deprecate the use of VPAID." VAST 4.3 does NOT remove it: its own change
-    // list only adds SIMID support plus error code 902, its glossary still
-    // defines VPAID, and it still documents what to include "if VPAID support
-    // is indicated in the request". An earlier version of this catalogue raised
-    // a hard error on VPAID in a 4.3 document, which would have been a
-    // fabricated spec violation on a conformant tag.
-    id: "VPAID-deprecated",
-    group: "interactive",
-    severity: "warning",
-    spec: vast43("§1.8 Deprecating VPAID"),
-    appliesTo: (ctx) => atLeast(ctx.declared, "4.1"),
-    check: (ctx) =>
-      vpaidNodes(ctx.root).map((node) =>
-        hit(
-          node,
-          {
-            ru: "VPAID официально объявлен устаревшим начиная с VAST 4.1.",
-            en: "VPAID has been officially deprecated since VAST 4.1.",
-          },
-          {
-            ru: "Формально VPAID всё ещё допустим — спецификация 4.3 его не удаляла. Но он не поддерживается на CTV и всё хуже работает на мобильных. Замена — SIMID: интерактив живёт в изолированном iframe, а видео остаётся обычным MediaFile, который плеер умеет буферизовать и мерить.",
-            en: "VPAID is still formally valid — 4.3 did not remove it. But it is unsupported on CTV and increasingly unreliable on mobile. The replacement is SIMID: the interactive layer runs in a sandboxed iframe while the video stays an ordinary MediaFile the player can buffer and measure.",
-          },
-          "apiFramework=VPAID",
-        ),
-      ),
-  },
   {
     id: "VPAID-mediafile-type",
     group: "interactive",
@@ -108,9 +76,14 @@ export const interactiveRules: Rule[] = [
         ),
   },
   {
+    // Advisory, not a warning. <MediaFiles> is a list of candidates the
+    // player picks from by capability, so a VPAID-only block is conformant —
+    // VPAID 2.0’s own fallback story is exactly this list. The cost is real
+    // (a player without VPAID renders nothing) but it is a reach decision, not
+    // a spec violation, and an image-only unit has no video to fall back to.
     id: "VPAID-no-video-fallback",
     group: "interactive",
-    severity: "warning",
+    severity: "advisory",
     spec: vast("§3.13.3 MediaFiles"),
     check: (ctx) =>
       descendants(ctx.root, "MediaFiles")
@@ -339,10 +312,3 @@ export const interactiveRules: Rule[] = [
         ),
   },
 ];
-
-/** Every node that declares VPAID, on either a MediaFile or a Creative. */
-function vpaidNodes(root: Parameters<typeof descendants>[0]) {
-  return [...descendants(root, "MediaFile"), ...descendants(root, "Creative")].filter(
-    (node) => (attr(node, "apiFramework") ?? "").toLowerCase() === "vpaid",
-  );
-}

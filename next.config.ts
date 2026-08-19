@@ -43,6 +43,35 @@ const NEUTRAL_PATHS = [
   { source: "/c/s/:token", destination: "/api/creative/simid/:token" },
 ];
 
+/**
+ * Origins allowed to frame `/c/player`, the validator's isolated player.
+ *
+ * The page exists to be cross-origin to the app; letting anyone else frame it
+ * would hand them a ready-made VPAID execution surface pointed at our domain.
+ * Mirrors `getAllowedParentOrigins()` in lib/site.ts — inlined because
+ * next.config.ts runs outside the app's module resolution.
+ *
+ * Only `frame-ancestors` is set, not a full policy: IMA loads its own script,
+ * spawns frames and creates blob URLs, and a script-src guess here would break
+ * the playback this page exists for while protecting nothing extra — the origin
+ * boundary is the control.
+ */
+const FRAME_ANCESTORS = (() => {
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  try {
+    const url = new URL(site);
+    const origins = new Set([url.origin]);
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      const twin = new URL(site);
+      twin.hostname = url.hostname === "localhost" ? "127.0.0.1" : "localhost";
+      origins.add(twin.origin);
+    }
+    return [...origins].join(" ");
+  } catch {
+    return "'none'";
+  }
+})();
+
 const nextConfig: NextConfig = {
   async rewrites() {
     // Origin of the public blob store, read off the first pushed asset — its
@@ -107,6 +136,16 @@ const nextConfig: NextConfig = {
         // `Allow-Credentials` — invalid with `*`, and there are no cookies here.
         source: "/:path(v|t|c/.*)",
         headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
+      {
+        // Narrower than the rule above and declared after it, so it wins for
+        // this one path: the player frame is not a cross-origin asset anyone
+        // should fetch, it is a document only our own page may embed.
+        source: "/c/player",
+        headers: [
+          { key: "Content-Security-Policy", value: `frame-ancestors ${FRAME_ANCESTORS}` },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
       },
     ];
   },

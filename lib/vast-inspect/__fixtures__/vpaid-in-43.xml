@@ -3,21 +3,24 @@
   VPAID declared inside a VAST 4.3 document, with no plain video to fall back on.
   The regression this pins down: 4.3 does NOT remove apiFramework="VPAID" — its
   change list only adds SIMID support and error code 902, and it still documents
-  how to serve VPAID when a request asks for it. So this must produce a
-  deprecation WARNING and zero errors. An earlier version of the catalogue
-  reported a hard spec violation here, on a conformant tag.
+  how to serve VPAID when a request asks for it. So this must produce zero
+  errors. An earlier version of the catalogue reported a hard spec violation
+  here, on a conformant tag.
 
-  The missing video fallback is a genuine warning of its own: a CTV player, which
-  cannot run VPAID at all, renders nothing.
+  It also pins what we deliberately do NOT say about a VPAID creative: nothing
+  about the deprecation (a conscious buyer decision), nothing about Mezzanine (no
+  video asset exists to transcode) and nothing about ViewableImpression (the unit
+  measures its own). The missing video fallback stays reported, as advice: a CTV
+  player cannot run VPAID at all and renders nothing.
 -->
 <VAST version="4.3">
   <Ad id="vpaid-1">
     <InLine>
-      <AdServingId>fixture-vpaid-43</AdServingId>
       <AdSystem>Fixture</AdSystem>
-      <AdTitle>Legacy interactive unit</AdTitle>
-      <Impression><![CDATA[https://tracking.example.com/impression]]></Impression>
       <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://tracking.example.com/impression]]></Impression>
+      <AdServingId>fixture-vpaid-43</AdServingId>
+      <AdTitle>Legacy interactive unit</AdTitle>
       <Creatives>
         <Creative id="creative-vpaid">
           <UniversalAdId idRegistry="unknown">unknown</UniversalAdId>

@@ -50,6 +50,7 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 | `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
 | `/dashboard/subscriptions` | session | All billing; Stripe checkout returns here |
 | `/tools/vast-validator`, `/tools/vast-generator` | public | Free tools ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read; the generator is a placeholder |
+| `/c/player` | public | The validator's player, deliberately on a **different origin** from the app ([ADR-0021](decisions/0021-validator-player-on-an-isolated-origin.md)) — it executes a stranger's VPAID unit, so it hosts nothing of ours. Inert until its parent posts a document |
 | `/dev/harness` | **local only** | The creative harness: runs a built VPAID unit against schema-derived config at four slot sizes and judges it against the mandatory lifecycle. 404 outside local development ([security.md](security.md)) |
 
 The public catalog reads `templates` as `anon` — `templates_select_published` already

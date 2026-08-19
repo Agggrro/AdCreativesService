@@ -42,6 +42,14 @@ single standard. See [ADR-0002](decisions/0002-multi-format-creative-delivery.md
 - **Declared `type` must match the actual file.** `baseVideoMediaFile()` sniffs the
   MIME type from the URL's extension rather than assuming `video/mp4` — a webm
   declared as mp4 is a spec violation a strict player is entitled to reject.
+- **`<AdServingId>` is emitted, and `<InLine>`'s children are in schema order.**
+  `AdServingId` is required and non-empty from VAST 4.1 (§3.4); an SSP that wraps our
+  tag mints its own at its own level, which does not satisfy the `InLine`'s, and strict
+  ingest parsers validate it here. The order is the XSD's `xs:sequence` —
+  `AdSystem, Error, Impression, AdServingId, AdTitle, AdVerifications, Creatives` — which
+  reads inverted because `Inline_type` extends `AdDefinitionBase_type` and the base's
+  children come first. `lib/vast/builder.ts` and the inspector's
+  `lib/vast-inspect/rules/ordering.ts` hold the same sequence; change both or neither.
 
 The adapter layer hides these differences from the endpoint. Each adapter is
 responsible for spec-conformant output — validate with the **`vast-spec-reviewer`**
@@ -74,7 +82,13 @@ from secondary sources — several widely-repeated claims are wrong, and a
 validator that repeats them invents violations. **VPAID is deprecated from VAST
 4.1 and has never been removed**: 4.3's own change list only adds SIMID support
 and error code 902, and 4.3 still documents what to include "if VPAID support is
-indicated in the request". `InteractiveCreativeFile` is a **4.0** element, not
+indicated in the request". The engine knows this in order *not* to raise an error —
+it no longer reports the deprecation at all, and suppresses the `Mezzanine` and
+`ViewableImpression` advisories on a VPAID creative, which has no video asset to
+transcode and measures its own viewability ([ADR-0020](decisions/0020-validator-reports-faults-not-opinions.md),
+[ADR-0012](decisions/0012-viewability-measurement.md)). The fact still appears in the
+capability matrix, where a fact belongs; it is not advice.
+`InteractiveCreativeFile` is a **4.0** element, not
 4.1; 4.1 added its `variableDuration` attribute. `Pricing` is 3.0. The
 `interactiveStart` tracking event — the one a SIMID creative fires — arrived in
 the 4.2 XSD.
@@ -84,6 +98,10 @@ running dev server. It asserts that the clean fixture produces zero errors and
 zero warnings, that each broken fixture reports the specific rules it was built
 to trip, that named false positives stay absent, and that dry-run lets no
 third-party tracker through while live mode passes the document byte-identical.
+It also pins the VPAID advisory suppression in **three** directions — absent on the
+all-VPAID fixture, present on the plain linear one, and present on a pod mixing the two.
+The first alone would pass a bug that disabled those advisories outright; the first two
+would pass one that scoped the suppression to the document instead of to the creative.
 Run it after any change to the rules.
 
 Coverage spans VAST 2.0–4.3, SIMID 1.2 and OMID, in ten groups: document, ad,

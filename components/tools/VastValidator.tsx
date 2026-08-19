@@ -1,25 +1,29 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import { Button, buttonClass } from "@/components/ui/Button";
 import { inputClass, Notice } from "@/components/ui/Field";
 import { Segmented } from "@/components/ui/Segmented";
-import { ValidatorReport } from "@/components/tools/ValidatorReport";
-import { ParserVsPlayer, ValidatorTimeline } from "@/components/tools/ValidatorTimeline";
+import { HelpLabel } from "@/components/ui/Tooltip";
+import {
+  DegradedNotice,
+  Recommendations,
+  ReferenceSections,
+  VerdictStrip,
+} from "@/components/tools/ValidatorReport";
+import { ValidatorTimeline } from "@/components/tools/ValidatorTimeline";
 import {
   SDK_LOAD_FAILED,
   ValidatorStage,
   type ResolvedAd,
-  type VpaidMode,
 } from "@/components/validator/ValidatorStage";
 import { IMA_SDK_SRC } from "@/components/players/load-ima-sdk";
 import type { PlayerEvent } from "@/components/players/types";
-// Per-module imports: the @/lib/vast-inspect barrel reaches node:dns via the
-// fetcher and cannot be bundled for the browser. These two modules are pure.
-import type { InspectReport, PixelMode, Placement } from "@/lib/vast-inspect/model";
-import { renderReportText } from "@/lib/vast-inspect/render-text";
+// Per-module import: the @/lib/vast-inspect barrel reaches node:dns via the
+// fetcher and cannot be bundled for the browser. model.ts is pure.
+import type { InspectReport, PixelMode } from "@/lib/vast-inspect/model";
 
 type InputMode = "url" | "xml";
 
@@ -27,32 +31,37 @@ type InputMode = "url" | "xml";
 const MAX_PASTED_BYTES = 256 * 1024;
 
 /**
- * Content clip for the instream placement.
+ * Content clip the ad break interrupts.
  *
  * Served from our own origin rather than a third party's bucket: the validator
  * page should not make a request to anyone else's infrastructure to do its job,
  * and a clip we control cannot disappear from under us.
  *
  * The element that plays it uses `preload="metadata"`, not `auto`. The clip is
- * the *background* an instream preroll interrupts — IMA pauses it for the whole
- * ad break — so a run only ever plays a few seconds of it. Preloading the entire
- * file would spend the visitor's bandwidth on video nobody watches.
+ * the *background* a preroll interrupts — IMA pauses it for the whole ad break —
+ * so a run only ever plays a few seconds of it.
  */
 const INSTREAM_CONTENT_SRC = "/tools/instream-content.mp4";
 
 /**
  * The VAST validator (ADR-0013).
  *
- * Holds the run settings, calls the inspection endpoint, and renders the
- * report. Playback is a separate concern layered on top of `report.playback`.
+ * One verb. Pressing it mounts the player and fires the inspection at the same
+ * time; the player waits for the document and starts the moment it lands. The
+ * two used to be separate buttons, which exposed an implementation detail — that
+ * analysis and playback are different mechanisms — as if it were a workflow.
  *
- * Nothing is persisted anywhere: the report exists in this component's state
- * and leaves only if the user copies or downloads it. That is a product
- * decision, not an omission — the tool would otherwise be storing other
- * people's ad tags.
+ * The order matters and is not cosmetic: the stage must mount inside the click,
+ * because `AdDisplayContainer.initialize()` needs user activation and the
+ * inspection can take tens of seconds on a long wrapper chain. See the note at
+ * the top of ValidatorStage.
+ *
+ * Nothing is persisted anywhere: the report exists in this component's state and
+ * disappears with the page. That is a product decision, not an omission — the
+ * tool would otherwise be storing other people's ad tags.
  */
 export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
-  const { locale, dict } = useLocale();
+  const { dict } = useLocale();
   const t = dict.tools.validator;
 
   const [mode, setMode] = useState<InputMode>("url");
@@ -61,37 +70,20 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
   // a hydration mismatch on a controlled input.
   const [urlValue, setUrlValue] = useState(initialTag);
   const [xmlValue, setXmlValue] = useState("");
-  const [placement, setPlacement] = useState<Placement>("instream");
   const [pixelMode, setPixelMode] = useState<PixelMode>("dryRun");
-  const [vpaidMode, setVpaidMode] = useState<VpaidMode>("insecure");
 
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<InspectReport | null>(null);
-  const [copied, setCopied] = useState(false);
-  const reportRef = useRef<HTMLDivElement>(null);
 
-  // Playback is separate state from the report: a report can be read without
-  // ever starting the player, and re-running the player must not re-run the
-  // analysis. `runToken` remounts the stage, which is how a clean restart works
-  // — the same mechanism PreviewPanel uses.
+  // `runToken` remounts the stage, which is how a clean re-run works — the same
+  // mechanism PreviewPanel uses. 0 means no run has been started.
   const [runToken, setRunToken] = useState(0);
+  // The stage refuses to run a stranger's creative on our own origin, and says
+  // so here rather than rendering an unexplained empty well.
+  const [sandboxMissing, setSandboxMissing] = useState(false);
   const [events, setEvents] = useState<PlayerEvent[]>([]);
   const [resolvedAd, setResolvedAd] = useState<ResolvedAd | null>(null);
-
-  /**
-   * Which pixel mode the current report was built for.
-   *
-   * The document handed to the player is baked into the report at check time —
-   * dry-run neutralizes it, live does not — so moving the toggle afterwards
-   * cannot change what plays. Without this the control silently lied: a user who
-   * checked in live mode, then switched to "do not fire" and pressed play, still
-   * fired real pixels at a third party while the help text under the control
-   * promised the opposite. Comparing against this makes the staleness visible
-   * and blocks playback until the check is re-run.
-   */
-  const [pixelModeAtCheck, setPixelModeAtCheck] = useState<PixelMode | null>(null);
-  const playbackStale = report !== null && pixelModeAtCheck !== pixelMode;
 
   const appendEvent = useCallback((event: PlayerEvent) => {
     setEvents((current) => [...current, event]);
@@ -102,12 +94,6 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
   // stream rather than tracked separately: the timeline is already the record
   // of what happened, and a second source for the same fact could disagree.
   const sdkBlocked = events.some((event) => event.name === SDK_LOAD_FAILED);
-
-  function startPlayback() {
-    setEvents([]);
-    setResolvedAd(null);
-    setRunToken((token) => token + 1);
-  }
 
   const value = mode === "url" ? urlValue : xmlValue;
 
@@ -132,6 +118,7 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
     if (problem) {
       setError(problem);
       setReport(null);
+      setRunToken(0);
       return;
     }
 
@@ -140,7 +127,9 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
     setReport(null);
     setEvents([]);
     setResolvedAd(null);
-    setRunToken(0);
+    // Synchronous, before the await: this is what keeps the SDK's
+    // `initialize()` inside the user gesture that started the run.
+    setRunToken((token) => token + 1);
 
     try {
       const response = await fetch("/api/tools/vast/inspect", {
@@ -151,55 +140,29 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
       const data = (await response.json()) as InspectReport | { error: string };
       if (!response.ok || "error" in data) {
         setError("error" in data ? data.error : t.errRequest);
+        // Nothing will ever be handed to the player, so take the stage down
+        // rather than leaving a black rectangle waiting on a document.
+        setRunToken(0);
         return;
       }
       setReport(data);
-      setPixelModeAtCheck(pixelMode);
       if (mode === "url") {
         const next = new URL(window.location.href);
         next.searchParams.set("tag", urlValue.trim());
         window.history.replaceState(null, "", next.toString());
       }
-      // The report is long; without this the page stays at the form and the
-      // result looks like nothing happened.
-      requestAnimationFrame(() =>
-        reportRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      );
     } catch {
       setError(t.errRequest);
+      setRunToken(0);
     } finally {
       setRunning(false);
     }
   }
 
-  function reportText(): string {
-    return report ? renderReportText(report, locale) : "";
-  }
-
-  async function copyReport() {
-    if (!report) return;
-    try {
-      await navigator.clipboard.writeText(reportText());
-      setCopied(true);
-      // Label swap rather than a toast — the CopyButton precedent (§8).
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      setError(t.errRequest);
-    }
-  }
-
-  function download(contents: string, filename: string, type: string) {
-    const url = URL.createObjectURL(new Blob([contents], { type }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  const playback = report?.playback;
-  const playable = Boolean(playback?.adsResponse || playback?.adTagUrl);
+  const playback = report?.playback ?? null;
+  const started = runToken > 0;
+  const unplayable =
+    report !== null && !report.playback.adsResponse && !report.playback.adTagUrl;
 
   // The delivery standard the tag actually declares — the well's strip states
   // what the request proved, so an em dash is the honest reading when the tag
@@ -207,12 +170,80 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
   const standardLabel =
     report?.interactive.filter((hit) => hit.present).map((hit) => hit.standard).join(" + ") || "—";
 
+  const inputLabel = mode === "url" ? t.inputLabelUrl : t.inputLabelXml;
+
   return (
-    <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
+      {/* Player left, controls right — the instrument layout (§6 "Free tools").
+          `grid-cols-1` is not redundant with the default: a bare `grid` gives one
+          `auto` track, which sizes to its widest item — and the timeline table is
+          wider than a phone. `grid-cols-*` is `minmax(0, 1fr)`, which caps the
+          track at the container and lets the table scroll inside its own box. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section className="flex flex-col gap-2">
+          {/* The one dark surface on the page (§7). Clipping lives on the inner
+              screen rectangle, not here — same shape as PreviewPanel, so a focus
+              ring inside the well is never cut off (§3). */}
+          <div className="rounded-ctl bg-well p-3">
+            {/* Serving well, not demo well: a real ad request happened, so the
+                strip states the fixed facts of that request (§7). Both values
+                come from the report, so nothing is fabricated — which is what §7
+                forbids on a well that made no request. */}
+            <div className="flex items-center justify-between gap-3 pb-3">
+              <span className="data-instr text-[11px] uppercase tracking-[0.09em] text-well-fg">
+                {t.standard} · {standardLabel}
+              </span>
+              {report?.chain[0]?.elapsedMs ? (
+                <span className="inline-flex items-center gap-1.5 text-well-live">
+                  <span className="size-1.5 rounded-full bg-well-live" />
+                  <span className="data-instr text-[11px] uppercase tracking-[0.09em]">
+                    {t.responded} · {report.chain[0].elapsedMs} {t.ms}
+                  </span>
+                </span>
+              ) : null}
+            </div>
+
+            {started ? (
+              <ValidatorStage
+                key={runToken}
+                runToken={runToken}
+                playback={playback}
+                contentSrc={INSTREAM_CONTENT_SRC}
+                onEvent={appendEvent}
+                onAdResolved={setResolvedAd}
+                onUnavailable={() => setSandboxMissing(true)}
+              />
+            ) : (
+              <div className="flex aspect-video w-full items-center justify-center rounded-ctl bg-well-screen px-6">
+                {/* Human prose, so sans at the caption role — the well's mono is
+                    for machine readouts, not for sentences (§4, §7). */}
+                <p className="max-w-[52ch] text-center text-xs leading-4 text-well-fg">
+                  {t.wellIdle}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {sandboxMissing && <Notice tone="dead">{t.sandboxUnavailable}</Notice>}
+
+          {unplayable && <Notice tone="warn">{t.playerUnavailable}</Notice>}
+
+          {/* Under the well, because it explains the black rectangle above it.
+              `info`, not `dead`: the tag is not at fault and neither is the
+              report — the condition is this browser, and the notice names the
+              address to allow (§3, §7). */}
+          {sdkBlocked && (
+            <Notice tone="info" live detail={IMA_SDK_SRC}>
+              {t.sdkBlocked}
+            </Notice>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <span className="label-instr">{t.inputMode}</span>
           <Segmented
-            label={t.settings}
+            label={t.inputMode}
             value={mode}
             onChange={(next) => {
               setMode(next);
@@ -223,13 +254,18 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
               { value: "xml", label: t.modeXml },
             ]}
           />
+          </div>
 
-          <label className="flex flex-col gap-2">
-            <span className="label-instr">
-              {mode === "url" ? t.inputLabelUrl : t.inputLabelXml}
+          <div className="flex flex-col gap-2">
+            {/* Not a <label> wrapper: the legend is itself the tooltip trigger
+                (§6), and a button inside a <label> would toggle the field on
+                click. The input is associated by id instead. */}
+            <span id="validator-input-label">
+              <HelpLabel label={inputLabel} help={t.inputHelp} />
             </span>
             {mode === "url" ? (
               <input
+                aria-labelledby="validator-input-label"
                 type="url"
                 inputMode="url"
                 spellCheck={false}
@@ -240,7 +276,8 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
               />
             ) : (
               <textarea
-                rows={10}
+                aria-labelledby="validator-input-label"
+                rows={6}
                 spellCheck={false}
                 value={xmlValue}
                 onChange={(event) => setXmlValue(event.target.value)}
@@ -248,190 +285,56 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
                 className={`${inputClass} resize-y whitespace-pre`}
               />
             )}
-          </label>
-        </div>
+          </div>
 
-        {/* Every control carries its help text (§6 Inputs). "Insecure" is the
-            least self-explanatory and most consequential choice here, so it is
-            the last one that should ship without an explanation. */}
-        <div className="grid items-start gap-4 sm:grid-cols-3">
-          <div className="flex flex-col gap-2">
-            <span className="label-instr">{t.placement}</span>
-            <Segmented
-              fill
-              label={t.placement}
-              value={placement}
-              onChange={setPlacement}
-              options={[
-                { value: "instream", label: t.placementInstream },
-                { value: "outstream", label: t.placementOutstream },
-              ]}
-            />
-            <span className="text-xs leading-4 text-fg-muted">{t.placementHint}</span>
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="label-instr">{t.pixels}</span>
-            <Segmented
-              fill
-              label={t.pixels}
-              value={pixelMode}
-              onChange={setPixelMode}
-              options={[
-                { value: "dryRun", label: t.pixelsDry },
-                { value: "live", label: t.pixelsLive },
-              ]}
-            />
-            <span className="text-xs leading-4 text-fg-muted">
-              {pixelMode === "dryRun" ? t.pixelsHintDry : t.pixelsHintLive}
-            </span>
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="label-instr">{t.vpaidMode}</span>
-            <Segmented
-              fill
-              label={t.vpaidMode}
-              value={vpaidMode}
-              onChange={setVpaidMode}
-              options={[
-                { value: "enabled", label: t.vpaidEnabled },
-                { value: "insecure", label: t.vpaidInsecure },
-                { value: "disabled", label: t.vpaidDisabled },
-              ]}
-            />
-            <span className="text-xs leading-4 text-fg-muted">{t.vpaidHint}</span>
-          </div>
-        </div>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="flex flex-col gap-2">
+              <HelpLabel label={t.pixels} help={t.pixelsHelp} />
+              <Segmented
+                label={t.pixels}
+                value={pixelMode}
+                onChange={setPixelMode}
+                options={[
+                  { value: "dryRun", label: t.pixelsDry },
+                  { value: "live", label: t.pixelsLive },
+                ]}
+              />
+            </div>
 
-        {/* The one primary on the page — the whole accent budget (§3). */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" onClick={run} disabled={running}>
-            {running ? `${t.running}…` : t.run}
-          </Button>
+            {/* The one primary on the page — the whole accent budget (§3). */}
+            <Button variant="primary" onClick={run} disabled={running}>
+              {running ? `${t.running}…` : t.run}
+            </Button>
+          </div>
+
+          {error && (
+            <p role="alert" className="flex items-center gap-2 text-[13px] leading-5 text-dead-fg">
+              <AlertCircle aria-hidden className="size-4 shrink-0" />
+              {error}
+            </p>
+          )}
+
           {report && (
             <>
-              <Button variant="secondary" onClick={copyReport}>
-                {copied ? t.copiedReport : t.copyReport}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => download(reportText(), `vast-report-${stamp}.txt`, "text/plain")}
-              >
-                {t.downloadReport}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  download(
-                    JSON.stringify(report, null, 2),
-                    `vast-report-${stamp}.json`,
-                    "application/json",
-                  )
-                }
-              >
-                {t.downloadJson}
-              </Button>
+              <DegradedNotice report={report} />
+              <VerdictStrip report={report} />
             </>
           )}
-        </div>
+        </section>
+      </div>
 
-        {error && (
-          <p role="alert" className="flex items-center gap-2 text-[13px] leading-5 text-dead-fg">
-            <AlertCircle aria-hidden className="size-4 shrink-0" />
-            {error}
-          </p>
-        )}
-      </section>
-
-      {report && (
-        <div ref={reportRef} className="flex flex-col gap-6">
-          <Notice tone={report.playback.mode === "dryRun" ? "info" : "warn"}>
-            {report.playback.mode === "dryRun" ? t.dryRunNotice : t.liveNotice}
-          </Notice>
-
-          <section className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[15px] font-semibold leading-[22px]">{t.sectionPlayer}</h2>
-              {playable && !playbackStale && (
-                <Button variant="secondary" onClick={startPlayback}>
-                  {runToken === 0 ? t.startPlayback : t.restartPlayback}
-                </Button>
-              )}
-            </div>
-
-            {/* The analysis above is still valid — only the document prepared
-                for the player is stale — so the report stays on screen and just
-                the play control goes away. */}
-            {playbackStale && <Notice tone="warn">{t.pixelModeChanged}</Notice>}
-
-            {/* The one dark surface on the page (§7). Clipping lives on the
-                inner screen rectangle, not here — same shape as PreviewPanel,
-                so a focus ring inside the well is never cut off (§3). */}
-            <div className="rounded-ctl bg-well p-3">
-              {/* Serving well, not demo well: a real ad request happened, so the
-                  strip states the fixed facts of that request (§7). Both values
-                  come from the report — the standard the tag actually declared
-                  and the measured first-hop time — so nothing is fabricated,
-                  which is what §7 forbids on a well that made no request. */}
-              <div className="flex items-center justify-between gap-3 pb-3">
-                <span className="data-instr text-[11px] uppercase tracking-[0.09em] text-well-fg">
-                  {t.standard} · {standardLabel}
-                </span>
-                {report.chain[0]?.elapsedMs ? (
-                  <span className="inline-flex items-center gap-1.5 text-well-live">
-                    <span className="size-1.5 rounded-full bg-well-live" />
-                    <span className="data-instr text-[11px] uppercase tracking-[0.09em]">
-                      {t.responded} · {report.chain[0].elapsedMs} {t.ms}
-                    </span>
-                  </span>
-                ) : null}
-              </div>
-
-              {playable && runToken > 0 ? (
-                <ValidatorStage
-                  key={runToken}
-                  runToken={runToken}
-                  playback={report.playback}
-                  placement={placement}
-                  vpaidMode={vpaidMode}
-                  contentSrc={INSTREAM_CONTENT_SRC}
-                  onEvent={appendEvent}
-                  onAdResolved={setResolvedAd}
-                />
-              ) : (
-                <div className="flex aspect-video w-full items-center justify-center rounded-ctl bg-well-screen px-6">
-                  {/* Human prose, so sans at the caption role — the well's mono
-                      is for machine readouts, not for sentences (§4, §7). */}
-                  <p className="max-w-[52ch] text-center text-xs leading-4 text-well-fg">
-                    {playable ? t.startPlayback : t.playerUnavailable}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Under the well, because it explains the black rectangle above it.
-                `info`, not `dead`: the tag is not at fault and neither is the
-                report — the condition is this browser, and the notice names the
-                address to allow (§3, §7). */}
-            {sdkBlocked && (
-              <Notice tone="info" live detail={IMA_SDK_SRC}>
-                {t.sdkBlocked}
-              </Notice>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-3 border-t border-hairline pt-6">
+      {started && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <section className="flex flex-col gap-2">
             <h2 className="text-[15px] font-semibold leading-[22px]">{t.sectionTimeline}</h2>
-            <ValidatorTimeline events={events} />
-            {resolvedAd && <ParserVsPlayer facts={report.facts} resolved={resolvedAd} />}
+            <ValidatorTimeline events={events} trackers={report?.trackers ?? []} />
           </section>
 
-          <ValidatorReport report={report} />
-
-          <p className="max-w-[66ch] border-t border-hairline pt-6 text-xs leading-4 text-fg-muted">
-            {t.shareHint}
-          </p>
+          {report && <Recommendations findings={report.findings} />}
         </div>
       )}
+
+      {report && <ReferenceSections report={report} resolvedAd={resolvedAd} />}
     </div>
   );
 }

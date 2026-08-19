@@ -3,26 +3,50 @@
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import { LOCALE_TAG } from "@/lib/i18n/dictionaries";
 import { Chip } from "@/components/ui/Chip";
-import { CELL, HEAD, NUM_HEAD, railCell, ROW, TableFrame, TableHead } from "@/components/ui/Table";
+import { HelpLabel } from "@/components/ui/Tooltip";
+import {
+  CELL_TIGHT,
+  HEAD_TIGHT,
+  NUM_HEAD_TIGHT,
+  railCellTight,
+  ROW,
+  TableFrame,
+  TableHead,
+} from "@/components/ui/Table";
+import { joinTrackers } from "@/components/tools/tracker-join";
 import type { PlayerEvent } from "@/components/players/types";
 import type { ResolvedAd } from "@/components/validator/ValidatorStage";
-import type { ParsedFacts } from "@/lib/vast-inspect/model";
+import type { ParsedFacts, TrackerHit } from "@/lib/vast-inspect/model";
 
 /**
- * The run timeline.
+ * The run timeline, at the readout density (docs/design-system.md §6).
  *
- * What the player reported, in the order it reported it. This is the part of
- * the tool that answers "the tag looks fine, so why is the quartile missing" —
- * the answer is usually a row that never appeared.
+ * What the player reported, in the order it reported it, with the tracking
+ * address each event carries. This is the part of the tool that answers "the tag
+ * looks fine, so why is the quartile missing" — the answer is usually a row that
+ * never appeared, or an address sitting in the unfired list at the bottom.
+ *
+ * The addresses used to be a second table repeating the same event vocabulary a
+ * screen further down. Merging them is not only compaction: the question "did
+ * this quartile fire, and to whom" is one question, and it was being answered in
+ * two places that the reader had to join by hand.
  */
-export function ValidatorTimeline({ events }: { events: PlayerEvent[] }) {
+export function ValidatorTimeline({
+  events,
+  trackers = [],
+}: {
+  events: PlayerEvent[];
+  /** Declared trackers from the report, joined onto the events by name. */
+  trackers?: TrackerHit[];
+}) {
   const { locale, dict } = useLocale();
   const t = dict.tools.validator;
   const number = new Intl.NumberFormat(LOCALE_TAG[locale]);
+  const { rows, unfired } = joinTrackers(events, trackers);
 
   if (events.length === 0) {
     return (
-      <div className="rounded-ctl border border-hairline bg-surface px-4 py-6">
+      <div className="rounded-ctl border border-hairline bg-surface px-3 py-4">
         <p className="text-[13px] leading-5 text-fg-muted">{t.noTimeline}</p>
       </div>
     );
@@ -32,39 +56,100 @@ export function ValidatorTimeline({ events }: { events: PlayerEvent[] }) {
     // Purpose-built rather than `TableFrame`: this is the one table in the
     // report that also scrolls vertically, so it needs `overflow-auto` and a
     // height cap rather than the shared horizontal-only frame.
-    <div className="max-h-[420px] overflow-auto rounded-ctl border border-hairline bg-surface">
-      <table className="w-full min-w-[620px] border-collapse">
+    <div className="max-h-[520px] overflow-auto rounded-ctl border border-hairline bg-surface">
+      <table className="w-full min-w-[520px] border-collapse">
         <thead className="sticky top-0 z-10">
           <tr className="border-b border-hairline bg-surface-sunken">
-            <th className={NUM_HEAD}>{t.colTime}</th>
-            <th className={HEAD}>{t.colSource}</th>
-            <th className={HEAD}>{t.colEvent}</th>
-            <th className={HEAD}>{t.colMessage}</th>
+            <th className={NUM_HEAD_TIGHT}>{t.colTime}</th>
+            <th className={HEAD_TIGHT}>{t.colSource}</th>
+            <th className={HEAD_TIGHT}>{t.colEvent}</th>
+            <th className="whitespace-nowrap px-3 py-1.5 text-left">
+              <HelpLabel label={t.colTracker} help={t.trackerHelp} />
+            </th>
           </tr>
         </thead>
         <tbody>
-          {events.map((event, index) => (
+          {rows.map(({ event, trackers: hits }, index) => (
             <tr key={`${event.at}-${event.name}-${index}`} className={ROW}>
               {/* Every row carries a real state — the tone the emitter chose —
                   so every row earns a rail (docs/design-system.md §6). */}
-              <td className={railCell(event.tone, "data-instr text-right text-[13px]")}>
-                {number.format(event.at)} ms
-              </td>
-              <td className={`${CELL} whitespace-nowrap`}>
-                <Chip>{event.source}</Chip>
-              </td>
-              <td className={`${CELL} data-instr whitespace-nowrap text-[13px]`}>{event.name}</td>
-              {/* Machine text, not prose: what lands here is an SDK message with
-                  its numeric codes, or a serialized LOG payload (§4). */}
-              <td className={CELL}>
-                {event.detail && (
-                  <span className="data-instr block max-w-[60ch] text-[13px] leading-5 text-fg-secondary">
-                    {event.detail}
-                  </span>
+              {/* nowrap: at this column width a four-digit reading wraps to
+                  "1,759" / "ms" and silently doubles the row height. */}
+              <td
+                className={railCellTight(
+                  event.tone,
+                  "data-instr whitespace-nowrap text-right text-[13px]",
                 )}
+              >
+                {number.format(event.at)} {t.ms}
+              </td>
+              <td className={`${CELL_TIGHT} whitespace-nowrap`}>
+                {/* Flex, not a bare inline-block: a chip on the cell's text baseline
+                    drags the line box past the row height (see CELL_TIGHT). */}
+                <span className="flex items-center">
+                  <Chip>{event.source}</Chip>
+                </span>
+              </td>
+              <td className={`${CELL_TIGHT} data-instr text-[13px]`}>
+                <span className="flex flex-col gap-0.5">
+                  <span className="whitespace-nowrap">{event.name}</span>
+                  {/* Machine text, not prose: what lands here is an SDK message
+                      with its numeric codes, or a serialized LOG payload (§4). */}
+                  {event.detail && (
+                    <span className="block max-w-[52ch] leading-5 text-fg-secondary">
+                      {event.detail}
+                    </span>
+                  )}
+                </span>
+              </td>
+              <td className={CELL_TIGHT}>
+                {hits.map((hit, position) => (
+                  <code
+                    key={`${hit.path}-${position}`}
+                    className="data-instr block max-w-[56ch] truncate text-[13px] text-fg-secondary"
+                  >
+                    {hit.url}
+                  </code>
+                ))}
               </td>
             </tr>
           ))}
+
+          {unfired.length > 0 && (
+            <>
+              <tr className="border-b border-hairline bg-surface-sunken">
+                <td className="px-3 py-1.5 label-instr" colSpan={4}>
+                  {t.trackersUnfired} · {number.format(unfired.length)}
+                </td>
+              </tr>
+              {unfired.map((hit, index) => (
+                <tr key={`${hit.path}-${index}`} className={ROW}>
+                  {/* No rail. We did not observe these failing to fire — we
+                      inferred it from a name join — and a rail would assert a
+                      state the tool did not measure (§6). */}
+                  <td
+                    className={railCellTight(
+                      null,
+                      "data-instr whitespace-nowrap text-right text-[13px] text-fg-muted",
+                    )}
+                  >
+                    —
+                  </td>
+                  <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-[13px] text-fg-muted`}>
+                    #{hit.hop}
+                  </td>
+                  <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-[13px] text-fg-muted`}>
+                    {hit.event ? `${hit.kind}:${hit.event}` : hit.kind}
+                  </td>
+                  <td className={CELL_TIGHT}>
+                    <code className="data-instr block max-w-[56ch] truncate text-[13px] text-fg-secondary">
+                      {hit.url}
+                    </code>
+                  </td>
+                </tr>
+              ))}
+            </>
+          )}
         </tbody>
       </table>
     </div>
@@ -116,8 +201,8 @@ export function ParserVsPlayer({ facts, resolved }: { facts: ParsedFacts; resolv
     rows.push({
       key: "duration",
       label: "Duration",
-      declared: `${number.format(facts.durationSeconds)} s`,
-      resolved: `${number.format(resolved.duration)} s`,
+      declared: `${number.format(facts.durationSeconds)} ${t.unitSeconds}`,
+      resolved: `${number.format(resolved.duration)} ${t.unitSeconds}`,
       agrees,
     });
   }
@@ -180,23 +265,25 @@ export function ParserVsPlayer({ facts, resolved }: { facts: ParsedFacts; resolv
 
   return (
     <TableFrame>
-      <table className="w-full min-w-[620px] border-collapse">
+      <table className="w-full min-w-[480px] border-collapse">
         <TableHead>
-          <th className={HEAD}>{t.colFeature}</th>
-          <th className={HEAD}>XML</th>
-          <th className={HEAD}>IMA</th>
+          <th className={HEAD_TIGHT}>{t.colFeature}</th>
+          <th className={HEAD_TIGHT}>XML</th>
+          <th className={HEAD_TIGHT}>IMA</th>
         </TableHead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.key} className={ROW}>
               {/* Agreement is a real state; disagreement rails `warn` because
                   it is a discrepancy to look into, not a spec violation. */}
-              <td className={railCell(row.agrees ? "live" : "warn", "data-instr text-[13px]")}>
+              <td className={railCellTight(row.agrees ? "live" : "warn", "data-instr text-[13px]")}>
                 {row.label}
               </td>
-              <td className={`${CELL} data-instr text-[13px] text-fg-secondary`}>{row.declared}</td>
+              <td className={`${CELL_TIGHT} data-instr text-[13px] text-fg-secondary`}>
+                {row.declared}
+              </td>
               <td
-                className={`${CELL} data-instr text-[13px] ${
+                className={`${CELL_TIGHT} data-instr text-[13px] ${
                   row.agrees ? "text-fg-secondary" : "text-warn-fg"
                 }`}
               >
