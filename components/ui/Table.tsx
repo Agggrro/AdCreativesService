@@ -24,8 +24,8 @@ export const HEAD = "label-instr whitespace-nowrap px-4 py-2 text-left";
 /** Right-aligned header, for numeric columns. */
 export const NUM_HEAD = `${HEAD} text-right`;
 
-/** Row separator — `fill`, lighter than the panel's `hairline` edge. */
-export const ROW = "border-b border-fill last:border-b-0";
+/** Row separator — `hairline`, the lighter inner rule that keeps a 30-row table from reading as a grid (§3). */
+export const ROW = "border-b border-hairline last:border-b-0";
 
 /**
  * First cell of a row, carrying the 3px state rail.
@@ -48,7 +48,7 @@ export function railCell(tone: Tone | null, extra = ""): string {
  * `overflow-hidden` or the 2px-offset focus ring is clipped away (§3).
  */
 export function railRow(tone: Tone | null): string {
-  return `border-b border-fill last:border-b-0 border-l-[3px] ${
+  return `border-b border-hairline last:border-b-0 border-l-[3px] ${
     tone ? RAIL[tone] : "border-l-transparent"
   } first:rounded-t-ctl last:rounded-b-ctl`;
 }
@@ -78,7 +78,7 @@ export function railRow(tone: Tone | null): string {
  * whose only content is a chip or another inline-block should wrap it in a
  * `flex` span, which has no line box at all.
  */
-export const CELL_TIGHT = "px-3 py-1.5 align-middle text-[13px] leading-5";
+export const CELL_TIGHT = "px-3 py-1.5 align-middle type-small";
 
 /** Header cell at the readout density. */
 export const HEAD_TIGHT = "label-instr whitespace-nowrap px-3 py-1.5 text-left";
@@ -100,7 +100,8 @@ export function railCellTight(tone: Tone | null, extra = ""): string {
  * Scroll frame for a table.
  *
  * Wide content scrolls inside its own box; the page body never scrolls sideways
- * (§5). Not `Panel`, which sets `overflow-hidden` and would clip focus rings.
+ * (§5). Separate from `Panel` because the scroll container is the point: a table
+ * needs `overflow-x-auto` on the element that owns the border, not on a child.
  */
 export function TableFrame({
   children,
@@ -110,7 +111,7 @@ export function TableFrame({
   className?: string;
 }) {
   return (
-    <div className={`overflow-x-auto rounded-ctl border border-hairline bg-surface ${className}`}>
+    <div className={`overflow-x-auto rounded-panel border border-hairline bg-surface ${className}`}>
       {children}
     </div>
   );
@@ -120,7 +121,7 @@ export function TableFrame({
 export function TableHead({ children }: { children: React.ReactNode }) {
   return (
     <thead>
-      <tr className="border-b border-hairline bg-surface-sunken">{children}</tr>
+      <tr className="border-b border-hairline bg-surface-2">{children}</tr>
     </thead>
   );
 }

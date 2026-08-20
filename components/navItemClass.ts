@@ -7,7 +7,7 @@
  */
 export function navItemClass(current: boolean, extra = "") {
   const base = current
-    ? "border-b-2 border-accent px-2.5 pt-1.5 pb-1 text-[13px] font-medium text-fg"
-    : "rounded-ctl px-2.5 py-1.5 text-[13px] text-fg-secondary hover:bg-fill";
+    ? "border-b-2 border-accent px-3 pt-2 pb-1.5 text-[14px] font-medium text-fg"
+    : "rounded-ctl px-3 py-2 text-[14px] text-fg-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-fg";
   return extra ? `${base} ${extra}` : base;
 }

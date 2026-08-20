@@ -61,10 +61,10 @@ export default async function MyCreativesPage({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
+          <h1 className="type-h2">
             {dict.dashboard.creatives}
           </h1>
-          <p className="max-w-[66ch] text-[13px] leading-5 text-fg-muted">
+          <p className="type-small max-w-[66ch] text-fg-secondary">
             {dict.dashboard.creativesSubtitle}
           </p>
         </div>
@@ -88,7 +88,7 @@ export default async function MyCreativesPage({
               `TableFrame`, not `Panel`: `Panel` is `overflow-hidden` and
               would clip the focus ring on the new edge-adjacent action
               buttons (docs/design-system.md §2). */}
-          <table className="w-full table-fixed border-collapse text-[13px]">
+          <table className="w-full table-fixed border-collapse type-small">
             <colgroup>
               <col />
               <col className="w-[88px]" />
@@ -127,7 +127,7 @@ export default async function MyCreativesPage({
                     >
                       <Link
                         href={`/dashboard/creatives/${c.id}`}
-                        className="text-[13px] font-medium underline-offset-4 hover:underline"
+                        className="type-small font-medium underline-offset-4 hover:underline"
                       >
                         {label}
                       </Link>
@@ -154,7 +154,7 @@ export default async function MyCreativesPage({
                           }
                         />
                       ) : (
-                        <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-fg-muted">
+                        <span className="chip-instr text-fg-muted">
                           —
                         </span>
                       )}
@@ -202,7 +202,7 @@ export default async function MyCreativesPage({
         </TableFrame>
       ) : (
         <Panel className="flex flex-col items-start gap-3 p-6">
-          <p className="text-[13px] text-fg-muted">
+          <p className="type-small text-fg-muted">
             {dict.dashboard.noCreatives}
           </p>
           <LinkButton href="/catalog" variant="secondary">

@@ -9,7 +9,7 @@ import { setLocale } from "@/app/actions/locale";
 
 /**
  * Segmented RU | EN control. Language codes, never flags — a flag denotes a
- * country, not a language (docs/design-system.md §8). The choice is persisted
+ * country, not a language (docs/design-system.md §10). The choice is persisted
  * server-side, so the landing page and the dashboard always agree.
  */
 export function LanguageSwitcher() {

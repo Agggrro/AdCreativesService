@@ -45,25 +45,38 @@ bug even if the code "works". Details in [docs/adtech-standards.md](docs/adtech-
 
 ## Non-negotiable design rules
 
-The UI is governed by **Instrument** — the design system in
+The UI is governed by **Midnight** — the design system in
 [docs/design-system.md](docs/design-system.md), decided in
-[ADR-0007](docs/decisions/0007-design-system-instrument.md). It is binding on every
-page, component, state, and user-visible string. The short version:
+[ADR-0022](docs/decisions/0022-midnight-design-system.md) (superseding ADR-0007). It is
+binding on every page, component, state, and user-visible string. The short version:
 
-1. **One light theme.** No dark theme, no toggle, no `prefers-color-scheme`. The single
-   dark surface is the player well.
-2. **Warm is action, cold is alarm.** The Sienna accent (`#A24B2E`) means action or
-   current selection only, at most twice per screen. Errors are cold red, informational
-   states are blue. Never the reverse.
-3. **Tokens only.** No literal hex and no Tailwind palette colours (`gray-*`, `blue-*`,
-   …) in components. Need a value the system lacks? Amend the doc first.
+1. **One dark theme.** No light theme, no toggle, no `prefers-color-scheme`, no `dark:`
+   variants. The theme is not conditional.
+2. **Warm is action, cold is alarm.** The apricot accent (`#E9A57B`) means action or
+   current selection only — twice per product screen, three times on `/` and `/catalog`.
+   Errors are cold red, informational states are blue. Never the reverse.
+3. **Tokens only, and contrast is computed.** No literal hex and no Tailwind palette
+   colours in `app/` or `components/`. Every new pair gets its WCAG ratio measured and
+   written down — text ≥ 4.5:1, non-text ≥ 3:1. Need a value the system lacks? Amend the
+   doc first.
 4. **Human writes sans, machine writes mono.** VAST tags, ids, formats, timecodes,
    metrics, status words, labels, and all text inputs are IBM Plex Mono with
-   `tabular-nums`; prose is IBM Plex Sans.
-5. **Hairlines, not shadows.** Radius 3px, 8pt grid, 44px table rows, lists are tables
-   with a semantic state rail — not card grids.
-6. **Every user-visible string is RU + EN** through the i18n layer, at the moment it is
+   `tabular-nums`; prose is Onest; display headings are Prata at 32px and up.
+5. **Elevation, not shadows.** Radius scale 8/12/16/20, 8pt grid, 44px table rows, lists
+   are tables with a semantic state rail — not card grids.
+6. **Every surface is responsive**, checked at 390 / 768 / 1280 / 1920 / 2560. Page
+   shells go through `ui/Container.tsx` inside `ui/Section.tsx` — a hand-typed
+   `max-w-[…]` is a defect. Full-bleed colour with contained prose is what owns a wide
+   monitor.
+7. **Every user-visible string is RU + EN** through the i18n layer, at the moment it is
    written. No locale logic on the public VAST path.
+
+**Creative templates are the one exemption.** `runtime/templates/**` and
+`runtime/lib/vpaid-base.js` sit outside the palette, type scale, radius scale and depth
+rules — a creative wears the advertiser's brand, not ours. They are still bound by the
+close control ([ADR-0009](docs/decisions/0009-mandatory-close-control.md)), the VPAID
+lifecycle plus `api.debug`, the `creative-check` gate, and legibility. Nothing there is a
+precedent for anything in `app/`.
 
 **Before building any new interface and after finishing it, invoke the
 [`design-check`](.claude/skills/design-check/SKILL.md) skill.**
@@ -165,6 +178,6 @@ in Chrome** for those, which drives the user's real browser with its real extens
 - [docs/data-model.md](docs/data-model.md) — entities, relationships, RLS intent
 - [docs/billing.md](docs/billing.md) — Stripe model, webhooks, subscription lifecycle
 - [docs/security.md](docs/security.md) — trust boundaries, public endpoint, secrets
-- [docs/design-system.md](docs/design-system.md) — Instrument: tokens, typography, components, RU/EN
+- [docs/design-system.md](docs/design-system.md) — Midnight: tokens, typography, components, motion, RU/EN
 - [docs/mvp-scope.md](docs/mvp-scope.md) — what's in/out of MVP
 - [docs/decisions/](docs/decisions/) — Architecture Decision Records (ADRs)

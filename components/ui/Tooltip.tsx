@@ -14,12 +14,12 @@ import { CircleHelp } from "lucide-react";
  * it does not earn the right to be unexplained.
  *
  * **The label is the trigger, and that is not a detail.** A bare `?` button would
- * be an icon-only control, which §9 forbids without qualification — and
+ * be an icon-only control, which §11 forbids without qualification — and
  * ADR-0007 records four iterations of trying to carve an exception out of that
  * rule, each one narrowing the exception instead of questioning it, before
  * retracting it entirely. Rather than reopen that argument, the whole label
  * ("Tracking pixels ?") is one button: the word is visible, it *is* the
- * accessible name, and the icon accompanies it exactly as §9 requires. The side
+ * accessible name, and the icon accompanies it exactly as §11 requires. The side
  * benefit is the one a 14px glyph could never have — a touch target the size of
  * the label.
  *
@@ -209,7 +209,7 @@ export function HelpLabel({
               // Hidden until measured, so the panel never flashes at 0,0 on open.
               visibility: position ? "visible" : "hidden",
             }}
-            className="fixed z-50 max-w-[44ch] rounded-ctl border border-hairline bg-surface px-3 py-2 text-[13px] leading-5 text-fg-secondary shadow-overlay"
+            className="fixed z-50 max-w-[44ch] rounded-panel border border-hairline bg-surface px-3 py-2 type-small text-fg-secondary shadow-overlay"
             onPointerEnter={cancelClose}
             onPointerLeave={scheduleClose}
           >

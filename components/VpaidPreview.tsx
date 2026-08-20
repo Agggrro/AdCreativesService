@@ -76,7 +76,7 @@ export function VpaidPreview({
     video.muted = true;
     video.playsInline = true;
     video.style.cssText = hasVideo
-      ? "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;"
+      ? "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--color-well-screen);"
       : "display:none;";
     slot.appendChild(video);
 
@@ -121,8 +121,12 @@ export function VpaidPreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateKey, configKey]);
 
+  // The hairline is load-bearing, not trim. The well keeps the ground tone while
+  // the band around it lifts to `surface`, and that step is only 1.06:1 — a
+  // raised block with no border is not elevated, it is invisible
+  // (docs/design-system.md §2, §7).
   return (
-    <div className="mx-auto w-full max-w-[664px] rounded-ctl bg-well p-3">
+    <div className="mx-auto w-full max-w-2xl rounded-well border border-well-line bg-well p-3">
       <div
         ref={slotRef}
         className="relative w-full overflow-hidden rounded-ctl bg-well-screen"
@@ -130,7 +134,7 @@ export function VpaidPreview({
       />
       {/* One caption slot: the placeholder disclosure until a click-through
           fires, the readout after (docs/design-system.md §7). */}
-      <p className="pt-3 text-center text-xs leading-4 text-well-fg">
+      <p className="pt-3 text-center type-caption text-well-fg">
         {clicked ? (
           <>
             <span className="text-well-live">{dict.preview.clickThrough}</span> →{" "}

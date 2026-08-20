@@ -31,12 +31,12 @@ export default async function NewCreativePage({
   if (!template) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-[13px] text-fg-muted">
+        <p className="type-small text-fg-muted">
           {dict.configurator.notFound}
         </p>
         <Link
           href="/catalog"
-          className="text-[13px] font-medium text-fg underline underline-offset-4"
+          className="type-small font-medium text-fg underline underline-offset-4"
         >
           {dict.catalog.backToCatalog}
         </Link>
@@ -50,10 +50,10 @@ export default async function NewCreativePage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
+        <h1 className="type-h2">
           {dict.configurator.configureTitle}: {template.name}
         </h1>
-        <p className="max-w-[66ch] text-[13px] leading-5 text-fg-muted">
+        <p className="type-small max-w-[66ch] text-fg-secondary">
           {dict.configurator.configureSubtitle}
         </p>
       </div>

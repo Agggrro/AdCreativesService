@@ -26,8 +26,9 @@ const PLAYERS: { key: PlayerKey; label: string }[] = [
  * (nothing saved to the DB) and runs it in whichever of the three player
  * backends is selected — same VAST tag, three different players.
  *
- * This is the one dark surface in the product: a creative is always judged
- * against black (docs/design-system.md §7).
+ * The well: a creative is judged against black (docs/design-system.md §7). It is no
+ * longer "the one dark surface" — the whole product is dark — so it is separated
+ * by elevation and a hairline instead.
  */
 export function PreviewPanel({
   templateId,
@@ -113,14 +114,15 @@ export function PreviewPanel({
           onChange={setTab}
           options={PLAYERS.map((p) => ({ value: p.key, label: p.label }))}
         />
-        <p className="text-[11px] leading-4 text-fg-muted">
+        <p className="type-caption text-fg-muted">
           {dict.preview.sameTag}
         </p>
       </div>
 
-      <div className="rounded-ctl bg-well p-3">
+      {/* Hairline plus a lifted surround is what separates the well; the tone step alone is 1.06:1 (docs/design-system.md §2, §7). */}
+      <div className="rounded-well border border-well-line bg-well p-3">
         {/* Instrument strip: what a buyer checks before pressing play */}
-        <div className="flex items-center justify-between gap-3 pb-3 font-mono text-[11px] uppercase tracking-[0.09em] text-well-fg">
+        <div className="chip-instr flex items-center justify-between gap-3 pb-3 text-well-fg">
           <span className="data-instr">
             {dict.preview.format} · {format || "—"}
           </span>
@@ -135,33 +137,44 @@ export function PreviewPanel({
           )}
         </div>
 
-        <div
-          className="relative w-full overflow-hidden rounded-ctl bg-well-screen"
-          style={{ aspectRatio: "16 / 9" }}
-        >
-          {commonProps && (tab === "sandbox" ? (
-            <SandboxPlayer key={launchToken} {...commonProps} />
-          ) : tab === "ima" ? (
-            <ImaPlayer key={launchToken} {...commonProps} />
-          ) : (
-            <FluidPlayer key={launchToken} {...commonProps} />
-          ))}
+        {/*
+          The ad slot clips — a creative may not paint outside it — but the launch
+          control is a **sibling** of the clipped rect, not a child of it.
+          Sitting inside, its focus ring (2px solid, 2px offset) fell entirely
+          outside the clipping box and was erased, leaving the configurator's
+          primary preview control with no visible focus state at all. §2 names
+          this as the single most repeated way focus disappears here. Out here the
+          ring lands in the well's own 12px padding and is visible.
+        */}
+        <div className="relative">
+          <div
+            className="relative w-full overflow-hidden rounded-ctl bg-well-screen"
+            style={{ aspectRatio: "16 / 9" }}
+          >
+            {commonProps && (tab === "sandbox" ? (
+              <SandboxPlayer key={launchToken} {...commonProps} />
+            ) : tab === "ima" ? (
+              <ImaPlayer key={launchToken} {...commonProps} />
+            ) : (
+              <FluidPlayer key={launchToken} {...commonProps} />
+            ))}
+          </div>
 
           {!launched && (
             <button
               type="button"
               onClick={launch}
               disabled={minting || !format}
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white transition-colors hover:bg-white/5 disabled:cursor-wait"
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-ctl text-well-fg transition-colors duration-150 hover:bg-well-fg/5 disabled:cursor-wait"
             >
               {minting ? (
                 <Loader2 className="animate-spin" size={26} aria-hidden />
               ) : (
                 <span className="flex size-12 items-center justify-center rounded-ctl border border-well-line bg-well">
-                  <Play size={20} className="fill-white" aria-hidden />
+                  <Play size={20} className="fill-well-fg" aria-hidden />
                 </span>
               )}
-              <span className="text-[13px] font-medium">
+              <span className="type-small font-medium">
                 {minting ? dict.preview.building : dict.preview.launch}
               </span>
             </button>
@@ -191,11 +204,11 @@ export function PreviewPanel({
       )}
 
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-[11px] leading-4 text-fg-muted">
+        <p className="min-w-0 flex-1 type-caption text-fg-muted">
           {error ? (
             <span
               role="alert"
-              className="inline-flex items-start gap-1 text-dead-fg"
+              className="inline-flex items-start gap-1 text-dead"
             >
               <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
               {error}
@@ -216,7 +229,7 @@ export function PreviewPanel({
             type="button"
             onClick={launch}
             disabled={minting}
-            className={buttonClass("secondary", "shrink-0")}
+            className={buttonClass("secondary", "md", "shrink-0")}
           >
             <RotateCcw size={13} aria-hidden /> {dict.preview.restart}
           </button>
@@ -245,7 +258,7 @@ function ExpiryHint({
 
   const remaining = Math.max(0, Math.round((expiresAt - now) / 1000));
   return (
-    <p className="data-instr pt-3 text-[11px] text-well-fg">
+    <p className="type-data pt-3 text-well-fg">
       {remaining > 0 ? `${validFor} ${remaining}${seconds}` : expired}
     </p>
   );

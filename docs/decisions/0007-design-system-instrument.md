@@ -1,7 +1,11 @@
 # 0007. "Instrument" design system: single light theme, Sienna accent, cold semantics
 
-- Status: Accepted
+- Status: **Superseded by [0022](0022-midnight-design-system.md)** (2026-08-20)
 - Date: 2026-07-26
+
+> Kept for the record, not for guidance. The reasoning below is still worth reading —
+> ADR-0022 keeps several of its rules and answers the two objections it raised against a
+> dark direction — but a rule stated here is not in force unless 0022 restates it.
 
 ## Context
 

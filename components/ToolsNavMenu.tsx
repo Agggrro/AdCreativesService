@@ -24,7 +24,10 @@ import { navItemClass } from "@/components/navItemClass";
  * anchor hazard (`transform`/`filter`/`contain` hijacking `fixed`) doesn't
  * apply because this is `position: absolute` against a `relative` wrapper it
  * owns, not `fixed` against the viewport — which also means it correctly
- * scrolls with the (non-`sticky`) header instead of detaching from it.
+ * scrolls with the header. The header became `sticky` in the Midnight redesign, and
+ * §6 requires that check to be re-run when it changes: the panel is `absolute`
+ * against a `relative` wrapper it owns one level up, so a sticky ancestor gives it
+ * no viewport anchor to hijack, and it still travels with the bar.
  */
 export function ToolsNavMenu({
   label,
@@ -81,29 +84,29 @@ export function ToolsNavMenu({
         <ChevronDown
           size={14}
           aria-hidden
-          className={`transition-transform duration-[120ms] ${open ? "rotate-180" : ""}`}
+          className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`}
         />
       </button>
 
       {open && (
         <div
           id={panelId}
-          className="absolute left-0 top-full z-50 mt-2 w-80 divide-y divide-hairline rounded-ctl border border-hairline bg-surface shadow-overlay"
+          className="absolute left-0 top-full z-50 mt-2 w-80 divide-y divide-hairline rounded-panel border border-hairline bg-surface shadow-overlay"
         >
           {items.map((tool, i) => (
             <Link
               key={tool.href}
               href={tool.href}
               onClick={() => setOpen(false)}
-              className={`block px-3 py-3 hover:bg-fill focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+              className={`block px-3 py-3 hover:bg-surface-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                 i === 0 ? "rounded-t-ctl" : ""
               } ${i === items.length - 1 ? "rounded-b-ctl" : ""}`}
             >
               <span className="flex items-center justify-between gap-3">
-                <span className="text-[13px] font-medium text-fg">{tool.name}</span>
+                <span className="type-small font-medium text-fg">{tool.name}</span>
                 <StateWord tone={tool.tone} label={tool.state} />
               </span>
-              <span className="mt-0.5 block text-[12px] leading-4 text-fg-muted">
+              <span className="mt-0.5 block type-caption text-fg-muted">
                 {tool.description}
               </span>
             </Link>

@@ -177,7 +177,7 @@ export function HarnessStage({
     video.muted = true;
     video.playsInline = true;
     video.style.cssText = hasVideo
-      ? "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;"
+      ? "position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--color-well-screen);"
       : "display:none;";
     slot.appendChild(video);
 

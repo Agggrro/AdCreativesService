@@ -13,7 +13,7 @@ code on every change (see the [`doc-sync`](../.claude/skills/doc-sync/SKILL.md) 
 | [data-model.md](data-model.md) | Entities, relationships, and RLS intent (conceptual schema) |
 | [billing.md](billing.md) | Stripe model, plans, webhooks, subscription lifecycle |
 | [security.md](security.md) | Trust boundaries, public endpoint, secrets, RLS scope |
-| [design-system.md](design-system.md) | Instrument: the binding UI contract — tokens, typography, components, RU/EN |
+| [design-system.md](design-system.md) | Midnight: the binding UI contract — tokens, typography, components, motion, RU/EN |
 | [mvp-scope.md](mvp-scope.md) | What is in and out of the first shippable version |
 | [decisions/](decisions/) | Architecture Decision Records (ADRs) — one file per significant decision |
 

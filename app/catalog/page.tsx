@@ -2,6 +2,9 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getDict } from "@/lib/i18n/server";
 import { AppTopBar } from "@/components/AppTopBar";
 import { CatalogGrid } from "@/components/CatalogGrid";
+import { Section } from "@/components/ui/Section";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Footer } from "@/components/ui/Footer";
 
 /**
  * The public template catalog. Deliberately not behind auth: it is the
@@ -23,18 +26,12 @@ export default async function CatalogPage() {
     <main className="flex flex-1 flex-col">
       <AppTopBar />
 
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-6 px-6 py-10">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
-            {dict.catalog.title}
-          </h1>
-          <p className="max-w-[66ch] text-[13px] leading-5 text-fg-muted">
-            {dict.catalog.subtitle}
-          </p>
-        </div>
-
+      <Section tone="ground" pad="md" width="wide" innerClassName="flex flex-col gap-10">
+        <PageHeader title={dict.catalog.title} subtitle={dict.catalog.subtitle} />
         <CatalogGrid templates={templates ?? []} dict={dict} />
-      </div>
+      </Section>
+
+      <Footer dict={dict} />
     </main>
   );
 }

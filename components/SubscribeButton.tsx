@@ -53,7 +53,7 @@ export function SubscribeButton({
         {loading ? dict.common.working : children}
       </button>
       {error && (
-        <span role="alert" className="text-[11px] text-dead-fg">
+        <span role="alert" className="type-caption text-dead">
           {error}
         </span>
       )}

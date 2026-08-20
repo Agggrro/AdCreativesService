@@ -181,22 +181,23 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
           track at the container and lets the table scroll inside its own box. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className="flex flex-col gap-2">
-          {/* The one dark surface on the page (§7). Clipping lives on the inner
+          {/* The player well (§7) — separated by elevation and a hairline, not by being
+              darker than the page. Clipping lives on the inner
               screen rectangle, not here — same shape as PreviewPanel, so a focus
               ring inside the well is never cut off (§3). */}
-          <div className="rounded-ctl bg-well p-3">
+          <div className="rounded-well border border-well-line bg-well p-3">
             {/* Serving well, not demo well: a real ad request happened, so the
                 strip states the fixed facts of that request (§7). Both values
                 come from the report, so nothing is fabricated — which is what §7
                 forbids on a well that made no request. */}
             <div className="flex items-center justify-between gap-3 pb-3">
-              <span className="data-instr text-[11px] uppercase tracking-[0.09em] text-well-fg">
+              <span className="chip-instr text-well-fg">
                 {t.standard} · {standardLabel}
               </span>
               {report?.chain[0]?.elapsedMs ? (
                 <span className="inline-flex items-center gap-1.5 text-well-live">
                   <span className="size-1.5 rounded-full bg-well-live" />
-                  <span className="data-instr text-[11px] uppercase tracking-[0.09em]">
+                  <span className="chip-instr">
                     {t.responded} · {report.chain[0].elapsedMs} {t.ms}
                   </span>
                 </span>
@@ -217,7 +218,7 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
               <div className="flex aspect-video w-full items-center justify-center rounded-ctl bg-well-screen px-6">
                 {/* Human prose, so sans at the caption role — the well's mono is
                     for machine readouts, not for sentences (§4, §7). */}
-                <p className="max-w-[52ch] text-center text-xs leading-4 text-well-fg">
+                <p className="max-w-[52ch] text-center type-caption text-well-fg">
                   {t.wellIdle}
                 </p>
               </div>
@@ -308,7 +309,7 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
           </div>
 
           {error && (
-            <p role="alert" className="flex items-center gap-2 text-[13px] leading-5 text-dead-fg">
+            <p role="alert" className="flex items-center gap-2 type-small text-dead">
               <AlertCircle aria-hidden className="size-4 shrink-0" />
               {error}
             </p>
@@ -330,7 +331,7 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
           box, but a box this shape should not be narrow in the first place). */}
       {started && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-[15px] font-semibold leading-[22px]">{t.sectionTimeline}</h2>
+          <h2 className="type-h3">{t.sectionTimeline}</h2>
           <ValidatorTimeline events={events} trackers={report?.trackers ?? []} />
         </section>
       )}

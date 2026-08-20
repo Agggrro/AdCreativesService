@@ -84,7 +84,7 @@ export function DeleteCreativeButton({
       {open &&
         createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-fg/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ground/70 p-4"
           onClick={() => setOpen(false)}
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
@@ -102,18 +102,18 @@ export function DeleteCreativeButton({
             // spill unwrapped past its own edge. `min-w-0` puts `max-w-sm`
             // back in charge of the card's width, the way it would work if
             // this weren't a flex child at all.
-            className="w-full min-w-0 max-w-sm rounded-ctl border border-hairline bg-surface p-6 shadow-overlay"
+            className="w-full min-w-0 max-w-sm rounded-panel border border-hairline bg-surface p-6 shadow-overlay"
           >
             <h2
               id="delete-creative-title"
-              className="text-[15px] font-semibold leading-[22px] tracking-[-0.01em]"
+              className="type-h3"
             >
               {dict.dashboard.deleteConfirmTitle}
             </h2>
-            <p className="mt-2 truncate text-[13px] font-medium leading-5">
+            <p className="mt-2 truncate type-small font-medium">
               {creativeName}
             </p>
-            <p className="mt-2 break-words text-[13px] leading-5 text-fg-muted">
+            <p className="mt-2 break-words type-small text-fg-muted">
               {dict.dashboard.deleteConfirmBody}
             </p>
             <div className="mt-6 flex justify-end gap-3">

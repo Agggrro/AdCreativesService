@@ -81,17 +81,17 @@ export default async function CreativePage({
     <div className="flex flex-col gap-6">
       <Link
         href="/dashboard/creatives"
-        className="self-start text-[13px] text-fg-muted underline underline-offset-4 hover:text-fg"
+        className="self-start type-small text-fg-muted underline underline-offset-4 hover:text-fg"
       >
         {dict.dashboard.creatives}
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
+          <h1 className="type-h2">
             {creative.name ?? template?.name ?? dict.dashboard.template}
           </h1>
-          <p className="text-[13px] text-fg-muted">
+          <p className="type-small text-fg-muted">
             {template?.name} ·{" "}
             <span className="data-instr uppercase">
               {creative.selected_format}
@@ -112,7 +112,7 @@ export default async function CreativePage({
             qualifier={serving ? undefined : dict.dashboard.notServingHint}
           />
         ) : (
-          <span className="text-xs leading-4 text-fg-muted">
+          <span className="type-caption text-fg-muted">
             {dict.dashboard.statsUnavailable}
           </span>
         )}
@@ -120,17 +120,22 @@ export default async function CreativePage({
 
       <div className="flex flex-col gap-2">
         <h2 className="label-instr">{dict.dashboard.funnel}</h2>
-        <div className="grid gap-px overflow-hidden rounded-ctl border border-hairline bg-hairline sm:grid-cols-3">
+        {/*
+          A clipping parent would erase a 2px-offset focus ring (§2). Safe here
+          and only here: every cell is a static metric readout with no focusable
+          descendant. Put a control in one and the rounding moves to the cells.
+        */}
+        <div className="grid gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-3">
           {DELIVERY.map((step) => (
             <div key={step.key} className="flex flex-col gap-2 bg-surface p-4">
               <span className="label-instr">
                 {dict.catalog.funnel[step.label]}
               </span>
-              <span className="data-instr text-[22px] font-medium leading-7">
+              <span className="type-metric">
                 {statsAvailable ? number.format(counts[step.key]) : "—"}
               </span>
               {step.hint && statsAvailable && (
-                <span className="text-xs leading-4 text-fg-muted">
+                <span className="type-caption text-fg-muted">
                   {dict.dashboard[step.hint]}
                 </span>
               )}
@@ -145,14 +150,14 @@ export default async function CreativePage({
           */}
           <div className="flex flex-col gap-2 bg-surface p-4">
             <span className="label-instr">{dict.dashboard.ctr}</span>
-            <span className="data-instr text-[22px] font-medium leading-7">
+            <span className="type-metric">
               {/* Not `0%` when nothing has been delivered — that would claim
                   nobody clicked. No denominator means not measurable yet. */}
               {statsAvailable && counts.impressions > 0
                 ? percent.format(counts.clicks / counts.impressions)
                 : "—"}
             </span>
-            <span className="text-xs leading-4 text-fg-muted">
+            <span className="type-caption text-fg-muted">
               {dict.dashboard.ctrOfImpressions}
             </span>
           </div>
@@ -184,7 +189,7 @@ export default async function CreativePage({
             offering it the wrong explanation.
           */}
           <span
-            className={`data-instr text-[22px] font-medium leading-7 ${
+            className={`type-metric ${
               viewableApplicable ? "text-fg" : "text-fg-disabled"
             }`}
           >
@@ -192,7 +197,7 @@ export default async function CreativePage({
               ? number.format(counts.viewable)
               : "—"}
           </span>
-          <span className="text-xs leading-4 text-fg-muted">
+          <span className="type-caption text-fg-muted">
             {viewableApplicable
               ? dict.dashboard.viewableSelfReported
               : dict.dashboard.viewableNotApplicable}
@@ -203,7 +208,7 @@ export default async function CreativePage({
       <div className="flex flex-col gap-2">
         <h2 className="label-instr">{dict.dashboard.vastTag}</h2>
         <Panel className="flex flex-wrap items-center justify-between gap-3 p-4">
-          <code className="data-instr min-w-0 flex-1 truncate text-[13px] text-fg-secondary">
+          <code className="data-instr min-w-0 flex-1 truncate type-small text-fg-secondary">
             {tag}
           </code>
           <CopyButton value={tag} />

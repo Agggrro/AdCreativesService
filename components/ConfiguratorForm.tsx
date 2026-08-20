@@ -201,7 +201,7 @@ export function ConfiguratorForm({
             defaultValue={initialName}
             className={inputClass}
           />
-          <span className="text-xs text-fg-muted">
+          <span className="type-caption text-fg-muted">
             {dict.dashboard.creativeNameHelp}
           </span>
         </label>
@@ -216,10 +216,10 @@ export function ConfiguratorForm({
               return (
                 <label
                   key={s}
-                  className={`cursor-pointer border-r border-hairline px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.06em] transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+                  className={`cursor-pointer border-r border-hairline px-3 py-1.5 chip-instr transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
                     current
-                      ? "bg-fill font-medium text-fg"
-                      : "text-fg-secondary hover:bg-fill"
+                      ? "bg-surface-2 font-medium text-fg"
+                      : "text-fg-secondary hover:bg-surface-2"
                   }`}
                 >
                   <input
@@ -277,7 +277,7 @@ export function ConfiguratorForm({
         })}
 
         {fields.length === 0 && (
-          <p className="text-[13px] text-fg-muted">
+          <p className="type-small text-fg-muted">
             {dict.configurator.noFields}
           </p>
         )}
@@ -359,7 +359,7 @@ function Field({
             onChange={(e) => onChange(e.target.value)}
             className="w-full accent-fg-secondary"
           />
-          <span className="data-instr w-10 shrink-0 text-right text-[13px] text-fg-secondary">
+          <span className="data-instr w-10 shrink-0 text-right type-small text-fg-secondary">
             {value || "0"}
           </span>
         </span>
@@ -379,7 +379,7 @@ function Field({
         />
       )}
 
-      {field.help && <span className="text-xs text-fg-muted">{field.help}</span>}
+      {field.help && <span className="type-caption text-fg-muted">{field.help}</span>}
     </label>
   );
 }

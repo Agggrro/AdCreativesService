@@ -50,7 +50,7 @@ function parseSize(key: SizeKey): { width: number; height: number } {
  * Templates run **one at a time**, and that is a correctness constraint rather
  * than a layout preference — VPAID units share the `window.getVPAIDAd` global,
  * so a grid of live units would render the last one loaded five times over
- * (docs/design-system.md §9). A sweep is therefore sequential: each template is
+ * (docs/design-system.md §11). A sweep is therefore sequential: each template is
  * mounted, allowed to complete its lifecycle, judged, and unmounted before the
  * next one starts.
  */
@@ -109,10 +109,10 @@ export function HarnessRunner({
 
   if (!current) {
     return (
-      <p className="text-[15px] leading-6 text-fg-secondary">
+      <p className="type-body text-fg-secondary">
         No template has a resolvable VPAID unit. Run{" "}
-        <code className="data-instr text-[13px]">npm run db:seed</code>, then{" "}
-        <code className="data-instr text-[13px]">npm run build:runtime</code>.
+        <code className="type-data">npm run db:seed</code>, then{" "}
+        <code className="type-data">npm run build:runtime</code>.
       </p>
     );
   }
@@ -181,7 +181,7 @@ export function HarnessRunner({
         </div>
       </div>
 
-      {/* The one dark surface (docs/design-system.md §7): a creative is judged
+      {/* The player well (docs/design-system.md §7): a creative is judged
           against black. One well, one live unit.
 
           No instrument strip. §7 makes that conditional on an ad request having
@@ -190,7 +190,13 @@ export function HarnessRunner({
           things a strip would have said are already on screen anyway: the unit
           key is the current segment above, and the size is the well's own
           dimensions. */}
-      <div className="w-fit rounded-ctl bg-well p-3">
+      {/*
+        The slot is a fixed ad size by definition — the harness exists to run a
+        creative at four specific ones — so it cannot be made fluid. §5's answer
+        applies: wide content scrolls inside its own container, and the page body
+        never scrolls sideways.
+      */}
+      <div className="w-fit max-w-full overflow-x-auto rounded-well border border-well-line bg-well p-3">
         <HarnessStage
           key={`${currentId}-${runToken}`}
           unitKey={current.unitKey}
@@ -203,12 +209,12 @@ export function HarnessRunner({
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-[15px] font-semibold leading-[22px]">Lifecycle</h2>
+        <h2 className="type-h3">Lifecycle</h2>
         <VerdictTable templates={templates} verdicts={verdicts} />
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-[15px] font-semibold leading-[22px]">Run timeline</h2>
+        <h2 className="type-h3">Run timeline</h2>
         {/* The validator's timeline, not a second one: same `PlayerEvent` input,
             same rails, same head band. §6 — one implementation per repeated
             element. */}
@@ -246,7 +252,7 @@ function VerdictTable({
 }) {
   return (
     <TableFrame>
-      <table className="w-full border-collapse text-[13px] leading-5">
+      <table className="w-full border-collapse type-small">
         <TableHead>
           <th className={HEAD}>Template</th>
           <th className={HEAD}>Verdict</th>

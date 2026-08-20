@@ -29,7 +29,7 @@ import { chipType } from "@/components/ui/Chip";
  * which is why the corners are rounded on the first and last segment instead of
  * on the container.
  *
- * The current segment is marked with `bg-fill`, never the accent. A segmented
+ * The current segment is marked with `bg-surface-2`, never the accent. A segmented
  * control is a choice among peers, not a task action, and the accent means
  * action (§3).
  */
@@ -66,13 +66,29 @@ export function Segmented<T extends string>({
   wrap = false,
   className = "",
 }: SegmentedProps<T>) {
+  /*
+   * A wrapping strip is not one strip. The joined form gets its shape from
+   * `first:rounded-l-ctl` / `last:rounded-r-ctl` and a shared outer border, and
+   * both of those describe a single row: once it wraps, every row but the first
+   * starts with a square end and every row but the last ends with one, and the
+   * outer border draws a box around the ragged block rather than around the
+   * controls. So the wrapping variant becomes separate chips with a gap — each
+   * one carries its own border and radius, which is correct at any number of
+   * rows. Only the landing hero and the harness pass `wrap`.
+   */
+  const container = wrap
+    ? `inline-flex flex-wrap gap-2 ${fill ? "w-full" : ""}`
+    : `inline-flex rounded-ctl border border-line bg-surface ${fill ? "w-full" : ""}`;
+
+  const segment = wrap
+    ? "rounded-ctl border border-line bg-surface"
+    : "border-r border-hairline first:rounded-l-ctl last:rounded-r-ctl last:border-r-0";
+
   return (
     <div
       role="group"
       aria-label={label}
-      className={`inline-flex rounded-ctl border border-line bg-surface ${fill ? "w-full" : ""} ${
-        wrap ? "flex-wrap" : ""
-      } ${className}`}
+      className={`${container} ${className}`}
     >
       {options.map((option) => {
         const current = option.value === value;
@@ -83,20 +99,20 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             aria-pressed={current}
             disabled={option.disabled}
-            className={`${chipType} border-r border-hairline px-2.5 py-1.5 transition-colors first:rounded-l-ctl last:rounded-r-ctl last:border-r-0 ${
+            className={`${chipType} ${segment} px-2.5 py-1.5 transition-colors duration-150 ${
               fill ? "flex-1" : ""
             } ${
               // `current` is checked before `disabled`, not after. A disabled
-              // strip still has a current segment, and dropping `bg-fill` from
+              // strip still has a current segment, and dropping `bg-surface-2` from
               // it leaves the choice shown in neither colour nor form while
               // `aria-pressed` below still says which one it is — visual and
-              // accessible state disagreeing about the same fact (§9, "state
+              // accessible state disagreeing about the same fact (§11, "state
               // encoded in form as well as colour").
               current
-                ? `bg-fill text-fg${option.disabled ? " cursor-not-allowed" : ""}`
+                ? `bg-surface-2 text-fg${option.disabled ? " cursor-not-allowed" : ""}`
                 : option.disabled
-                  ? "cursor-not-allowed text-fg-disabled"
-                  : "text-fg-secondary hover:bg-fill"
+                  ? "cursor-not-allowed text-fg-muted"
+                  : "text-fg-secondary hover:bg-surface-2"
             }`}
           >
             {option.label}

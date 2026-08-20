@@ -4,6 +4,7 @@ import { getDict } from "@/lib/i18n/server";
 import { Field, Notice, Panel } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { AppTopBar } from "@/components/AppTopBar";
+import { Container } from "@/components/ui/Container";
 
 export default async function SignupPage({
   searchParams,
@@ -17,21 +18,19 @@ export default async function SignupPage({
     <main className="flex flex-1 flex-col">
       <AppTopBar />
 
-      <div className="flex flex-1 items-center justify-center p-6">
-        <div className="flex w-full max-w-sm flex-col gap-5">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
-              {dict.auth.signUpTitle}
-            </h1>
-            <p className="text-[13px] leading-5 text-fg-muted">
+      <div className="flex flex-1 items-center justify-center py-16">
+        <Container width="narrow" className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <h1 className="type-h2">{dict.auth.signUpTitle}</h1>
+            <p className="type-small text-fg-secondary">
               {dict.auth.signUpSubtitle}
             </p>
           </div>
 
           {sp.error && <Notice tone="dead">{sp.error}</Notice>}
 
-          <Panel className="p-5">
-            <form action={signUp} className="flex flex-col gap-4">
+          <Panel className="p-6">
+            <form action={signUp} className="flex flex-col gap-5">
               <Field label={dict.common.email} name="email" type="email" />
               <Field
                 label={dict.common.password}
@@ -39,22 +38,22 @@ export default async function SignupPage({
                 type="password"
                 minLength={8}
               />
-              <Button type="submit" variant="primary" className="w-full justify-center">
+              <Button type="submit" variant="primary" className="w-full">
                 {dict.auth.createAccount}
               </Button>
             </form>
           </Panel>
 
-          <p className="text-[13px] text-fg-muted">
+          <p className="type-small text-fg-muted">
             {dict.auth.haveAccount}{" "}
             <Link
               href="/login"
-              className="font-medium text-fg underline underline-offset-4"
+              className="rounded-ctl font-medium text-accent underline underline-offset-4 transition-colors duration-150 hover:text-accent-hover"
             >
               {dict.common.signIn}
             </Link>
           </p>
-        </div>
+        </Container>
       </div>
     </main>
   );

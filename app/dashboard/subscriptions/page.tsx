@@ -3,8 +3,15 @@ import { getDict } from "@/lib/i18n/server";
 import { LOCALE_TAG, statusTone } from "@/lib/i18n/dictionaries";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { Notice, Panel } from "@/components/ui/Field";
-import { RAIL, StateBadge } from "@/components/ui/State";
-import { CELL, HEAD, ROW } from "@/components/ui/Table";
+import { StateBadge } from "@/components/ui/State";
+import {
+  CELL,
+  HEAD,
+  ROW,
+  TableFrame,
+  TableHead,
+  railCell,
+} from "@/components/ui/Table";
 
 /**
  * What the badge should say, rather than what Stripe last told us. A row can sit
@@ -18,7 +25,8 @@ function effectiveStatus(s: {
 }): string {
   const entitled = s.status === "active" || s.status === "trialing";
   const expired =
-    s.current_period_end !== null && new Date(s.current_period_end) <= new Date();
+    s.current_period_end !== null &&
+    new Date(s.current_period_end) <= new Date();
   return entitled && expired ? "past_due" : s.status;
 }
 
@@ -57,10 +65,8 @@ export default async function SubscriptionsPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">
-          {dict.dashboard.subscriptions}
-        </h1>
-        <p className="max-w-[66ch] text-[13px] leading-5 text-fg-muted">
+        <h1 className="type-h2">{dict.dashboard.subscriptions}</h1>
+        <p className="type-small max-w-[66ch] text-fg-secondary">
           {dict.dashboard.subscriptionsSubtitle}
         </p>
       </div>
@@ -75,70 +81,72 @@ export default async function SubscriptionsPage({
       )}
 
       {subs && subs.length > 0 ? (
-        <Panel>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[13px]">
-              <thead>
-                <tr className="border-b border-hairline">
-                  <th className={HEAD}>{dict.dashboard.plan}</th>
-                  <th className={HEAD}>{dict.dashboard.period}</th>
-                  <th className={HEAD}>{dict.dashboard.status}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subs.map((s) => (
-                  <tr key={s.id} className={ROW}>
-                    <td
-                      className={`${CELL} border-l-[3px] pl-[13px] ${RAIL[statusTone(s.status)]}`}
-                    >
-                      <span className="text-[13px] font-medium">
-                        {s.plan_type === "all_access"
-                          ? dict.dashboard.planUltimate
-                          : `${dict.dashboard.planSingle} — ${
-                              templateName.get(s.template_id ?? "") ??
-                              dict.dashboard.template
-                            }`}
-                      </span>
-                    </td>
-                    <td className={`${CELL} whitespace-nowrap text-fg-muted`}>
-                      {s.current_period_end ? (
-                        <>
-                          {/* A cancelling subscription ENDS on that date — saying
+        <TableFrame>
+          <table className="w-full border-collapse type-small">
+            <TableHead>
+              <th className={HEAD}>{dict.dashboard.plan}</th>
+              <th className={HEAD}>{dict.dashboard.period}</th>
+              <th className={HEAD}>{dict.dashboard.status}</th>
+            </TableHead>
+            <tbody>
+              {subs.map((s) => (
+                <tr key={s.id} className={ROW}>
+                  {/*
+                    The rail reads `effectiveStatus`, the same value as the state
+                    word in the last cell. Reading `s.status` here — the raw
+                    Stripe mirror — put a green `live` rail beside a red PAST DUE
+                    word on exactly the row `effectiveStatus` exists for: a stale
+                    mirror whose period has already passed. Two forms disagreeing
+                    about one fact is what §11's "state encoded in form as well as
+                    colour" forbids, and on a billing screen the rail was painting
+                    the reassuring one while `/api/vast` served empty.
+                  */}
+                  <td className={railCell(statusTone(effectiveStatus(s)))}>
+                    <span className="type-small font-medium">
+                      {s.plan_type === "all_access"
+                        ? dict.dashboard.planUltimate
+                        : `${dict.dashboard.planSingle} — ${
+                            templateName.get(s.template_id ?? "") ??
+                            dict.dashboard.template
+                          }`}
+                    </span>
+                  </td>
+                  <td className={`${CELL} whitespace-nowrap text-fg-muted`}>
+                    {s.current_period_end ? (
+                      <>
+                        {/* A cancelling subscription ENDS on that date — saying
                               "renews" would be the opposite of the truth. */}
-                          <span>
-                            {s.cancel_at_period_end
-                              ? dict.dashboard.endsOn
-                              : dict.dashboard.renews}{" "}
-                          </span>
-                          <span className="data-instr">
-                            {formatDate(s.current_period_end)}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="data-instr">—</span>
-                      )}
-                    </td>
-                    <td className={`${CELL} whitespace-nowrap`}>
-                      <StateBadge status={effectiveStatus(s)} dict={dict} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
+                        <span>
+                          {s.cancel_at_period_end
+                            ? dict.dashboard.endsOn
+                            : dict.dashboard.renews}{" "}
+                        </span>
+                        <span className="data-instr">
+                          {formatDate(s.current_period_end)}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="data-instr">—</span>
+                    )}
+                  </td>
+                  <td className={`${CELL} whitespace-nowrap`}>
+                    <StateBadge status={effectiveStatus(s)} dict={dict} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableFrame>
       ) : (
-        <p className="text-[13px] text-fg-muted">
+        <p className="type-small text-fg-muted">
           {dict.dashboard.noSubscriptions}
         </p>
       )}
 
       <Panel className="flex flex-wrap items-center justify-between gap-4 p-4">
         <div className="flex flex-col gap-1">
-          <p className="text-[15px] font-semibold leading-[22px]">
-            {dict.dashboard.ultimateTitle}
-          </p>
-          <p className="text-[13px] text-fg-muted">
+          <p className="type-h3">{dict.dashboard.ultimateTitle}</p>
+          <p className="type-small text-fg-muted">
             {dict.dashboard.ultimateSubtitle}
           </p>
         </div>
@@ -147,7 +155,7 @@ export default async function SubscriptionsPage({
         </SubscribeButton>
       </Panel>
 
-      <p className="text-[13px] text-fg-muted">
+      <p className="type-small text-fg-muted">
         {dict.dashboard.singleTemplateHint}
       </p>
     </div>

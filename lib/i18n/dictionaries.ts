@@ -55,13 +55,71 @@ const ru = {
     subscriptions: "Подписки",
     tools: "Инструменты",
     language: "Язык интерфейса",
+    menu: "Меню",
+  },
+  meta: {
+    title: "CreoSmith — интерактивные видеокреативы",
+    description:
+      "Соберите интерактивный видеокреатив без разработчика и заберите динамический VAST-тег для любого DSP. SIMID 1.1 и VPAID 2.0.",
   },
   landing: {
-    title: "Интерактивные видеокреативы без единой строчки кода",
+    eyebrow: "Интерактивные видеокреативы",
+    title: "Реклама, с которой зритель что-то делает",
     subtitle:
-      "Настройте шаблон, получите динамический VAST-тег и вставьте его в DSP. Поддерживаются SIMID и VPAID.",
+      "Выберите шаблон, настройте под кампанию и заберите динамический VAST-тег. SIMID 1.1 и VPAID 2.0 — вставляется в любой DSP без разработчика.",
     ctaStart: "Начать бесплатно",
     ctaDashboard: "Перейти в кабинет",
+    ctaTemplates: "Смотреть шаблоны",
+    heroNote: "7 дней бесплатно · правка креатива не требует перевыпуска тега",
+
+    howEyebrow: "Как это работает",
+    howTitle: "От шаблона до тега в DSP — четыре шага",
+    howLead:
+      "Ни один из них не требует разработчика. Правка в креативе не заставляет перевыпускать тег — кампания продолжает идти.",
+    step1Title: "Выберите шаблон",
+    step1Body:
+      "Пять механик: шоппинг, скретч, до/после, квиз и возрастной гейт.",
+    step2Title: "Настройте под кампанию",
+    step2Body:
+      "Видео, изображения, ссылка перехода, тексты кнопок. Превью обновляется сразу.",
+    step3Title: "Заберите VAST-тег",
+    step3Body:
+      "Один динамический URL. Формат отдачи выбираете вы — SIMID или VPAID.",
+    step4Title: "Вставьте в DSP",
+    step4Body:
+      "Тег отдаёт интерактив, пока активна подписка. Дальше — обычная закупка.",
+    tagLabel: "Ваш тег",
+
+    templatesEyebrow: "Шаблоны",
+    templatesTitle: "Пять механик, готовых к запуску",
+    customTitle: "Нужна своя механика?",
+    customBody: "Соберём шаблон под вашу кампанию и добавим его в каталог.",
+
+    stdEyebrow: "Совместимость",
+    stdTitle: "Стандарты, а не костыли",
+    stdLead:
+      "Мы отдаём то, что DSP уже умеет читать. Никаких собственных плееров и обёрток на стороне площадки.",
+    stdVast: "Формат тега",
+    stdSimid: "Интерактив нового поколения",
+    stdVpaid: "Совместимость с текущим парком",
+    stdOmid: "Проброс верификации вендора",
+
+    toolsEyebrow: "Бесплатно, без аккаунта",
+    toolsTitle: "Инструменты, которыми пользуются и не наши клиенты",
+
+    finalTitle: "Соберите первый креатив сегодня",
+    finalBody:
+      "Семь дней бесплатно, все шаблоны открыты. Тег живёт, пока активна подписка.",
+    ctaCheckTag: "Проверить свой тег",
+  },
+  footer: {
+    tagline:
+      "Интерактивные видеокреативы и динамические VAST-теги для медиабайеров и креативных агентств.",
+    product: "Продукт",
+    tools: "Инструменты",
+    standards: "Стандарты",
+    howItWorks: "Как это работает",
+    rights: "© 2026 CreoSmith",
   },
   auth: {
     signInTitle: "Вход в CreoSmith",
@@ -69,8 +127,7 @@ const ru = {
     signUpTitle: "Создание аккаунта",
     signUpSubtitle: "Начните собирать интерактивные креативы.",
     createAccount: "Создать аккаунт",
-    checkEmail:
-      "Подтвердите адрес по ссылке в письме, затем войдите.",
+    checkEmail: "Подтвердите адрес по ссылке в письме, затем войдите.",
     noAccount: "Нет аккаунта?",
     createOne: "Создайте его",
     haveAccount: "Уже есть аккаунт?",
@@ -110,7 +167,8 @@ const ru = {
     onTrial: "триал",
     impressions: "Показы",
     clicks: "Клики",
-    clicksHint: "Только переход по кнопке действия — промежуточные клики не считаются",
+    clicksHint:
+      "Только переход по кнопке действия — промежуточные клики не считаются",
     funnel: "Доставка",
     ctr: "CTR",
     ctrOfImpressions: "от показов",
@@ -121,10 +179,8 @@ const ru = {
     openCreative: "Открыть",
     statsUnavailable:
       "Статистика сейчас недоступна, поэтому цифры и состояние отдачи скрыты — показывать неверные мы не будем. Обновите страницу через минуту; если не пройдёт, напишите нам.",
-    viewableNotApplicable:
-      "Измеряется вашим вендором верификации, а не нами",
-    viewableSelfReported:
-      "Собственная оценка, без аккредитации OMID",
+    viewableNotApplicable: "Измеряется вашим вендором верификации, а не нами",
+    viewableSelfReported: "Собственная оценка, без аккредитации OMID",
     viewabilityHeading: "Измерение просмотра",
     createCreative: "Создать креатив",
     edit: "Изменить",
@@ -168,7 +224,8 @@ const ru = {
     deliveryFormat: "Формат доставки",
     noFields: "У этого шаблона нет настраиваемых полей.",
     required: "обязательное",
-    errFormatRequired: "Выберите формат доставки — без него креатив не собрать.",
+    errFormatRequired:
+      "Выберите формат доставки — без него креатив не собрать.",
     errTemplateNotFound:
       "Шаблон не найден или снят с публикации. Выберите другой в каталоге.",
     errFieldRequired: "Заполните обязательное поле",
@@ -178,6 +235,7 @@ const ru = {
     errDeleteFailed:
       "Не удалось удалить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
     media: {
+      sourceLabel: "Источник файла",
       uploadTab: "Загрузить",
       urlTab: "Ссылка",
       chooseFile: "Выбрать файл",
@@ -225,7 +283,8 @@ const ru = {
     ms: "мс",
     validFor: "Тег превью действителен ещё",
     seconds: "с",
-    expired: "Тег превью истёк — нажмите «Перезапустить», чтобы получить новый.",
+    expired:
+      "Тег превью истёк — нажмите «Перезапустить», чтобы получить новый.",
     served: "Реклама отдана",
     format: "Формат",
     loadingUnit: "Загружаем интерактивный блок…",
@@ -253,8 +312,7 @@ const ru = {
     demoTitle: "Как это работает",
     demoHint:
       "Пример с нейтральными заглушками — рекламодатель загружает свои изображения и ссылки.",
-    heroHint:
-      "Демонстрационные изображения — рекламодатель загружает свои.",
+    heroHint: "Демонстрационные изображения — рекламодатель загружает свои.",
     heroSwitcher: "Переключатель шаблонов",
     noDemo:
       "Демо в браузере для этого шаблона пока нет. Механику можно собрать в конфигураторе и проверить в плеере.",
@@ -277,8 +335,7 @@ const ru = {
     heading: "Домен доставки рекламы",
     whose:
       "Этот домен принадлежит CreoSmith и используется только для доставки рекламы: VAST-теги, счётчики показов и файлы интерактивных креативов.",
-    noSite:
-      "Сайта здесь нет. Продукт и контакты — на основном домене.",
+    noSite: "Сайта здесь нет. Продукт и контакты — на основном домене.",
     whitelist:
       "Если вам нужно внести домен в whitelist, добавьте его целиком. Отдаются только рекламные ответы; ни авторизации, ни кук на этом домене нет.",
     goToSite: "Перейти на основной сайт",
@@ -299,6 +356,13 @@ const ru = {
     generatorSoonBody:
       "Сейчас в работе валидатор. Генератор появится следующим — он будет собирать VAST, который валидатор принимает без замечаний.",
     validatorName: "Валидатор VAST",
+    playerFrame: "Плеер VAST",
+    validatorMetaTitle: "Валидатор VAST — проверить и проиграть тег",
+    validatorMetaDescription:
+      "Вставьте URL или XML VAST-тега. Проверяем по спецификации IAB, проходим цепочку враппера, проигрываем в Google IMA и показываем каждую ошибку с исправлением. VPAID, SIMID и OMID включены. Бесплатно, без аккаунта.",
+    generatorMetaTitle: "Генератор VAST-тегов",
+    generatorMetaDescription:
+      "Собирает корректный VAST из ваших параметров, когда нужен тестовый тег на пять минут. Бесплатно, без аккаунта.",
     validatorDescription:
       "Разбор тега или XML по спецификации IAB, прогон в реальном плеере и отчёт с ошибками и рекомендациями.",
     validator: {
@@ -310,7 +374,7 @@ const ru = {
       inputLabelUrl: "Ссылка на VAST",
       inputLabelXml: "Тело документа VAST",
       placeholderUrl: "https://adserver.example.com/vast?id=…",
-      placeholderXml: "<VAST version=\"4.2\"> …",
+      placeholderXml: '<VAST version="4.2"> …',
       pixels: "Трекинг-пиксели",
       pixelsDry: "Не отправлять",
       pixelsLive: "Отправлять",
@@ -318,7 +382,8 @@ const ru = {
       running: "Проверяем",
       errEmptyUrl: "Вставьте ссылку на VAST-тег.",
       errEmptyXml: "Вставьте тело VAST-документа.",
-      errBadUrl: "Это не похоже на абсолютный адрес. Ожидается http:// или https://.",
+      errBadUrl:
+        "Это не похоже на абсолютный адрес. Ожидается http:// или https://.",
       errTooLarge: "Документ больше 256 КБ — столько мы не разбираем.",
       errRequest: "Не удалось выполнить проверку. Попробуйте ещё раз.",
       verdictPass: "Пройдено",
@@ -381,8 +446,7 @@ const ru = {
         "Адрес из самого тега — то, что ушло бы в бою. Плеер не сообщает, какой именно URL он дёрнул, поэтому строка сопоставлена с событием по имени, а не по факту запроса.",
       trackersUnfired: "Объявлены, но не сработали",
       sectionReference: "Разбор документа",
-      wellIdle:
-        "Плеер запустится сразу после нажатия «Проверить».",
+      wellIdle: "Плеер запустится сразу после нажатия «Проверить».",
       inputMode: "Способ ввода",
       sectionComparison: "XML против плеера",
       // Units are interface text, not machine values: `256 КБ` in an error message and
@@ -430,13 +494,72 @@ const en: Dict = {
     subscriptions: "Subscriptions",
     tools: "Tools",
     language: "Interface language",
+    menu: "Menu",
+  },
+  meta: {
+    title: "CreoSmith — interactive video ad creatives",
+    description:
+      "Build an interactive video creative without a developer and take a dynamic VAST tag for any DSP. SIMID 1.1 and VPAID 2.0.",
   },
   landing: {
-    title: "Interactive video ad creatives, without code",
+    eyebrow: "Interactive video creative",
+    title: "Ads your viewer actually touches",
     subtitle:
-      "Configure a template, get a dynamic VAST tag for your DSP, and serve shoppable, interactive ads. SIMID and VPAID supported.",
+      "Pick a template, tune it to the campaign, take the dynamic VAST tag. SIMID 1.1 and VPAID 2.0 — it pastes into any DSP, with no developer.",
     ctaStart: "Start free trial",
     ctaDashboard: "Go to dashboard",
+    ctaTemplates: "See the templates",
+    heroNote: "7 days free · editing a creative never reissues the tag",
+
+    howEyebrow: "How it works",
+    howTitle: "Template to DSP tag in four steps",
+    howLead:
+      "None of them needs a developer. Editing a creative does not force a new tag — the campaign keeps running.",
+    step1Title: "Pick a template",
+    step1Body:
+      "Five mechanics: shoppable, scratch, before/after, quiz, and an age gate.",
+    step2Title: "Tune it to the campaign",
+    step2Body:
+      "Video, images, click-through, button copy. The preview updates as you type.",
+    step3Title: "Take the VAST tag",
+    step3Body:
+      "One dynamic URL. You choose the delivery format — SIMID or VPAID.",
+    step4Title: "Paste it into your DSP",
+    step4Body:
+      "The tag serves the interactive payload while the subscription is active. The rest is ordinary buying.",
+    tagLabel: "Your tag",
+
+    templatesEyebrow: "Templates",
+    templatesTitle: "Five mechanics, ready to run",
+    customTitle: "Need a mechanic of your own?",
+    customBody:
+      "We will build the template around your campaign and add it to the catalog.",
+
+    stdEyebrow: "Compatibility",
+    stdTitle: "Standards, not workarounds",
+    stdLead:
+      "We serve what a DSP already knows how to read. No player of our own, no wrapper on the publisher's side.",
+    stdVast: "Tag format",
+    stdSimid: "Next-generation interactivity",
+    stdVpaid: "Works with the installed base",
+    stdOmid: "Vendor verification pass-through",
+
+    toolsEyebrow: "Free, no account",
+    toolsTitle: "Tools people who aren't our customers use anyway",
+
+    finalTitle: "Build your first creative today",
+    finalBody:
+      "Seven days free, every template open. The tag lives as long as the subscription does.",
+    ctaCheckTag: "Check your own tag",
+  },
+  footer: {
+    tagline:
+      "Interactive video creative and dynamic VAST tags for media buyers and creative agencies.",
+    product: "Product",
+    tools: "Tools",
+    standards: "Standards",
+    howItWorks: "How it works",
+    rights: "© 2026 CreoSmith",
   },
   auth: {
     signInTitle: "Sign in to CreoSmith",
@@ -484,7 +607,8 @@ const en: Dict = {
     onTrial: "trial",
     impressions: "Impressions",
     clicks: "Clicks",
-    clicksHint: "Final call-to-action only — intermediate clicks are not counted",
+    clicksHint:
+      "Final call-to-action only — intermediate clicks are not counted",
     funnel: "Delivery",
     ctr: "CTR",
     ctrOfImpressions: "of impressions",
@@ -495,8 +619,7 @@ const en: Dict = {
     openCreative: "Open",
     statsUnavailable:
       "Delivery numbers are unavailable right now, so counts and serving state are hidden rather than shown wrong. Refresh in a minute; if it persists, contact us.",
-    viewableNotApplicable:
-      "Measured by your verification vendor, not by us",
+    viewableNotApplicable: "Measured by your verification vendor, not by us",
     viewableSelfReported: "Self-reported, not OMID-accredited",
     viewabilityHeading: "Viewability measurement",
     createCreative: "Create creative",
@@ -547,6 +670,7 @@ const en: Dict = {
     errDeleteFailed:
       "Could not delete the creative. Try again; if it keeps failing, contact us.",
     media: {
+      sourceLabel: "File source",
       uploadTab: "Upload",
       urlTab: "URL",
       chooseFile: "Choose file",
@@ -659,6 +783,13 @@ const en: Dict = {
     generatorSoonBody:
       "The validator is what we are building now. The generator comes next, and it will produce VAST the validator accepts without a finding.",
     validatorName: "VAST validator",
+    playerFrame: "VAST player",
+    validatorMetaTitle: "VAST validator — check and play a VAST tag",
+    validatorMetaDescription:
+      "Paste a VAST tag URL or XML. Checks it against the IAB specification, walks the wrapper chain, plays it in Google IMA, and reports every fault with a fix. VPAID, SIMID and OMID included. Free, no account.",
+    generatorMetaTitle: "VAST tag generator",
+    generatorMetaDescription:
+      "Builds a correct VAST tag from your parameters, for when you need a test tag in five minutes. Free, no account.",
     validatorDescription:
       "Parse a tag or document against the IAB specification, play it in a real player, and report every fault with a fix.",
     validator: {
@@ -670,7 +801,7 @@ const en: Dict = {
       inputLabelUrl: "VAST tag URL",
       inputLabelXml: "VAST document body",
       placeholderUrl: "https://adserver.example.com/vast?id=…",
-      placeholderXml: "<VAST version=\"4.2\"> …",
+      placeholderXml: '<VAST version="4.2"> …',
       pixels: "Tracking pixels",
       pixelsDry: "Do not fire",
       pixelsLive: "Fire",
@@ -678,8 +809,10 @@ const en: Dict = {
       running: "Checking",
       errEmptyUrl: "Paste a VAST tag URL.",
       errEmptyXml: "Paste a VAST document body.",
-      errBadUrl: "That does not look like an absolute address. http:// or https:// is expected.",
-      errTooLarge: "The document is larger than 256 KB, which is more than we parse.",
+      errBadUrl:
+        "That does not look like an absolute address. http:// or https:// is expected.",
+      errTooLarge:
+        "The document is larger than 256 KB, which is more than we parse.",
       errRequest: "The check could not be completed. Try again.",
       verdictPass: "Pass",
       verdictWarn: "Pass with warnings",
@@ -736,8 +869,7 @@ const en: Dict = {
         "The address from the tag itself — what would fire in production. No player reports which URL it actually requested, so the row is matched to the event by name rather than by observation.",
       trackersUnfired: "Declared but never fired",
       sectionReference: "Document detail",
-      wellIdle:
-        "The player starts as soon as you press Check.",
+      wellIdle: "The player starts as soon as you press Check.",
       inputMode: "Input mode",
       sectionComparison: "XML versus player",
       unitSeconds: "s",
@@ -758,7 +890,9 @@ export const dictionaries: Record<Locale, Dict> = { ru, en };
 export type { Dict };
 
 export function isLocale(value: unknown): value is Locale {
-  return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" && (LOCALES as readonly string[]).includes(value)
+  );
 }
 
 /**

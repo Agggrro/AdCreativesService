@@ -42,7 +42,12 @@ export function HeroShowcase({
     <div className="flex flex-col gap-3">
       <Segmented
         wrap
-        className="self-start"
+        // Centred on both axes: the hero is a centred composition, and the well
+        // below is `mx-auto`, so a left-aligned switcher sat off-axis from the
+        // thing it switches. `justify-center` is what centres the *wrapped* rows
+        // too — without it the strip centres as a block but its second row still
+        // starts at the left edge on a narrow viewport.
+        className="self-center justify-center"
         label={dict.catalog.heroSwitcher}
         value={active.id}
         onChange={setActiveId}

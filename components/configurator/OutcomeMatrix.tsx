@@ -13,7 +13,7 @@ export interface OutcomeBlock {
 
 /**
  * `A → A → B`. The path is machine text, not copy — it is the same string in
- * both locales, so it needs no dictionary entry (docs/design-system.md §8).
+ * both locales, so it needs no dictionary entry (docs/design-system.md §10).
  *
  * A block whose fields declare no `block` falls back to the first field's name,
  * which is still machine text. Blocks come from the database, and the contract
@@ -69,11 +69,15 @@ export function isBlockComplete(
  * focusable" submit-does-nothing failure that `display:none` on a `required`
  * field causes — `ConfiguratorForm`'s own guard is what enforces completeness.
  *
- * Accent budget: zero. The open row is marked with `bg-surface-sunken`, which
+ * Accent budget: zero. The open row is marked with `bg-surface-2`, which
  * merges it into the panel it opens, leaving the page's single warm element the
- * submit button (§3). Not `bg-fill`: `idle-fg` on `fill` measures 4.49:1, just
- * under the 4.5:1 threshold for the 11px state word — and "open and still empty"
- * is the row a user looks at most.
+ * submit button (§3).
+ *
+ * Under Instrument this row could not use the sunken surface: `idle-fg` on `fill`
+ * measured 4.49:1, just under the threshold for the 11px state word, and "open and
+ * still empty" is the row a user looks at most. Rebuilding the ramp for dark
+ * closed that gap — `idle` on `surface-2` now measures 6.54:1 — so the workaround
+ * is gone and `bg-surface-2` is simply the right surface.
  */
 export function OutcomeMatrix({
   blocks,
@@ -94,13 +98,14 @@ export function OutcomeMatrix({
   return (
     <div className="flex flex-col gap-2">
       {/*
-        Deliberately not `ui/Field.tsx`'s `Panel`, which is otherwise this exact
-        class string: `Panel` sets `overflow-hidden`, and a focus ring drawn at
-        2px offset around a row button would be clipped away by it
-        (docs/design-system.md §3). Rounding the first and last row instead is
-        what §3 prescribes.
+        This is `Panel`'s class string, and it may as well be a `Panel` now —
+        `Panel` stopped setting `overflow-hidden`, which was the whole reason
+        this was hand-rolled: a focus ring drawn 2px outside a row button was
+        being clipped away by it (§2). Left inline only because the rows round
+        their own first/last corners, which a generic container has no business
+        knowing about.
       */}
-      <div className="rounded-ctl border border-hairline bg-surface">
+      <div className="rounded-panel border border-hairline bg-surface">
         {blocks.map((block, i) => {
           const complete = isBlockComplete(block, values);
           const open = openId === block.id;
@@ -108,18 +113,18 @@ export function OutcomeMatrix({
           return (
             <div
               key={block.id}
-              className={i > 0 ? "border-t border-fill" : undefined}
+              className={i > 0 ? "border-t border-hairline" : undefined}
             >
               <button
                 type="button"
                 onClick={() => onToggle(block.id)}
                 aria-expanded={open}
                 aria-controls={open ? panelId : undefined}
-                className={`flex min-h-11 w-full items-center gap-3 border-l-[3px] py-2 pr-4 pl-[13px] text-left transition-colors duration-[120ms] first:rounded-t-ctl last:rounded-b-ctl ${
+                className={`flex min-h-11 w-full items-center gap-3 border-l-[3px] py-2 pr-4 pl-[13px] text-left transition-colors duration-150 first:rounded-t-ctl last:rounded-b-ctl ${
                   RAIL[complete ? "live" : "idle"]
-                } ${open ? "bg-surface-sunken" : "hover:bg-surface-sunken"}`}
+                } ${open ? "bg-surface-2" : "hover:bg-surface-2"}`}
               >
-                <span className="data-instr flex-1 text-[13px] text-fg">
+                <span className="data-instr flex-1 type-small text-fg">
                   {formatPath(block)}
                 </span>
                 <StateWord
@@ -133,7 +138,7 @@ export function OutcomeMatrix({
                 <ChevronDown
                   size={14}
                   aria-hidden
-                  className={`shrink-0 text-fg-muted transition-transform duration-[120ms] ${
+                  className={`shrink-0 text-fg-muted transition-transform duration-150 ${
                     open ? "rotate-180" : ""
                   }`}
                 />
@@ -142,7 +147,7 @@ export function OutcomeMatrix({
               {open ? (
                 <div
                   id={panelId}
-                  className="flex flex-col gap-4 border-t border-fill bg-surface-sunken px-4 py-4 last:rounded-b-ctl"
+                  className="flex flex-col gap-4 border-t border-hairline bg-surface-2 px-4 py-4 last:rounded-b-ctl"
                 >
                   {block.fields.map((field) => renderField(field))}
                 </div>

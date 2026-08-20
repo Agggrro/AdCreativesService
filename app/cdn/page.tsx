@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Container } from "@/components/ui/Container";
 import { getSiteUrl } from "@/lib/site";
 import { dictionaries, LOCALES } from "@/lib/i18n/dictionaries";
 
@@ -24,24 +25,24 @@ export default function CdnInfoPage() {
   const siteUrl = getSiteUrl();
 
   return (
-    <main className="mx-auto flex min-h-full max-w-[68ch] flex-col gap-8 px-6 py-16">
+    <Container width="prose" className="flex min-h-full flex-col gap-8 py-16">
       {LOCALES.map((locale) => {
         const t = dictionaries[locale].cdn;
         return (
           <section key={locale} className="flex flex-col gap-3" lang={locale}>
             <h1 className="label-instr">{t.heading}</h1>
-            <p className="text-[13px] leading-5 text-fg">{t.whose}</p>
-            <p className="text-[13px] leading-5 text-fg-muted">{t.noSite}</p>
-            <p className="text-[13px] leading-5 text-fg-muted">{t.whitelist}</p>
+            <p className="type-small text-fg">{t.whose}</p>
+            <p className="type-small text-fg-muted">{t.noSite}</p>
+            <p className="type-small text-fg-muted">{t.whitelist}</p>
             <a
               href={siteUrl}
-              className="self-start text-[13px] underline underline-offset-4 hover:text-fg"
+              className="self-start type-small underline underline-offset-4 hover:text-fg"
             >
               {t.goToSite}
             </a>
           </section>
         );
       })}
-    </main>
+    </Container>
   );
 }

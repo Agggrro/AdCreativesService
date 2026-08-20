@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PlayerEvent } from "@/components/players/types";
 import type { Playback } from "@/lib/vast-inspect/model";
 import { getSandboxUrl } from "@/lib/site";
+import { useDict } from "@/components/i18n/LocaleProvider";
 import {
   isSandboxMessage,
   SANDBOX_CHANNEL,
@@ -55,6 +56,9 @@ export function ValidatorStage({
   runToken,
   onUnavailable,
 }: ValidatorStageProps) {
+  // The frame’s accessible name is a user-visible string, so it comes from the
+  // dictionary like every other one (§10).
+  const dict = useDict();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const readyRef = useRef(false);
   const playbackRef = useRef(playback);
@@ -162,7 +166,7 @@ export function ValidatorStage({
       // than a frame holding a dead AdsManager — the remount `runToken` gives
       // this component is only worth having if the frame honours it too.
       src={`${sandboxOrigin}/c/player?r=${runToken}`}
-      title="VAST player"
+      title={dict.tools.playerFrame}
       // Autoplay is delegated across the origin boundary; user activation is not
       // inherited by a cross-origin frame.
       allow="autoplay; fullscreen"

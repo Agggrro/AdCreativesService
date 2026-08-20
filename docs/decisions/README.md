@@ -21,7 +21,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0004](0004-mvp-on-free-tiers.md) | Run the MVP entirely on free tiers | Accepted |
 | [0005](0005-interactive-image-creatives.md) | Interactive-image creatives via VPAID/SIMID (not display) | Accepted |
 | [0006](0006-live-preview-token.md) | Stateless signed tokens for the live "Launch Ad" preview | Accepted |
-| [0007](0007-design-system-instrument.md) | "Instrument" design system: single light theme, Sienna accent, cold semantics | Accepted |
+| [0007](0007-design-system-instrument.md) | "Instrument" design system: single light theme, Sienna accent, cold semantics | Superseded by 0022 |
 | [0008](0008-catalog-first-information-architecture.md) | Catalog-first information architecture: three sections, public catalog, honest metrics | Accepted |
 | [0009](0009-mandatory-close-control.md) | Mandatory close control, no fixed watch duration | Accepted |
 | [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted |
@@ -36,6 +36,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0019](0019-creative-telemetry-channel.md) | Creative telemetry over an origin-locked postMessage channel | Accepted |
 | [0020](0020-validator-reports-faults-not-opinions.md) | The validator reports faults, not opinions | Accepted |
 | [0021](0021-validator-player-on-an-isolated-origin.md) | The validator's player runs on an isolated origin | Accepted |
+| [0022](0022-midnight-design-system.md) | "Midnight": one dark theme, a pastel warm accent, and creatives outside the system | Accepted |
 
 ## Template
 

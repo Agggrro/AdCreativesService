@@ -4,6 +4,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { isLocalHeaders } from "@/lib/dev-only";
 import { demoConfig, demoUnitKey } from "@/lib/template-demo";
 import { HarnessRunner, type HarnessTemplate } from "@/components/dev/HarnessRunner";
+import { Container } from "@/components/ui/Container";
 
 export const dynamic = "force-dynamic";
 
@@ -76,16 +77,16 @@ export default async function HarnessPage({
     : undefined;
 
   return (
-    <main className="mx-auto flex w-full max-w-[1080px] flex-col gap-8 px-6 py-10">
+    <Container width="wide" className="flex flex-col gap-8 py-10">
       <div className="flex flex-col gap-2 border-b border-hairline pb-6">
-        <h1 className="text-[20px] font-semibold leading-7 tracking-[-0.01em]">
+        <h1 className="type-h2">
           Creative harness
         </h1>
-        <p className="max-w-[66ch] text-[15px] leading-6 text-fg-secondary">
+        <p className="type-body max-w-[66ch] text-fg-secondary">
           Runs a built VPAID unit against config derived from its template
           schema, and checks it completed the mandatory lifecycle. Local only —
           this page does not exist in production. Rebuild units with{" "}
-          <code className="data-instr text-[13px]">npm run build:runtime</code>{" "}
+          <code className="type-data">npm run build:runtime</code>{" "}
           before a run.
         </p>
       </div>
@@ -99,6 +100,6 @@ export default async function HarnessPage({
             : undefined
         }
       />
-    </main>
+    </Container>
   );
 }

@@ -43,7 +43,7 @@ type ValidatorDict = Dict["tools"]["validator"];
  *
  * The unit goes through the dictionary like any other interface word: an error
  * message reading "256 КБ" beside a table reading "256 KB" is one screen
- * speaking two languages (§8).
+ * speaking two languages (§10).
  */
 function formatBytes(bytes: number, tag: string, t: ValidatorDict): string {
   if (bytes < 1024) return `${bytes} ${t.unitBytes}`;
@@ -57,7 +57,7 @@ function Reading({ label, value }: { label: string; value: string }) {
   return (
     <span className="inline-flex items-baseline gap-1.5">
       <span className="label-instr">{label}</span>
-      <span className="data-instr text-[13px] text-fg">{value}</span>
+      <span className="type-data text-fg">{value}</span>
     </span>
   );
 }
@@ -65,8 +65,8 @@ function Reading({ label, value }: { label: string; value: string }) {
 /** An empty section body, so "nothing found" never looks like a failed render. */
 function EmptyNote({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-ctl border border-hairline bg-surface px-4 py-4">
-      <p className="text-[13px] leading-5 text-fg-muted">{children}</p>
+    <div className="rounded-panel border border-hairline bg-surface px-4 py-4">
+      <p className="type-small text-fg-muted">{children}</p>
     </div>
   );
 }
@@ -96,19 +96,19 @@ export function VerdictStrip({ report }: { report: InspectReport }) {
         : t.verdictPass;
 
   return (
-    <div className="flex flex-col gap-2 rounded-ctl border border-hairline bg-surface px-3 py-3">
+    <div className="flex flex-col gap-2 rounded-panel border border-hairline bg-surface px-3 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         <StateWord tone={verdictTone} label={verdictLabel} />
         {/* Label then count, not count then label: it is the only order that
             stays grammatical in Russian at every number, and it is the
             instrument-panel reading anyway. See lib/i18n/dictionaries.ts. */}
-        <span className="data-instr text-[13px] text-fg-secondary">
+        <span className="type-data text-fg-secondary">
           {t.countErrors} {number.format(report.counts.error)} ·{" "}
           {t.countWarnings} {number.format(report.counts.warning)} ·{" "}
           {t.countAdvisories} {number.format(report.counts.advisory)}
         </span>
       </div>
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-fill pt-2">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-hairline pt-2">
         <Reading label={t.version} value={report.declaredVersion ?? t.versionUnknown} />
         <Reading label={t.ads} value={number.format(report.adCount)} />
         <Reading label={t.hops} value={number.format(report.chain.length)} />
@@ -152,7 +152,7 @@ export function Recommendations({ findings }: { findings: Finding[] }) {
       <HelpLabel
         label={t.sectionRecommendations}
         help={t.recommendationsHelp}
-        className="text-[15px] font-semibold leading-[22px]"
+        className="type-h3"
       />
     </h2>
   );
@@ -176,7 +176,7 @@ export function Recommendations({ findings }: { findings: Finding[] }) {
           is a direct child of this container. Wrapping each group in a `<div>`
           made `railRow`'s `last:rounded-b-ctl` fire on the last row of *every*
           group, rounding rails in the middle of the panel. */}
-      <div className="rounded-ctl border border-hairline bg-surface">
+      <div className="rounded-panel border border-hairline bg-surface">
         {SEVERITY_ORDER.map((severity) => {
           const group = findings.filter((finding) => finding.severity === severity);
           if (group.length === 0) return null;
@@ -187,10 +187,10 @@ export function Recommendations({ findings }: { findings: Finding[] }) {
               {/* The group band is what makes severity legible from the shape of
                   the page rather than only from a word on every row (§6). */}
               <div
-                className={`flex items-center gap-2 border-b border-fill border-l-[3px] bg-surface-sunken py-2 pl-[13px] pr-4 ${RAIL[tone]}`}
+                className={`flex items-center gap-2 border-b border-hairline border-l-[3px] bg-surface-2 py-2 pl-[13px] pr-4 ${RAIL[tone]}`}
               >
                 <StateWord tone={tone} label={severityLabel[severity]} />
-                <span className="data-instr text-[13px] text-fg-muted">{group.length}</span>
+                <span className="type-data text-fg-muted">{group.length}</span>
               </div>
 
               {group.map((finding, index) => (
@@ -198,9 +198,9 @@ export function Recommendations({ findings }: { findings: Finding[] }) {
                   key={`${finding.ruleId}-${finding.hop}-${finding.path}-${index}`}
                   className={railRow(tone)}
                 >
-                  <summary className="flex cursor-pointer list-none flex-col gap-0.5 py-3 pl-[13px] pr-4 hover:bg-surface-sunken">
-                    <span className="text-[13px] leading-5">{finding.message[locale]}</span>
-                    <code className="data-instr block max-w-full truncate text-[13px] text-fg-muted">
+                  <summary className="flex cursor-pointer list-none flex-col gap-0.5 py-3 pl-[13px] pr-4 hover:bg-surface-2">
+                    <span className="type-small">{finding.message[locale]}</span>
+                    <code className="data-instr block max-w-full truncate type-small text-fg-muted">
                       {finding.path}
                       {finding.line ? `:${finding.line}` : ""}
                       {finding.hop > 0 ? ` · ${t.colHop} ${finding.hop}` : ""}
@@ -209,31 +209,31 @@ export function Recommendations({ findings }: { findings: Finding[] }) {
 
                   <div className="flex flex-col gap-2 pb-4 pl-[13px] pr-4">
                     {finding.offending && (
-                      <div className="overflow-x-auto rounded-ctl bg-surface-sunken px-3 py-2">
-                        <code className="data-instr whitespace-pre text-[13px] text-fg-secondary">
+                      <div className="overflow-x-auto rounded-ctl bg-surface-2 px-3 py-2">
+                        <code className="data-instr whitespace-pre type-small text-fg-secondary">
                           {finding.offending}
                         </code>
                       </div>
                     )}
-                    <p className="max-w-[66ch] text-[13px] leading-5 text-fg-secondary">
+                    <p className="type-small max-w-[66ch] text-fg-secondary">
                       {finding.hint[locale]}
                     </p>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                      <span className="data-instr text-xs leading-4 text-fg-muted">
+                      <span className="data-instr type-caption text-fg-muted">
                         {finding.ruleId}
                       </span>
                       <a
                         href={finding.spec.url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="text-xs leading-4 text-fg-muted underline underline-offset-4 hover:text-fg-secondary"
+                        className="type-caption text-fg-muted underline underline-offset-4 hover:text-fg-secondary"
                       >
                         <span className="data-instr">
                           {finding.spec.doc} {finding.spec.section}
                         </span>
                       </a>
                       {finding.iabErrorCode !== undefined && (
-                        <span className="data-instr text-xs leading-4 text-fg-muted">
+                        <span className="data-instr type-caption text-fg-muted">
                           {t.iabCode} {describeIabError(finding.iabErrorCode, locale)}
                         </span>
                       )}
@@ -261,13 +261,13 @@ export function Recommendations({ findings }: { findings: Finding[] }) {
  */
 function Fold({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <details className="group border-b border-fill last:border-b-0">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-[13px] font-medium leading-5 hover:bg-surface-sunken">
+    <details className="group border-b border-hairline last:border-b-0">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 type-small font-medium hover:bg-surface-2">
         {/* Open/closed is encoded in form, not only in what is visible below it
             (§9): the marker turns. */}
         <span
           aria-hidden
-          className="text-fg-muted transition-transform duration-[120ms] group-open:rotate-90"
+          className="text-fg-muted transition-transform duration-150 group-open:rotate-90"
         >
           ▸
         </span>
@@ -302,20 +302,29 @@ function Interactive({ report }: { report: InspectReport }) {
                 </span>
               </td>
               <td className={`${CELL_TIGHT} whitespace-nowrap`}>
+                {/*
+                  `info`, matching the rail above rather than contradicting it.
+                  The word used to be `live` — green, the health vocabulary —
+                  beside an `info` rail on the same row, which is two answers to
+                  one question (§11, "state encoded in form as well as colour").
+                  The rail's reasoning is the right one and now both follow it:
+                  "SIMID is present" is a fact about the tag, not a verdict that
+                  the tag is well.
+                */}
                 <StateWord
-                  tone={hit.present ? "live" : "idle"}
+                  tone={hit.present ? "info" : "idle"}
                   label={hit.present ? t.found : t.notFound}
                 />
               </td>
               <td className={CELL_TIGHT}>
                 <div className="flex flex-col gap-0.5">
                   {hit.resource && (
-                    <code className="data-instr block max-w-[52ch] truncate text-[13px] text-fg-secondary">
+                    <code className="data-instr block max-w-[52ch] truncate type-small text-fg-secondary">
                       {hit.resource}
                     </code>
                   )}
                   {hit.notes.map((note, index) => (
-                    <p key={index} className="max-w-[66ch] text-[13px] leading-5 text-fg-muted">
+                    <p key={index} className="type-small max-w-[66ch] text-fg-secondary">
                       {note[locale]}
                     </p>
                   ))}
@@ -348,9 +357,9 @@ function Features({ report }: { report: InspectReport }) {
             <tr key={feature.id} className={ROW}>
               <td className={CELL_TIGHT}>
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[13px] leading-5">{feature.label[locale]}</span>
+                  <span className="type-small">{feature.label[locale]}</span>
                   {feature.present && feature.detail && (
-                    <code className="data-instr block max-w-[52ch] truncate text-[13px] text-fg-muted">
+                    <code className="data-instr block max-w-[52ch] truncate type-small text-fg-muted">
                       {feature.detail}
                     </code>
                   )}
@@ -358,15 +367,15 @@ function Features({ report }: { report: InspectReport }) {
               </td>
               <td className={`${CELL_TIGHT} whitespace-nowrap`}>
                 <span className="flex items-baseline gap-2">
-                  <span className="data-instr text-[13px] text-fg-secondary">{feature.since}</span>
+                  <span className="type-data text-fg-secondary">{feature.since}</span>
                   {/* A version number is machine text even inside a qualifier (§4). */}
                   {feature.deprecatedIn && (
-                    <span className="text-xs leading-4 text-fg-muted">
+                    <span className="type-caption text-fg-muted">
                       {t.deprecatedIn} <span className="data-instr">{feature.deprecatedIn}</span>
                     </span>
                   )}
                   {feature.removedIn && (
-                    <span className="text-xs leading-4 text-fg-muted">
+                    <span className="type-caption text-fg-muted">
                       {t.removedIn} <span className="data-instr">{feature.removedIn}</span>
                     </span>
                   )}
@@ -379,7 +388,7 @@ function Features({ report }: { report: InspectReport }) {
                     label={feature.present ? t.found : t.notFound}
                   />
                   {!feature.availableAtDeclaredVersion && (
-                    <p className="text-xs leading-4 text-fg-muted">{t.unavailableAtVersion}</p>
+                    <p className="type-caption text-fg-muted">{t.unavailableAtVersion}</p>
                   )}
                 </div>
               </td>
@@ -422,7 +431,7 @@ function Chain({ hops }: { hops: Hop[] }) {
         <tbody>
           {hops.map((hop) => (
             <tr key={hop.index} className={ROW}>
-              <td className={railCellTight(toneOf(hop), "data-instr whitespace-nowrap text-[13px]")}>
+              <td className={railCellTight(toneOf(hop), "data-instr whitespace-nowrap type-small")}>
                 #{hop.index}
               </td>
               <td className={`${CELL_TIGHT} whitespace-nowrap`}>
@@ -430,27 +439,27 @@ function Chain({ hops }: { hops: Hop[] }) {
                   <Chip>{hop.kind}</Chip>
                 </span>
               </td>
-              <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-[13px]`}>
+              <td className={`${CELL_TIGHT} data-instr whitespace-nowrap type-small`}>
                 {hop.status !== undefined ? hop.status : "—"}
               </td>
-              <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-right text-[13px]`}>
+              <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-right type-small`}>
                 {hop.elapsedMs > 0 ? `${number.format(hop.elapsedMs)} ${t.ms}` : "—"}
               </td>
-              <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-right text-[13px]`}>
+              <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-right type-small`}>
                 {hop.bytes > 0 ? formatBytes(hop.bytes, tag, t) : "—"}
               </td>
               <td className={CELL_TIGHT}>
                 <div className="flex flex-col gap-0.5">
-                  <code className="data-instr block max-w-[46ch] truncate text-[13px] text-fg-secondary">
+                  <code className="data-instr block max-w-[46ch] truncate type-small text-fg-secondary">
                     {hop.url}
                   </code>
                   {hop.adSystem && (
-                    <span className="data-instr block text-[13px] leading-5 text-fg-muted">
+                    <span className="data-instr block type-small text-fg-muted">
                       {hop.adSystem}
                     </span>
                   )}
                   {hop.error && (
-                    <p className="max-w-[52ch] text-[13px] leading-5 text-dead-fg">
+                    <p className="max-w-[52ch] type-small text-dead">
                       {hop.error[locale]}
                     </p>
                   )}
@@ -477,8 +486,8 @@ export function ReferenceSections({
 
   return (
     <section className="flex flex-col gap-2 border-t border-hairline pt-4">
-      <h2 className="text-[15px] font-semibold leading-[22px]">{t.sectionReference}</h2>
-      <div className="rounded-ctl border border-hairline bg-surface">
+      <h2 className="type-h3">{t.sectionReference}</h2>
+      <div className="rounded-panel border border-hairline bg-surface">
         <Fold title={t.sectionInteractive}>
           <Interactive report={report} />
         </Fold>

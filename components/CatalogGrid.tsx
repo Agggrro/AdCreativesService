@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Dict } from "@/lib/i18n/dictionaries";
 import { templateSlug } from "@/lib/template-demo";
 import { Chip } from "@/components/ui/Chip";
+import { TemplatePreview } from "@/components/ui/TemplatePreview";
 
 export type CatalogTemplate = {
   id: string;
@@ -32,29 +33,28 @@ export function CatalogGrid({
   const shown = limit ? templates.slice(0, limit) : templates;
 
   if (shown.length === 0) {
-    return <p className="text-[13px] text-fg-muted">{dict.catalog.empty}</p>;
+    return <p className="type-small text-fg-muted">{dict.catalog.empty}</p>;
   }
 
-  // No `overflow-hidden` on the container: it would clip the 2px-offset focus
-  // ring on every edge tile (docs/design-system.md §2). Corner cells round
-  // themselves instead.
+  // No `overflow-hidden` on the tile or the container: either would clip the
+  // 2px-offset focus ring (docs/design-system.md §2). The preview rounds itself
+  // instead of being clipped by its parent.
   return (
-    <div className="grid gap-px rounded-ctl border border-hairline bg-hairline sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {shown.map((t) => (
         <Link
           key={t.id}
           href={`/catalog/${templateSlug(t.type)}`}
-          className="flex flex-col gap-3 bg-surface p-5 transition-colors first:rounded-t-ctl last:rounded-b-ctl hover:bg-surface-sunken"
+          className="flex flex-col gap-4 rounded-card border border-hairline bg-surface p-5 transition-colors duration-150 hover:bg-surface-2"
         >
-          <div className="flex flex-col gap-1">
-            <h3 className="text-[15px] font-semibold leading-[22px]">
-              {t.name}
-            </h3>
-            <p className="line-clamp-3 text-[13px] leading-5 text-fg-muted">
+          <TemplatePreview type={t.type} />
+          <div className="flex flex-col gap-2">
+            <h3 className="type-h3">{t.name}</h3>
+            <p className="type-small line-clamp-3 text-fg-secondary">
               {t.description}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-auto flex flex-wrap gap-2">
             {t.supported_standards.map((s) => (
               <Chip key={s}>{s}</Chip>
             ))}

@@ -14,6 +14,7 @@ import {
 } from "@/lib/creative-media";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { useDict } from "@/components/i18n/LocaleProvider";
+import { Segmented } from "@/components/ui/Segmented";
 import { buttonClass } from "@/components/ui/Button";
 import { inputClass } from "@/components/ui/Field";
 
@@ -112,12 +113,12 @@ export function MediaUploadField({
             // Never surface our own storage URL in the UI — it's our
             // infrastructure's internal address, not something a user needs
             // to see, and showing it invites copying it for unrelated hotlinking.
-            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] text-fg-secondary">
-              <Check size={14} className="shrink-0 text-live-fg" aria-hidden />
+            <span className="flex min-w-0 flex-1 items-center gap-1.5 type-small text-fg-secondary">
+              <Check size={14} className="shrink-0 text-live" aria-hidden />
               <span className="truncate">{uploadedName ?? m.uploaded}</span>
             </span>
           ) : (
-            <span className="data-instr min-w-0 flex-1 break-all text-[13px] text-fg-secondary">
+            <span className="data-instr min-w-0 flex-1 break-all type-small text-fg-secondary">
               {value}
             </span>
           )}
@@ -136,27 +137,27 @@ export function MediaUploadField({
         </div>
       ) : (
         <>
-          <div className="inline-flex self-start rounded-ctl border border-line bg-surface">
-            {(["upload", "url"] as const).map((key, i) => {
-              const current = mode === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setMode(key);
-                    setError(null);
-                  }}
-                  aria-pressed={current}
-                  className={`border-r border-hairline px-3 py-1.5 font-mono text-[11px] font-medium uppercase leading-4 tracking-[0.06em] transition-colors last:border-r-0 ${
-                    i === 0 ? "rounded-l-ctl" : "rounded-r-ctl"
-                  } ${current ? "bg-fill text-fg" : "text-fg-secondary hover:bg-fill"}`}
-                >
-                  {key === "upload" ? m.uploadTab : m.urlTab}
-                </button>
-              );
-            })}
-          </div>
+          {/*
+            The shared control, not a fourth copy of it. This was hand-rolled and
+            had already drifted — `px-3` here against `Segmented`'s `px-2.5` —
+            which is exactly the failure §6's "one implementation per repeated
+            element" describes. `Segmented`'s one documented exception is the
+            configurator's `sr-only` radio group; a plain two-button toggle is
+            not it.
+          */}
+          <Segmented
+            className="self-start"
+            label={m.sourceLabel}
+            value={mode}
+            onChange={(next) => {
+              setMode(next);
+              setError(null);
+            }}
+            options={[
+              { value: "upload" as const, label: m.uploadTab },
+              { value: "url" as const, label: m.urlTab },
+            ]}
+          />
 
           {mode === "upload" ? (
             <div>
@@ -197,7 +198,7 @@ export function MediaUploadField({
       )}
 
       {error && (
-        <p role="alert" className="inline-flex items-start gap-1 text-xs text-dead-fg">
+        <p role="alert" className="inline-flex items-start gap-1 type-caption text-dead">
           <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
           {error}
         </p>

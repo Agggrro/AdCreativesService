@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Prata, Onest, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { getDict } from "@/lib/i18n/server";
@@ -8,18 +8,31 @@ import { getCdnHost } from "@/lib/site";
 import { LocaleProvider } from "@/components/i18n/LocaleProvider";
 import "./globals.css";
 
-// Instrument runs on two faces only: Plex Sans for what a human wrote, Plex
-// Mono for what the machine owns (docs/design-system.md §4). Both subsets are
-// loaded because the UI ships in Russian and English.
-// 700 exists for the wordmark alone (docs/design-system.md §4) — no other role
-// on the type scale goes above 600.
-const plexSans = IBM_Plex_Sans({
-  variable: "--font-plex-sans",
+// Midnight runs on three faces (docs/design-system.md §4). All three carry
+// Cyrillic, so both UI languages share one grid with no font substitution — the
+// display face is chosen for that as much as for its shape.
+//
+// Prata is display only: headline sizes, 32px and up. It ships in a single
+// weight and there is no other, which is why nothing on the scale asks for a
+// bolder one.
+const prata = Prata({
+  variable: "--font-prata",
   subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400"],
   display: "swap",
 });
 
+// Body weight is 300 — the page is airier at identical sizes, and it is what
+// keeps a dark surface from reading as heavy.
+const onest = Onest({
+  variable: "--font-onest",
+  subsets: ["latin", "cyrillic"],
+  weight: ["300", "400", "500", "600"],
+  display: "swap",
+});
+
+// Everything the machine owns: VAST tags, ids, formats, timecodes, metrics,
+// status words, labels, and all text inputs.
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin", "cyrillic"],
@@ -27,11 +40,19 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "CreoSmith — Interactive Video Ad Creatives",
-  description:
-    "Generate and manage interactive video ad creatives (SIMID/VPAID) and get a dynamic VAST tag — no code.",
-};
+/**
+ * A tab title and a SERP description are user-visible strings, so they go through
+ * the i18n layer like every other one (docs/design-system.md §10). Before this they
+ * were English literals, which meant a page rendering `lang="ru"` titled itself in
+ * English.
+ *
+ * `generateMetadata` rather than a static export because the locale lives in a
+ * cookie, which only a request can read.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { dict } = await getDict();
+  return { title: dict.meta.title, description: dict.meta.description };
+}
 
 export default async function RootLayout({
   children,
@@ -69,7 +90,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${prata.variable} ${onest.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-ground text-fg">
         <LocaleProvider value={{ locale, dict }}>{children}</LocaleProvider>

@@ -1,12 +1,12 @@
 import { TEXT, TINT } from "@/components/ui/State";
 
 /**
- * Instrument form control: 32px high, 3px radius, mono 13px — inputs hold URLs,
+ * Midnight form control: 44px high (§6). 32px is the dense-table exception, not the default, mono 13px — inputs hold URLs,
  * macros, and timecodes, where every character matters (docs/design-system.md §4).
  * No `outline-none`: the focus ring is the one thing a control may never lose.
  */
 export const inputClass =
-  "w-full min-h-8 rounded-ctl border border-line bg-surface px-2.5 py-1.5 font-mono text-[13px] text-fg placeholder:text-fg-muted";
+  "w-full min-h-11 rounded-ctl border border-line bg-surface px-2.5 py-1.5 type-data text-fg placeholder:text-fg-muted";
 
 export function Field({
   label,
@@ -33,12 +33,25 @@ export function Field({
         minLength={minLength}
         className={inputClass}
       />
-      {help && <span className="text-xs text-fg-muted">{help}</span>}
+      {help && <span className="type-caption text-fg-muted">{help}</span>}
     </label>
   );
 }
 
-/** Hairline panel — the default container. Depth is a line, never a shadow. */
+/**
+ * Hairline panel — the default container. Depth is elevation plus a line, never a
+ * shadow (docs/design-system.md §2).
+ *
+ * **No `overflow-hidden`.** It used to have one, and it made this primitive
+ * unusable for anything containing a focusable child: §2's focus ring is drawn at
+ * 2px offset, so a clipping parent erases it. Four call sites had already refused
+ * `Panel` and hand-rolled the same box with a comment explaining why — `Table`,
+ * `ValidatorReport`, `OutcomeMatrix` and the creatives list. Four workarounds is
+ * the signal that the primitive was wrong, not the call sites.
+ *
+ * The cost is that a child with its own background no longer gets clipped to the
+ * rounded corner: a filled panel header rounds its own top corners.
+ */
 export function Panel({
   children,
   className,
@@ -48,7 +61,7 @@ export function Panel({
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-ctl border border-hairline bg-surface ${className ?? ""}`}
+      className={`rounded-panel border border-hairline bg-surface ${className ?? ""}`}
     >
       {children}
     </div>
@@ -88,11 +101,11 @@ export function Notice({
   return (
     <p
       role={live ? "alert" : undefined}
-      className={`rounded-ctl px-3 py-2 text-[13px] leading-5 ${styles}`}
+      className={`rounded-panel px-3 py-2 type-small ${styles}`}
     >
       {children}
       {detail && (
-        <span className="data-instr mt-1 block text-[12px] break-all">{detail}</span>
+        <span className="data-instr mt-1 block type-caption break-all">{detail}</span>
       )}
     </p>
   );

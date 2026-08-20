@@ -13,11 +13,11 @@ const DOT: Record<Tone, string> = {
 
 /** Foreground for a state word or a tinted notice. */
 export const TEXT: Record<Tone, string> = {
-  live: "text-live-fg",
-  info: "text-info-fg",
-  warn: "text-warn-fg",
-  dead: "text-dead-fg",
-  idle: "text-idle-fg",
+  live: "text-live",
+  info: "text-info",
+  warn: "text-warn",
+  dead: "text-dead",
+  idle: "text-idle",
 };
 
 /** 3px state rail on the first cell of a table row (docs/design-system.md §6). */
@@ -29,15 +29,20 @@ export const RAIL: Record<Tone, string> = {
   idle: "border-l-idle",
 };
 
-/** Tint background, for the few places a state needs a fill rather than a rail. */
+/**
+ * Tint background, for the few places a state needs a fill rather than a rail.
+ *
+ * Every tone reads on its own tint here — 6.5–7.8:1, measured. Under Instrument
+ * `idle` was the one pair that could not be combined (4.49:1, under AA), and it
+ * had to fall back to the plain sunken surface; rebuilding the ramp for dark
+ * (docs/design-system.md §3) closed that gap, so the exception is gone.
+ */
 export const TINT: Record<Tone, string> = {
   live: "bg-live-bg",
   info: "bg-info-bg",
   warn: "bg-warn-bg",
   dead: "bg-dead-bg",
-  // idle-fg on idle-bg measures 4.49:1 — under AA for small text, so this pair
-  // is deliberately absent rather than quietly wrong (docs/design-system.md §3).
-  idle: "bg-surface-sunken",
+  idle: "bg-idle-bg",
 };
 
 /**
@@ -75,7 +80,7 @@ export function ServingBadge({
     <span className="inline-flex items-center gap-2">
       <StateWord tone={serving ? "live" : "dead"} label={label} />
       {qualifier && (
-        <span className="text-xs leading-4 text-fg-muted">{qualifier}</span>
+        <span className="type-caption text-fg-muted">{qualifier}</span>
       )}
     </span>
   );

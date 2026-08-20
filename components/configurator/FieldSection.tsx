@@ -7,7 +7,7 @@
  * (docs/design-system.md §5) — including the first one, which always has the
  * creative-name field and the delivery-format control above it.
  *
- * The heading is the `h2` role — 15/22 weight 600. Deliberately *not*
+ * The heading is the `h3` role (§6). Deliberately *not*
  * `label-instr`: that role belongs to the field labels inside the section, and
  * reusing it here would flatten the two levels into one.
  */
@@ -25,7 +25,7 @@ export function FieldSection({
         algorithm, so the rule above runs unbroken instead of being cut around
         the heading.
       */}
-      <legend className="float-left w-full text-[15px] font-semibold leading-[22px] text-fg">
+      <legend className="float-left w-full type-h3">
         {heading}
       </legend>
       {children}

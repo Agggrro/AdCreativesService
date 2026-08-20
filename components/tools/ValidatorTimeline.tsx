@@ -46,8 +46,8 @@ export function ValidatorTimeline({
 
   if (events.length === 0) {
     return (
-      <div className="rounded-ctl border border-hairline bg-surface px-3 py-4">
-        <p className="text-[13px] leading-5 text-fg-muted">{t.noTimeline}</p>
+      <div className="rounded-panel border border-hairline bg-surface px-3 py-4">
+        <p className="type-small text-fg-muted">{t.noTimeline}</p>
       </div>
     );
   }
@@ -59,10 +59,10 @@ export function ValidatorTimeline({
     // because a run log you have to scroll sideways to read is not a log. The
     // table carries no minimum width for the same reason: it fits the page and
     // the address column truncates, rather than the page fitting the table.
-    <div className="max-h-[520px] overflow-y-auto rounded-ctl border border-hairline bg-surface">
+    <div className="max-h-[520px] overflow-y-auto rounded-panel border border-hairline bg-surface">
       <table className="w-full border-collapse">
         <thead className="sticky top-0 z-10">
-          <tr className="border-b border-hairline bg-surface-sunken">
+          <tr className="border-b border-hairline bg-surface-2">
             <th className={NUM_HEAD_TIGHT}>{t.colTime}</th>
             <th className={HEAD_TIGHT}>{t.colSource}</th>
             <th className={HEAD_TIGHT}>{t.colEvent}</th>
@@ -81,7 +81,7 @@ export function ValidatorTimeline({
               <td
                 className={railCellTight(
                   event.tone,
-                  "data-instr whitespace-nowrap text-right text-[13px]",
+                  "data-instr whitespace-nowrap text-right type-small",
                 )}
               >
                 {number.format(event.at)} {t.ms}
@@ -93,7 +93,7 @@ export function ValidatorTimeline({
                   <Chip>{event.source}</Chip>
                 </span>
               </td>
-              <td className={`${CELL_TIGHT} data-instr text-[13px]`}>
+              <td className={`${CELL_TIGHT} type-data`}>
                 <span className="flex flex-col gap-0.5">
                   <span className="whitespace-nowrap">{event.name}</span>
                   {/* Machine text, not prose: what lands here is an SDK message
@@ -109,7 +109,7 @@ export function ValidatorTimeline({
                 {hits.map((hit, position) => (
                   <code
                     key={`${hit.path}-${position}`}
-                    className="data-instr block max-w-[72ch] truncate text-[13px] text-fg-secondary"
+                    className="data-instr block max-w-[72ch] truncate type-small text-fg-secondary"
                   >
                     {hit.url}
                   </code>
@@ -120,7 +120,7 @@ export function ValidatorTimeline({
 
           {unfired.length > 0 && (
             <>
-              <tr className="border-b border-hairline bg-surface-sunken">
+              <tr className="border-b border-hairline bg-surface-2">
                 <td className="px-3 py-1.5 label-instr" colSpan={4}>
                   {t.trackersUnfired} · {number.format(unfired.length)}
                 </td>
@@ -133,19 +133,19 @@ export function ValidatorTimeline({
                   <td
                     className={railCellTight(
                       null,
-                      "data-instr whitespace-nowrap text-right text-[13px] text-fg-muted",
+                      "data-instr whitespace-nowrap text-right type-small text-fg-muted",
                     )}
                   >
                     —
                   </td>
-                  <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-[13px] text-fg-muted`}>
+                  <td className={`${CELL_TIGHT} data-instr whitespace-nowrap type-small text-fg-muted`}>
                     #{hit.hop}
                   </td>
-                  <td className={`${CELL_TIGHT} data-instr whitespace-nowrap text-[13px] text-fg-muted`}>
+                  <td className={`${CELL_TIGHT} data-instr whitespace-nowrap type-small text-fg-muted`}>
                     {hit.event ? `${hit.kind}:${hit.event}` : hit.kind}
                   </td>
                   <td className={CELL_TIGHT}>
-                    <code className="data-instr block max-w-[72ch] truncate text-[13px] text-fg-secondary">
+                    <code className="data-instr block max-w-[72ch] truncate type-small text-fg-secondary">
                       {hit.url}
                     </code>
                   </td>
@@ -166,7 +166,7 @@ interface Comparison {
   /**
    * A VAST element or attribute name, never a composed phrase. That keeps the
    * column machine text — identical in both locales and needing no dictionary
-   * entry (§8) — rather than English prose dressed up in mono.
+   * entry (§10) — rather than English prose dressed up in mono.
    */
   label: string;
   declared: string;
@@ -279,15 +279,15 @@ export function ParserVsPlayer({ facts, resolved }: { facts: ParsedFacts; resolv
             <tr key={row.key} className={ROW}>
               {/* Agreement is a real state; disagreement rails `warn` because
                   it is a discrepancy to look into, not a spec violation. */}
-              <td className={railCellTight(row.agrees ? "live" : "warn", "data-instr text-[13px]")}>
+              <td className={railCellTight(row.agrees ? "live" : "warn", "type-data")}>
                 {row.label}
               </td>
-              <td className={`${CELL_TIGHT} data-instr text-[13px] text-fg-secondary`}>
+              <td className={`${CELL_TIGHT} type-data text-fg-secondary`}>
                 {row.declared}
               </td>
               <td
-                className={`${CELL_TIGHT} data-instr text-[13px] ${
-                  row.agrees ? "text-fg-secondary" : "text-warn-fg"
+                className={`${CELL_TIGHT} type-data ${
+                  row.agrees ? "text-fg-secondary" : "text-warn"
                 }`}
               >
                 {row.resolved}

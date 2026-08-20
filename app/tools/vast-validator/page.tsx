@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
 import { getDict } from "@/lib/i18n/server";
 import { AppTopBar } from "@/components/AppTopBar";
+import { Section } from "@/components/ui/Section";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { VastValidator } from "@/components/tools/VastValidator";
 
-export const metadata: Metadata = {
-  title: "VAST validator — check and play a VAST tag",
-  description:
-    "Paste a VAST tag URL or XML. Checks it against the IAB specification, walks the wrapper chain, plays it in Google IMA, and reports every fault with a fix. VPAID, SIMID and OMID included. Free, no account.",
-};
+/**
+ * A tab title and a SERP description are user-visible strings (§10). This page
+ * reads the locale cookie already, so an English literal here meant a Russian
+ * visitor got `lang="ru"` with an English title.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const { dict } = await getDict();
+  return {
+    title: dict.tools.validatorMetaTitle,
+    description: dict.tools.validatorMetaDescription,
+  };
+}
 
 /**
  * The public VAST validator (ADR-0013).
@@ -33,14 +42,10 @@ export default async function VastValidatorPage({
     <main className="flex flex-1 flex-col">
       <AppTopBar />
 
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-6 px-6 py-10">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold leading-7 tracking-[-0.01em]">{t.title}</h1>
-          <p className="max-w-[66ch] text-[13px] leading-5 text-fg-muted">{t.subtitle}</p>
-        </div>
-
+      <Section tone="surface" pad="md" width="wide" innerClassName="flex flex-col gap-8">
+        <PageHeader title={t.title} subtitle={t.subtitle} />
         <VastValidator initialTag={initialTag} />
-      </div>
+      </Section>
     </main>
   );
 }

@@ -30,10 +30,10 @@ export async function AppTopBar() {
       right={
         user ? (
           <>
-            <span className="data-instr hidden text-[13px] text-fg-muted sm:inline">
+            <span className="data-instr hidden type-small text-fg-muted lg:inline">
               {user.email}
             </span>
-            <form action={signOut}>
+            <form action={signOut} className="hidden sm:block">
               <Button type="submit" variant="ghost">
                 {dict.common.signOut}
               </Button>
@@ -41,10 +41,16 @@ export async function AppTopBar() {
           </>
         ) : (
           <>
-            <LinkButton href="/login" variant="ghost">
+            {/*
+              The secondary action drops below `sm` and the primary one stays:
+              on a 390px bar there is room for one, and the one worth keeping is
+              the one the page exists to produce. Signing in is still reachable
+              from the login page's own copy and from the menu's destinations.
+            */}
+            <LinkButton href="/login" variant="ghost" className="hidden sm:inline-flex">
               {dict.common.signIn}
             </LinkButton>
-            <LinkButton href="/signup" variant="secondary">
+            <LinkButton href="/signup" variant="primary">
               {dict.common.getStarted}
             </LinkButton>
           </>

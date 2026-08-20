@@ -4,6 +4,8 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getDict } from "@/lib/i18n/server";
 import { demoConfig, demoUnitKey, slugToType } from "@/lib/template-demo";
 import { AppTopBar } from "@/components/AppTopBar";
+import { Section } from "@/components/ui/Section";
+import { Footer } from "@/components/ui/Footer";
 import { VpaidPreview } from "@/components/VpaidPreview";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { LinkButton } from "@/components/ui/Button";
@@ -42,19 +44,22 @@ export default async function TemplatePage({
     <main className="flex flex-1 flex-col">
       <AppTopBar />
 
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-6 px-6 py-10">
+      <Section
+        tone="ground"
+        pad="md"
+        width="wide"
+        innerClassName="flex flex-col gap-6"
+      >
         <Link
           href="/catalog"
-          className="self-start text-[13px] text-fg-muted underline underline-offset-4 hover:text-fg"
+          className="type-small w-fit rounded-ctl text-fg-muted underline underline-offset-4 transition-colors duration-150 hover:text-fg"
         >
           {dict.catalog.backToCatalog}
         </Link>
 
-        <div className="flex flex-col gap-3">
-          <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.02em] text-balance">
-            {template.name}
-          </h1>
-          <p className="max-w-[66ch] text-[15px] leading-6 text-fg-secondary">
+        <div className="flex flex-col gap-4">
+          <h1 className="type-h1 max-w-[22ch]">{template.name}</h1>
+          <p className="type-body-lg max-w-[66ch] text-fg-secondary">
             {template.description}
           </p>
           <div className="flex flex-wrap items-center gap-2">
@@ -100,23 +105,34 @@ export default async function TemplatePage({
           )}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <h2 className="label-instr">{dict.catalog.demoTitle}</h2>
-          {unitKey && config ? (
-            <VpaidPreview
-              templateKey={unitKey}
-              config={config}
-              caption={dict.catalog.demoHint}
-            />
-          ) : (
-            <Panel className="p-5">
-              <p className="text-[13px] leading-5 text-fg-muted">
-                {dict.catalog.noDemo}
-              </p>
-            </Panel>
-          )}
-        </div>
-      </div>
+      </Section>
+
+      {/*
+        The demo band lifts to `surface` so the well — which keeps the ground tone
+        — has something to sit on. A well on a ground band is invisible (§7).
+      */}
+      <Section
+        tone="surface"
+        pad="md"
+        width="wide"
+        bordered
+        innerClassName="flex flex-col gap-3"
+      >
+        <h2 className="label-instr">{dict.catalog.demoTitle}</h2>
+        {unitKey && config ? (
+          <VpaidPreview
+            templateKey={unitKey}
+            config={config}
+            caption={dict.catalog.demoHint}
+          />
+        ) : (
+          <Panel className="p-6">
+            <p className="type-small text-fg-secondary">{dict.catalog.noDemo}</p>
+          </Panel>
+        )}
+      </Section>
+
+      <Footer dict={dict} />
     </main>
   );
 }
