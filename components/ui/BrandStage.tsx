@@ -39,19 +39,12 @@ export function BrandStage() {
         <svg
           viewBox={MONOGRAM_VIEWBOX}
           className="relative h-32 w-auto sm:h-44 lg:h-[300px]"
-          fill="none"
           aria-hidden="true"
           focusable="false"
         >
-          <path d={MONOGRAM_C} className="stroke-accent" strokeWidth="10" />
-          <path
-            d={MONOGRAM_PLAY}
-            className="brand-play fill-fg stroke-fg"
-            strokeWidth="3.5"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-          <path d={MONOGRAM_S} className="stroke-fg" strokeWidth="10" />
+          <path d={MONOGRAM_C} className="fill-accent" />
+          <path d={MONOGRAM_PLAY} className="brand-play fill-fg" />
+          <path d={MONOGRAM_S} className="fill-fg" />
         </svg>
       </div>
     </div>

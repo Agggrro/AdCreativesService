@@ -38,17 +38,11 @@ export default function OpengraphImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <svg width="102" height="60" viewBox={MONOGRAM_VIEWBOX} fill="none">
-            <path d={MONOGRAM_C} stroke={BRAND.accent} strokeWidth="10" />
-            <path
-              d={MONOGRAM_PLAY}
-              fill={BRAND.fg}
-              stroke={BRAND.fg}
-              strokeWidth="3.5"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-            <path d={MONOGRAM_S} stroke={BRAND.fg} strokeWidth="10" />
+          {/* 85x60 is the nearest integer pair to the lockup's own 68.335:48 ratio. */}
+          <svg width="85" height="60" viewBox={MONOGRAM_VIEWBOX}>
+            <path d={MONOGRAM_C} fill={BRAND.accent} />
+            <path d={MONOGRAM_PLAY} fill={BRAND.fg} />
+            <path d={MONOGRAM_S} fill={BRAND.fg} />
           </svg>
           <div style={{ display: "flex", fontSize: 38, fontWeight: 600 }}>
             <span style={{ color: BRAND.accent }}>Creo</span>

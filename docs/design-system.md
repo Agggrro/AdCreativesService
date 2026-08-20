@@ -302,13 +302,57 @@ Constraints that bind any future revision:
   out next to the accent. Every colour is a token.
 - **The accent here is chrome, not action** — §3 exempts the lockup from the budget and
   stops there. The same shapes below the top bar would count.
-- **28px is a floor, not a default.** Below it the play triangle silts up inside the
-  counter; a smaller surface takes the `C` alone, never a shrunken lockup.
+- **28px is a floor, not a default.** A smaller surface takes the `C` alone, never a
+  shrunken lockup. What binds the floor is now the gap between the letters rather than
+  the triangle: the two overlap horizontally, so their gap is ~1.1px at 28px tall and the
+  `C`’s open side starts reading as one shape with the `S` at around 24px. The floor keeps
+  a step of margin over that measured failure point rather than sitting on it.
+  `app/icon.tsx` is the surface the rule was written for.
+- **The favicon sits on a round `ground` plate.** `app/icon.tsx` fills a circle rather
+  than the frame, so the corners of the PNG stay transparent and nothing reads as a black
+  box on a light tab strip. The plate is not decoration — it is what makes the background
+  known to be `ground` again, and so what lets the icon keep the colour split and the
+  contrast that goes with it (accent 9.48:1, `fg` 16.86:1). Both alternatives were
+  rendered at 16px and rejected on the evidence: a square plate is the black box, and bare
+  transparency loses the triangle, because `fg` is near-white and near-white on nothing
+  disappears against Chrome's ~#dee1e6 strip — apricot straight onto it measures 1.59:1.
+  The mark is inset inside the plate, not fitted to it: the `C` is a ring, and a ring
+  touching the edge of a disc reads as a smudge at 16px.
 
-The `C`'s radial terminals and the `S`'s flat ones both fall out of butt-capped arcs
-rather than hand-drawn outlines, and the `S`'s bowls are elliptical (rx 12.5, ry 9.5)
-because circular ones read narrow beside the `C`. The geometry is derived in the
-component's header comment; reuse it rather than redrawing.
+**The glyph is three filled outlines, not stroked arcs.** Strokes were how it used to be
+drawn, and they cannot express two things the reference does: the `C`’s terminals are cut
+by a *concave arc* where a butt cap can only cut radially, and the `S`’s stroke varies in
+width. Nothing in the glyph carries `stroke` or `strokeWidth`, so its weight no longer
+moves with the viewBox.
+
+The geometry is **measured, not drawn**: the reference render is separated into colour
+masks, traced with marching squares and fitted, landing on the reference at IoU
+0.992 / 0.991 / 0.994 (`C` / triangle / `S`) with nothing off by more than 3px on a
+1453px body. Three things worth knowing before touching it:
+
+- The `C` is a true circle — ~23.85 outer, ~15.76 inner, a stem of 8.09 and a 103° gap —
+  while the `S` has no single outer/inner radius pair the way the `C` does: its two bowls
+  take unequal radii, and its stem is ~7.2, thinner than the `C`’s. That asymmetry is the
+  reference’s, not a defect to “correct”. (“Stem” here is the letterform sense — the SVG
+  `stroke` attribute is gone from the glyph entirely.)
+- The letters **overlap**: the `C` ends at x 38.7 and the `S` begins at 36.5. That
+  interlock is why the viewBox is `0 0 68.335 48` rather than the 81.5 of the version that
+  held them apart, and why the bar lockup is 40px wide at 28px tall.
+- **The fitter is chosen per shape, and that is what keeps the curves clean.** A fitter
+  that subdivides until it meets a tolerance has to reproduce the reference render’s own
+  wobble, which at hero size reads as a lumpy edge. So the `C` and the triangle are arc
+  splines — lines and circular arcs, which cannot ripple because their curvature is
+  constant by construction, and which keep a straight edge exactly straight. The `S` is
+  neither a circle nor a polygon, so it takes cubic Béziers on a **fixed segment budget**,
+  raised only until the fit is in tolerance. Do not tighten that tolerance: the reference’s
+  `S` wanders from any clean construction by up to ~10px, and tracking it faithfully is
+  what produced the lumpy counter this replaced.
+
+The derivation is in the component’s header comment; reuse the exported geometry rather
+than redrawing it. The **colour** split, unlike the geometry, is necessarily restated in
+each consumer — Tailwind classes in the two browser components, `fill` attributes in the
+two Satori routes, because Satori has no CSSOM (§12). That is the one part of the mark
+that can drift; keep the four in step.
 
 The glyph is `aria-hidden` — the wordmark next to it is the accessible name, and labelling
 both would announce the brand twice. The strings are split in the dictionary

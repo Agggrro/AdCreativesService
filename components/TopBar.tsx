@@ -78,10 +78,14 @@ export function TopBar({
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           {/*
-            Below `sm` the bar carries brand · primary action · menu, and nothing
-            else fits: with the language control still here the cluster overflowed
-            390px by 11px. The control moves into the menu panel rather than being
-            dropped — it is reachable at every width, just not always in the bar.
+            Below `sm` the bar carries brand · primary action · menu. The language
+            control moves into the menu panel rather than being dropped — it is
+            reachable at every width, just not always in the bar.
+
+            This used to cite an 11px overflow at 390px. That figure was measured
+            against the previous lockup, which was 47.5px wide at `h-7`; the mark
+            is 39.9px now, so the number no longer reproduces. Re-measure before
+            citing one again.
           */}
           <span className="hidden sm:flex">
             <LanguageSwitcher />
