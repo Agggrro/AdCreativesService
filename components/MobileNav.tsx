@@ -21,7 +21,18 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
  * second disclosure inside this one: a menu inside a menu on a 390px screen is a
  * worse answer than four rows.
  */
-export function MobileNav({ items }: { items: TopBarLink[] }) {
+export function MobileNav({
+  items,
+  account,
+}: {
+  items: TopBarLink[];
+  /**
+   * The account actions. They live here because the bar has no room for them
+   * below `sm` — and without this slot a signed-in visitor on a phone had no
+   * way to sign out at all, which the desktop-only guard in `AppTopBar` caused.
+   */
+  account?: React.ReactNode;
+}) {
   const dict = useDict();
   const pathname = usePathname();
   const panelId = useId();
@@ -93,6 +104,10 @@ export function MobileNav({ items }: { items: TopBarLink[] }) {
                 <Link
                   key={row.href}
                   href={row.href}
+                  // Closing is derived from the route changing, which does not
+                  // happen when the tapped link IS the current route — so that
+                  // one case has to close the panel itself.
+                  onClick={close}
                   aria-current={current ? "page" : undefined}
                   className={`flex h-11 items-center text-[15px] ${
                     current ? "font-medium text-accent" : "text-fg-secondary"
@@ -102,6 +117,11 @@ export function MobileNav({ items }: { items: TopBarLink[] }) {
                 </Link>
               );
             })}
+            {account && (
+              <div className="mt-2 flex flex-col gap-2 border-t border-hairline pt-4">
+                {account}
+              </div>
+            )}
             {/*
               The language control lives here below `sm` — the bar has no room for
               it at 390px, and dropping it entirely would strand a Russian visitor

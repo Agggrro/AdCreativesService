@@ -174,11 +174,18 @@ export default async function Home({
           ))}
         </div>
 
-        {/* The tag is machine text, so it is mono and identical in both locales. */}
+        {/*
+          The tag is machine text — mono, identical in both locales, and it has to
+          be the shape the product actually emits. It read `?c=…&fmt=simid`, a
+          parameter name and a query arg that exist nowhere: the real tag is
+          `{cdn}/v?creative_id={uuid}` (app/dashboard/creatives/page.tsx). §7
+          forbids fabricating a response time on this screen for the same reason —
+          a machine value that means nothing on the one page a prospect trusts most.
+        */}
         <div className="mt-10 flex flex-col gap-4 rounded-panel border border-hairline bg-surface p-5 sm:flex-row sm:items-center sm:gap-5">
           <span className="label-instr shrink-0">{dict.landing.tagLabel}</span>
           <code className="type-data min-w-0 flex-1 truncate text-fg-secondary">
-            https://ads.creosmith.com/v?c=8f3a91d4-2b7e-4c05-9a11-6de0f2c48b73&amp;fmt=simid
+            https://ads.creosmith.com/v?creative_id=8f3a91d4-2b7e-4c05-9a11-6de0f2c48b73
           </code>
         </div>
       </Section>

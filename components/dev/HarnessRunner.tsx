@@ -155,7 +155,7 @@ export function HarnessRunner({
             type="button"
             onClick={() => startRun(currentId)}
             disabled={sweeping}
-            className={buttonClass("secondary")}
+            className={buttonClass("secondary", "sm")}
           >
             Restart
           </button>
@@ -163,7 +163,7 @@ export function HarnessRunner({
             type="button"
             onClick={startSweep}
             disabled={sweeping}
-            className={buttonClass("primary")}
+            className={buttonClass("primary", "sm")}
           >
             {/* The counter is mono with tabular-nums, or the primary's width
                 jitters as it advances (§4). */}

@@ -73,6 +73,33 @@ const FRAME_ANCESTORS = (() => {
 })();
 
 const nextConfig: NextConfig = {
+  /**
+   * `app/icon.tsx` generates the tab icon and Next links it as `/icon`, which is
+   * what a browser reading the markup uses. Nothing serves `/favicon.ico` any
+   * more, though — the starter default that used to sit there was deleted — and
+   * anything that requests that path blind rather than reading the `<link>` (a
+   * crawler, a feed reader, a bookmark service) got a 404 where it used to get
+   * 200. This restores the path without keeping a second copy of the mark.
+   */
+  async redirects() {
+    // App domain only. Redirects run *before* the rewrites below (see the order
+    // at the top of this file), so an unscoped rule would fire on the ad domain
+    // too — turning a request the catch-all sends straight to `/cdn/blocked`
+    // into a 307 that advertises an app route name to a publisher's page. The
+    // ad domain answers ads and one page explaining itself (ADR-0018); a
+    // favicon is not either of those, and it keeps getting the catch-all.
+    return CDN_HOST
+      ? [
+          {
+            source: "/favicon.ico",
+            destination: "/icon",
+            permanent: false,
+            missing: [{ type: "host" as const, value: CDN_HOST }],
+          },
+        ]
+      : [{ source: "/favicon.ico", destination: "/icon", permanent: false }];
+  },
+
   async rewrites() {
     // Origin of the public blob store, read off the first pushed asset — its
     // store id is part of the hostname and nothing else knows it. Null before

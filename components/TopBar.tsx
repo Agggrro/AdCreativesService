@@ -33,11 +33,15 @@ export function TopBar({
   brandHref,
   nav = [],
   right,
+  mobileAccount,
 }: {
   dict: Dict;
   brandHref: string;
   nav?: TopBarLink[];
+  /** The account cluster in the bar itself, from `sm` up. */
   right?: React.ReactNode;
+  /** The same actions for the mobile panel, where the bar has no room. */
+  mobileAccount?: React.ReactNode;
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-ground/90 backdrop-blur-md">
@@ -83,7 +87,7 @@ export function TopBar({
             <LanguageSwitcher />
           </span>
           {right}
-          {nav.length > 0 && <MobileNav items={nav} />}
+          {nav.length > 0 && <MobileNav items={nav} account={mobileAccount} />}
         </div>
       </Container>
     </header>

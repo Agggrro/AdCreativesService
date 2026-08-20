@@ -42,7 +42,7 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 
 | Route | Access | What it does |
 | --- | --- | --- |
-| `/` | public | Landing; renders the catalog grid at teaser length |
+| `/` | public | Landing. Brand stage, one live demo well with a template switcher, how-it-works, the full template grid, standards and the free tools, closing CTA, footer. Exactly one VPAID unit is mounted at a time — the grid below it is static previews ([design-system.md](design-system.md) §6) |
 | `/catalog`, `/catalog/[slug]` | public | Template catalog and a detail page with one live in-browser demo. Replaces the old `/preview` fixtures; `/preview` is a permanent redirect |
 | `/login`, `/signup`, `/auth/*` | public | Email/password auth; [`middleware.ts`](../middleware.ts) refreshes the session |
 | `/dashboard` | session | Redirect only — to `/dashboard/creatives`, or `/catalog` for a user with none |
@@ -51,6 +51,7 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 | `/dashboard/subscriptions` | session | All billing; Stripe checkout returns here |
 | `/tools/vast-validator`, `/tools/vast-generator` | public | Free tools ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read; the generator is a placeholder |
 | `/c/player` | public | The validator's player, deliberately on a **different origin** from the app ([ADR-0021](decisions/0021-validator-player-on-an-isolated-origin.md)) — it executes a stranger's VPAID unit, so it hosts nothing of ours. Inert until its parent posts a document |
+| `/icon`, `/opengraph-image` | public | Generated from the monogram’s own geometry at build time (Satori, so they read `lib/brand-palette.ts` rather than CSS tokens — [design-system.md](design-system.md) §12). `/favicon.ico` redirects to `/icon`, **app domain only**: an unscoped redirect would fire on the ad domain, which answers ads and one page and nothing else (ADR-0018) |
 | `/dev/harness` | **local only** | The creative harness: runs a built VPAID unit against schema-derived config at four slot sizes and judges it against the mandatory lifecycle. 404 outside local development ([security.md](security.md)) |
 
 The public catalog reads `templates` as `anon` — `templates_select_published` already

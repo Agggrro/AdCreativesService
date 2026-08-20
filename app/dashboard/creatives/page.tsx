@@ -169,7 +169,7 @@ export default async function MyCreativesPage({
                           on this wrapper, and in full on the creative's own
                           page (the row's name links there). */}
                       <div title={tag} className="inline-flex">
-                        <CopyButton value={tag} />
+                        <CopyButton value={tag} size="sm" />
                       </div>
                     </td>
                     <td className={`${CELL} whitespace-nowrap`}>
@@ -183,7 +183,7 @@ export default async function MyCreativesPage({
                       <div className="flex justify-end gap-2">
                         <Link
                           href={`/dashboard/creatives/${c.id}/edit`}
-                          className={buttonClass("secondary")}
+                          className={buttonClass("secondary", "sm")}
                         >
                           <Pencil size={14} aria-hidden />
                           {dict.dashboard.edit}

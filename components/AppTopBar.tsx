@@ -44,8 +44,8 @@ export async function AppTopBar() {
             {/*
               The secondary action drops below `sm` and the primary one stays:
               on a 390px bar there is room for one, and the one worth keeping is
-              the one the page exists to produce. Signing in is still reachable
-              from the login page's own copy and from the menu's destinations.
+              the one the page exists to produce. Sign-in moves into the menu
+              panel rather than disappearing — see `mobileAccount`.
             */}
             <LinkButton href="/login" variant="ghost" className="hidden sm:inline-flex">
               {dict.common.signIn}
@@ -54,6 +54,32 @@ export async function AppTopBar() {
               {dict.common.getStarted}
             </LinkButton>
           </>
+        )
+      }
+      /*
+       * The same actions again, for the menu panel. Everything in `right` above
+       * is hidden below `sm` because a 390px bar cannot hold it, and without a
+       * second home a signed-in visitor on a phone had **no way to sign out at
+       * all** — the account cluster was simply gone. The bar and the panel never
+       * show the same control at the same width, so this is two placements of
+       * one action, not two actions.
+       */
+      mobileAccount={
+        user ? (
+          <>
+            <span className="data-instr type-small break-all text-fg-muted">
+              {user.email}
+            </span>
+            <form action={signOut}>
+              <Button type="submit" variant="secondary" className="w-full">
+                {dict.common.signOut}
+              </Button>
+            </form>
+          </>
+        ) : (
+          <LinkButton href="/login" variant="secondary" className="w-full">
+            {dict.common.signIn}
+          </LinkButton>
         )
       }
     />

@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
-import { buttonClass } from "@/components/ui/Button";
+import { buttonClass, type ButtonSize } from "@/components/ui/Button";
 import { useDict } from "@/components/i18n/LocaleProvider";
 
-export function CopyButton({ value }: { value: string }) {
+/**
+ * `size` exists because this button lives in two densities: a data-table action
+ * cell, where §6 mandates `sm` and anything taller pushes the row past its 44px,
+ * and a detail-page panel, where the default applies.
+ */
+export function CopyButton({
+  value,
+  size = "md",
+}: {
+  value: string;
+  size?: ButtonSize;
+}) {
   const dict = useDict();
   const [copied, setCopied] = useState(false);
 
@@ -20,7 +31,7 @@ export function CopyButton({ value }: { value: string }) {
   }
 
   return (
-    <button type="button" onClick={copy} className={buttonClass("secondary")}>
+    <button type="button" onClick={copy} className={buttonClass("secondary", size)}>
       {/* Both labels are stacked in the same grid cell so the button's
           width is always the wider of the two — swapping "Copy tag" for
           "Tag copied" never resizes the button (or the column it sits in). */}

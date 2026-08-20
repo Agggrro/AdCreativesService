@@ -61,7 +61,9 @@ export function DeleteCreativeButton({
         type="button"
         onClick={() => setOpen(true)}
         title={dict.dashboard.deleteCreative}
-        className={buttonClass("secondary")}
+        // A row action: §6 puts this at `sm`, and the default would push the
+        // row past the 44px §2 fixes for a data table.
+        className={buttonClass("secondary", "sm")}
       >
         <Trash2 size={14} aria-hidden />
         {/* Short verb on the button itself — "Delete creative" is redundant
