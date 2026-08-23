@@ -13,7 +13,7 @@
 
 ## 1. Thesis
 
-We sell interactive video creative. A prospect judges the product by how it looks before
+We sell interactive ad creative. A prospect judges the product by how it looks before
 they configure anything, and a media buyer then lives inside it all day. **Midnight** is
 designed for both: a dark room where the creative is the light source.
 

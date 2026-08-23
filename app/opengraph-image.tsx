@@ -9,7 +9,7 @@ import { BRAND } from "@/lib/brand-palette";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "CreoSmith — interactive video ad creatives";
+export const alt = "CreoSmith — interactive ad creatives and VAST tags";
 
 /**
  * The link preview card. New: the product had no `opengraph-image` at all, so a
@@ -72,7 +72,7 @@ export default function OpengraphImage() {
               maxWidth: 820,
             }}
           >
-            Interactive video creative and a dynamic VAST tag — no developer.
+            An interactive ad creative and a dynamic VAST tag — no developer.
           </div>
         </div>
 

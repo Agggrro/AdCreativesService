@@ -58,13 +58,13 @@ const ru = {
     menu: "Меню",
   },
   meta: {
-    title: "CreoSmith — интерактивные видеокреативы",
+    title: "CreoSmith — интерактивные креативы и VAST-теги",
     description:
-      "Соберите интерактивный видеокреатив без разработчика и заберите динамический VAST-тег для любого DSP. SIMID 1.1 и VPAID 2.0.",
+      "Соберите интерактивный креатив без разработчика и заберите динамический VAST-тег для любого DSP. SIMID 1.1 и VPAID 2.0.",
   },
   landing: {
-    eyebrow: "Интерактивные видеокреативы",
-    title: "Реклама, с которой зритель что-то делает",
+    eyebrow: "Для медиабайеров и агентств",
+    title: "Реклама, с которой действительно взаимодействуют",
     subtitle:
       "Выберите шаблон, настройте под кампанию и заберите динамический VAST-тег. SIMID 1.1 и VPAID 2.0 — вставляется в любой DSP без разработчика.",
     ctaStart: "Начать бесплатно",
@@ -75,13 +75,13 @@ const ru = {
     howEyebrow: "Как это работает",
     howTitle: "От шаблона до тега в DSP — четыре шага",
     howLead:
-      "Ни один из них не требует разработчика. Правка в креативе не заставляет перевыпускать тег — кампания продолжает идти.",
+      "От первого шага до готового тега — ничего, кроме браузера.",
     step1Title: "Выберите шаблон",
     step1Body:
       "Пять механик: шоппинг, скретч, до/после, квиз и возрастной гейт.",
     step2Title: "Настройте под кампанию",
     step2Body:
-      "Видео, изображения, ссылка перехода, тексты кнопок. Превью обновляется сразу.",
+      "Медиафайлы, ссылка перехода, тексты кнопок. Превью обновляется сразу.",
     step3Title: "Заберите VAST-тег",
     step3Body:
       "Один динамический URL. Формат отдачи выбираете вы — SIMID или VPAID.",
@@ -91,7 +91,7 @@ const ru = {
     tagLabel: "Ваш тег",
 
     templatesEyebrow: "Шаблоны",
-    templatesTitle: "Пять механик, готовых к запуску",
+    templatesTitle: "Механики, готовые к запуску",
     customTitle: "Нужна своя механика?",
     customBody: "Соберём шаблон под вашу кампанию и добавим его в каталог.",
 
@@ -105,16 +105,15 @@ const ru = {
     stdOmid: "Проброс верификации вендора",
 
     toolsEyebrow: "Бесплатно, без аккаунта",
-    toolsTitle: "Инструменты, которыми пользуются и не наши клиенты",
+    toolsTitle: "Инструменты для VAST-тегов",
 
     finalTitle: "Соберите первый креатив сегодня",
-    finalBody:
-      "Семь дней бесплатно, все шаблоны открыты. Тег живёт, пока активна подписка.",
+    finalBody: "Семь дней бесплатно, все шаблоны открыты.",
     ctaCheckTag: "Проверить свой тег",
   },
   footer: {
     tagline:
-      "Интерактивные видеокреативы и динамические VAST-теги для медиабайеров и креативных агентств.",
+      "Интерактивные креативы и динамические VAST-теги.",
     product: "Продукт",
     tools: "Инструменты",
     standards: "Стандарты",
@@ -305,7 +304,7 @@ const ru = {
   catalog: {
     title: "Каталог шаблонов",
     subtitle:
-      "Интерактивные механики, готовые к запуску. Откройте любую и попробуйте руками.",
+      "Откройте любую и попробуйте руками.",
     empty: "Пока ни один шаблон не опубликован.",
     seeAll: "Весь каталог",
     standards: "Стандарты",
@@ -497,12 +496,12 @@ const en: Dict = {
     menu: "Menu",
   },
   meta: {
-    title: "CreoSmith — interactive video ad creatives",
+    title: "CreoSmith — interactive ad creatives and VAST tags",
     description:
-      "Build an interactive video creative without a developer and take a dynamic VAST tag for any DSP. SIMID 1.1 and VPAID 2.0.",
+      "Build an interactive ad creative without a developer and take a dynamic VAST tag for any DSP. SIMID 1.1 and VPAID 2.0.",
   },
   landing: {
-    eyebrow: "Interactive video creative",
+    eyebrow: "For media buyers and agencies",
     title: "Ads your viewer actually touches",
     subtitle:
       "Pick a template, tune it to the campaign, take the dynamic VAST tag. SIMID 1.1 and VPAID 2.0 — it pastes into any DSP, with no developer.",
@@ -514,13 +513,13 @@ const en: Dict = {
     howEyebrow: "How it works",
     howTitle: "Template to DSP tag in four steps",
     howLead:
-      "None of them needs a developer. Editing a creative does not force a new tag — the campaign keeps running.",
+      "From the first step to a working tag — nothing but a browser.",
     step1Title: "Pick a template",
     step1Body:
       "Five mechanics: shoppable, scratch, before/after, quiz, and an age gate.",
     step2Title: "Tune it to the campaign",
     step2Body:
-      "Video, images, click-through, button copy. The preview updates as you type.",
+      "Media, click-through, button copy. The preview updates as you type.",
     step3Title: "Take the VAST tag",
     step3Body:
       "One dynamic URL. You choose the delivery format — SIMID or VPAID.",
@@ -530,7 +529,7 @@ const en: Dict = {
     tagLabel: "Your tag",
 
     templatesEyebrow: "Templates",
-    templatesTitle: "Five mechanics, ready to run",
+    templatesTitle: "Mechanics ready to run",
     customTitle: "Need a mechanic of your own?",
     customBody:
       "We will build the template around your campaign and add it to the catalog.",
@@ -545,16 +544,15 @@ const en: Dict = {
     stdOmid: "Vendor verification pass-through",
 
     toolsEyebrow: "Free, no account",
-    toolsTitle: "Tools people who aren't our customers use anyway",
+    toolsTitle: "Tools for VAST tags",
 
     finalTitle: "Build your first creative today",
-    finalBody:
-      "Seven days free, every template open. The tag lives as long as the subscription does.",
+    finalBody: "Seven days free, every template open.",
     ctaCheckTag: "Check your own tag",
   },
   footer: {
     tagline:
-      "Interactive video creative and dynamic VAST tags for media buyers and creative agencies.",
+      "Interactive ad creatives and dynamic VAST tags.",
     product: "Product",
     tools: "Tools",
     standards: "Standards",
@@ -734,7 +732,7 @@ const en: Dict = {
   catalog: {
     title: "Template catalog",
     subtitle:
-      "Interactive mechanics ready to run. Open any of them and try it by hand.",
+      "Open any of them and try it by hand.",
     empty: "No templates published yet.",
     seeAll: "Whole catalog",
     standards: "Standards",
