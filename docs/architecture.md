@@ -27,6 +27,7 @@ performance profiles**. Keeping them separate is the core architectural idea.
 ┌──────────────────────────────────────────────────────────────────┐
 │  C. Ad-Serving Layer (public, high QPS, latency-sensitive)         │
 │     GET /api/vast?creative_id=…  (edge, cacheable)                 │
+│     GET /r click redirect · /pb conversion postbacks (ADR-0023)    │
 │     Stripe webhook  /api/stripe/webhook  (source of truth)        │
 │     Creative runtime/CDN: SIMID iframe / VPAID unit (signed URLs)  │
 └──────────────────────────────────────────────────────────────────┘
@@ -100,12 +101,15 @@ in the wild — **public, unauthenticated, high QPS, latency-sensitive**.
 
 It answers on both domains, under a neutral public path
 ([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)): `/v` for the tag, `/t`
-for the beacons, `/c/s/…` and `/c/u/…` for the creative assets. `/api/*` still
-resolves and always will — tags already pasted into a DSP point there.
+for the beacons, `/r` for clicks ([ADR-0023](decisions/0023-conversion-postbacks.md)),
+`/c/s/…` and `/c/u/…` for the creative assets. `/api/*` still resolves and always
+will — tags already pasted into a DSP point there.
 
-On the ad domain (`NEXT_PUBLIC_CDN_URL`), those four paths plus one information page
+On the ad domain (`NEXT_PUBLIC_CDN_URL`), those five paths plus one information page
 are the *only* things that answer; everything else is 404 at the routing layer, and
-no cookie is ever set on that host.
+no cookie is ever set on that host. The postback endpoint `/pb` is registered on
+every host like the rest but handed out only on the app domain, so the ad domain's
+catch-all keeps answering it 404.
 
 Request flow:
 
@@ -154,6 +158,39 @@ Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
   an origin miss for every new site the tag appears on.
 - **No database write on the beacon path.** `GET /api/track` hands its insert to
   `waitUntil` and returns 204 immediately — up to seven beacons fire per impression.
+
+### Click redirect `GET /r` and postbacks `GET|POST /pb`
+
+Conversion attribution, the way trackers do it
+([ADR-0023](decisions/0023-conversion-postbacks.md)).
+
+- **The builder routes every click destination through `/r`.** For each field in the
+  serving row's `click_fields` — the `config_schema` fields of type `url`, minus the OMID
+  script — whose value is an http(s) URL, `<ClickThrough>` and the matching
+  `<AdParameters>` key become a signed `/r?cid=&f=&exp=&sig=` link (`lib/click-url.ts`,
+  24-hour TTL). A script-capable destination (`javascript:`, `data:`) is dropped; any
+  other scheme passes through untracked. The units open what they are handed, so no
+  template changed. The preview context sets `click_fields: []`: previews are never
+  tracked.
+- **`/r` (`app/api/click/route.ts`)** reads the destination from the creative's own
+  config (snapshot first, `get_creative_serving` on a miss) by field name, then checks the
+  signature against that creative's current owner — forged, missing, minted for another
+  owner or more than a week past expiry is a `404`, which is what keeps it from being a
+  redirect to whatever an account configured. A
+  fresh link fetched by something that is not a known crawler mints a click id, writes it
+  through `record_click()` in `waitUntil` (capped per creative per minute, and logged when
+  it does not land), and 302s with `{click_id}`, `{creative_id}` and `{outcome}` filled in
+  and the result normalized through `URL`. A stale link, a HEAD or a crawler gets the same
+  302 with no id. A field that no longer resolves falls back to `clickThroughUrl`; an
+  unreadable database is a `503`; everything is `no-store`. There is no entitlement read:
+  only a served tag can have produced a genuine signature.
+- **`/pb` (`app/api/postback/route.ts`)** is called by a partner network's server with the
+  account's postback key and the click id. `lib/postback.ts` parses; `record_postback()`
+  does find-or-update-or-insert atomically in SQL and logs the hit for the owner. It is on
+  the app domain — a network's server is not a publisher's page.
+- **Reporting** is `get_creative_conversions()` per (UTC day, exit), rendered by
+  `components/ConversionReport.tsx` on the creative page. The key and the log live on
+  `/dashboard/creatives/postback`.
 
 ### Format adapter layer
 
@@ -393,6 +430,8 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | VPAID unit | Public Vercel Blob (CDN, 1y immutable) | Content-addressed URL straight in `<MediaFile>` — no function at all ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)) |
 | `GET /api/creative/unit/[token]` | Node | Fallback only, for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
 | Serving snapshots | Vercel Blob (private), 60s cache | Written by the creative writers and the Stripe webhook; read by `/api/vast`. Private because keys derive from `creative_id`, which is public in every tag URL. |
+| `GET /r` → `/api/click` | Node | The click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)): `node:crypto` for the link signature and the click id, and the service-role `record_click()` in `waitUntil` — the 302 never waits on Postgres. Excluded from the middleware matcher |
+| `GET\|POST /pb` → `/api/postback` | Node | S2S postbacks from partner networks. Awaits `record_postback()`, because the network needs to know whether it landed — a 5xx is what makes it retry. Excluded from the middleware matcher |
 | `POST /api/stripe/webhook` | Node | Needs raw body for signature verification |
 | `GET /api/creative/simid/[token]` | Node | Service-role Storage download; must be Node for supabase-js storage support, same as `/api/vast` |
 | `/api/tools/vast/*` | Node | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). Node is required, not incidental: the SSRF guard installs its own `lookup` on the socket via `node:http`/`node:dns`, which has no edge equivalent. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |

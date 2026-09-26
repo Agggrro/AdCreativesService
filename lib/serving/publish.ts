@@ -58,6 +58,7 @@ export async function publishCreativeSnapshot(
     template_type: row.template_type,
     runtime_keys: row.runtime_keys,
     supported_standards: row.supported_standards,
+    click_fields: row.click_fields,
     published_at: new Date().toISOString(),
   };
 

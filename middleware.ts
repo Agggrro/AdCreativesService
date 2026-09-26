@@ -63,7 +63,11 @@ export const config = {
   // before beforeFiles/afterFiles rewrites, so it sees `/v`, and the `api/vast`
   // exclusion above would not cover it. Without them every impression would pay
   // an edge invocation and an auth round trip.
+  //
+  // "r" and "pb" (ADR-0023) for the same reason, under both names: the click
+  // redirect is a viewer leaving an ad, and a postback is a network's server —
+  // neither can carry a session, and the click is waiting on this response.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|v$|t$|c/|api/vast(?!/preview)|api/vast/preview/|api/track|api/stripe|api/creative|api/cron|api/dev|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|v$|t$|r$|pb$|c/|api/vast(?!/preview)|api/vast/preview/|api/track|api/click|api/postback|api/stripe|api/creative|api/cron|api/dev|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

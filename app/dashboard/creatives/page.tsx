@@ -68,9 +68,17 @@ export default async function MyCreativesPage({
             {dict.dashboard.creativesSubtitle}
           </p>
         </div>
-        <LinkButton href="/catalog" variant="primary">
-          {dict.dashboard.createCreative}
-        </LinkButton>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* The postback lives inside this section rather than in the top
+              bar (ADR-0023): the bar is already full at 768px, and the page
+              only exists to serve these creatives' conversion numbers. */}
+          <LinkButton href="/dashboard/creatives/postback" variant="secondary">
+            {dict.conversions.setUp}
+          </LinkButton>
+          <LinkButton href="/catalog" variant="primary">
+            {dict.dashboard.createCreative}
+          </LinkButton>
+        </div>
       </div>
 
       {overviewError && (

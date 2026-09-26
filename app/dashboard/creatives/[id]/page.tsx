@@ -4,7 +4,24 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getCdnUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
 import { LOCALE_TAG, type Dict } from "@/lib/i18n/dictionaries";
+import {
+  formatAnswerPath,
+  isClickField,
+  parseConfigSchema,
+} from "@/lib/config-schema";
+import {
+  hasClickIdMacro,
+  isHttpUrl,
+  TAG_CLICK_FIELD,
+} from "@/lib/click-destination";
+import { asJsonObject } from "@/lib/json";
+import { UUID_RE } from "@/lib/uuid";
 import { CopyButton } from "@/components/CopyButton";
+import {
+  ConversionReport,
+  REPORT_DAYS,
+  type ExitLabel,
+} from "@/components/ConversionReport";
 import { Panel } from "@/components/ui/Field";
 import { ServingBadge } from "@/components/ui/State";
 
@@ -36,26 +53,66 @@ export default async function CreativePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // Shape-checked before any database call, the house rule in
+  // docs/security.md: junk in the URL costs a regex, not four failed queries.
+  if (!UUID_RE.test(id)) notFound();
+
   const supabase = await createServerSupabase();
   const { locale, dict } = await getDict();
 
-  const [{ data: creative }, { data: overview, error: overviewError }] =
-    await Promise.all([
+  const [
+    { data: creative },
+    { data: overview, error: overviewError },
+    { data: conversions, error: conversionsError },
+    { data: hasPostbackKey },
+  ] = await Promise.all([
     supabase
       .from("creatives")
       .select("id, name, selected_format, template_id, created_at, config_json")
       .eq("id", id)
       .maybeSingle(),
     supabase.rpc("get_creative_overview"),
+    // Owner-checked inside the function: a foreign id reads as no rows, and
+    // the creative lookup above has already 404'd it by then anyway.
+    supabase.rpc("get_creative_conversions", {
+      p_creative_id: id,
+      p_days: REPORT_DAYS,
+    }),
+    // Read-only: whether this account has set up a postback at all. It gates
+    // the missing-{click_id} warning, which would otherwise sit on every
+    // creative of an account that never meant to track conversions.
+    supabase.rpc("has_postback_key"),
   ]);
 
   if (!creative) notFound();
 
   const { data: template } = await supabase
     .from("templates")
-    .select("name, type")
+    .select("name, type, config_schema")
     .eq("id", creative.template_id)
     .maybeSingle();
+
+  // The exits this creative actually has: click-destination fields with a
+  // configured URL, in schema order (ADR-0023). A quiz's answer paths are
+  // machine text, the same in both locales (§10); the tag-level link is copy.
+  const config = asJsonObject(creative.config_json);
+  const clickFields = parseConfigSchema(template?.config_schema)
+    .fields.filter(isClickField)
+    .filter((field) => isHttpUrl(config[field.name]));
+  const exits: ExitLabel[] = clickFields.map((field) =>
+    field.name === TAG_CLICK_FIELD
+      ? { field: field.name, label: dict.conversions.mainExit, machine: false }
+      : {
+          field: field.name,
+          label: field.block ? formatAnswerPath(field.block) : field.name,
+          machine: true,
+        },
+  );
+  // Named, not counted: a quiz can have fifteen exits, and "the link" in the
+  // singular would send the owner looking for one.
+  const exitsMissingMacro = hasPostbackKey
+    ? exits.filter((exit) => !hasClickIdMacro(String(config[exit.field])))
+    : [];
 
   const row = (overview ?? []).find((r) => r.creative_id === creative.id);
   const serving = row?.should_serve ?? false;
@@ -214,6 +271,18 @@ export default async function CreativePage({
           <CopyButton value={tag} />
         </Panel>
       </div>
+
+      {/* Last on the page: a report read after the tag is copied, and the one
+          section here with tables long enough to push the tag out of view. */}
+      <ConversionReport
+        dict={dict}
+        locale={locale}
+        rows={conversions ?? []}
+        available={!conversionsError}
+        exits={exits}
+        exitsMissingMacro={exitsMissingMacro}
+        editHref={`/dashboard/creatives/${creative.id}/edit`}
+      />
     </div>
   );
 }

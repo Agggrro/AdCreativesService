@@ -167,12 +167,12 @@ floor, which would have left the alarm colour invisible.
 | trial / info | `info` `#89B0EA` | 8.85:1 | `#141D2B` | Trialing, renewing soon, informational |
 | warn / at risk | `warn` `#A796EE` | 7.71:1 | `#1B172B` | Valid but fragile: deprecated, ambiguous, or broken in part of the market |
 | dead / past due | `dead` `#EE8089` | 7.56:1 | `#2B1418` | Lapsed, failing, fail-closed |
+| idle / draft | `idle` `#A79E92` | 7.43:1 | `#1E1A17` | Not published, no activity, nothing filled in yet |
 
 `dead` has one extra token, `--color-dead-hover` `#F4979E`, for the destructive
 button alone — `dead-bg` on it measures 8.03:1. It is the accent’s `-hover` twin and
 exists for the same reason: a button needs a hover state, and a state colour is not
 allowed to acquire one by opacity.
-| idle / draft | `idle` `#A79E92` | 7.43:1 | `#1E1A17` | Not published, no activity, nothing filled in yet |
 
 One token per state now carries the rail, the dot **and** the word — the light system
 needed a separate darkened `-fg` because its rail tone was too light to read as text; on
@@ -450,6 +450,17 @@ that order so the safe choice sits nearest the reading direction's start. `Escap
 backdrop click both cancel. Confirming submits a server action — no client-side fetch/JSON
 round trip for a plain delete.
 
+`ui/ConfirmAction.tsx` is the one implementation. It was extracted when the second
+irreversible action arrived — rotating the postback key, which breaks every network still
+holding the old URL ([ADR-0023](decisions/0023-conversion-postbacks.md)) — and delete is
+now a thin wrapper around it. The affected item's name is optional, since a key has none.
+The heading is an `<h2>` element in the `h3` role — a heading of the page the dialog opens
+over, set at card size. It is a modal and behaves like one: focus starts on Cancel, Tab
+and Shift+Tab stay inside the card, Escape closes wherever focus is (the handler is on the
+document, not the backdrop), the consequence line is the dialog's `aria-describedby`, and
+closing returns focus to the trigger — unless the action removed it, as a delete does.
+Its children are spaced with `gap`, like every sibling group (§5).
+
 **Every overlay is portalled to `<body>` (`createPortal`), with one documented exception**
 (below, "Nav dropdown" — narrow on purpose; read it before citing it as precedent).
 `position: fixed` removes an element from layout flow but leaves it in the DOM tree, so an
@@ -547,7 +558,10 @@ column header, a section heading — and never floats free of one.
 owns** — a creative, a template, a subscription. A second, narrower density exists for
 **machine readouts**: tables whose rows the system emits rather than the user authors, and
 which are read as a stream rather than acted on. The validator's run timeline, feature
-matrix, wrapper chain and parser-versus-player comparison are the entire list today.
+matrix, wrapper chain and parser-versus-player comparison, and — since
+[ADR-0023](decisions/0023-conversion-postbacks.md) — the postback log and the conversion
+report's by-day table are the entire list today. The report's by-exit table is not: an
+exit is something the user configured, so it keeps 44px.
 
 - Row height **32px** — `px-3 py-1.5` on `data` 13/20 type, which the cell class sets
   itself rather than leaving to each call site. The rail stays 3px, so the left padding
@@ -730,6 +744,28 @@ Counting rules, because a metric that lies costs more than a metric that is miss
 
   With no impressions the ratio is genuinely not measurable, so it prints the em dash — the
   transient one, in `text-fg`. It is not `0%`, which would claim nobody clicked.
+- **The conversion report is a second strip, not an extension of the delivery one**
+  ([ADR-0023](decisions/0023-conversion-postbacks.md)). Its clicks are a different
+  measurement — navigations through our redirect, over 30 days — so they sit under their
+  own heading, are labelled **"Tracked clicks"** rather than "Clicks" (two labels a letter
+  apart on one screen get scanned as one number), and carry a qualifier saying what they
+  count. It reads clicks → conversions → revenue, then the two ratios closing it, each
+  naming its denominator: **CR "of clicks"** and **EPC "per click"** — a table column
+  included ("CR of clicks"). Both print the transient em dash with no clicks, for the
+  reason CTR does.
+  - **Laid out as two rows from `lg`**: a six-column grid, the three counts two columns
+    each, the two ratios three each. Five equal columns were measured too narrow for money
+    at the metric size — a large RUB amount ran out of its cell below ~1270px.
+  - **A qualifier's parts add up to the number above it.** The conversions count is
+    approved + pending; its caption names both, and names the rejected count as not
+    counted, with every number in mono.
+  - **Money is an amount plus an ISO code, one line per currency.** There is no FX, and a
+    sum across currencies is a number in none of them. With nothing approved the reading
+    is a real `0.00`, not a dash.
+  - **Conversion statuses are state and take the state vocabulary:** approved `live`,
+    pending `info`, rejected `idle` — not `dead`, since nothing about the account is
+    failing when an advertiser declines a lead. A **postback that failed** is `dead`: it
+    is a setup fault the owner has to act on.
 
 ## 7. The player well
 

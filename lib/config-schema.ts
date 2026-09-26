@@ -1,4 +1,5 @@
 import type { Json } from "@/types/database.types";
+import { CLICK_FIELD_RE, isScriptUrl } from "@/lib/click-destination";
 
 /**
  * A template's `config_schema` describes the fields the configurator form should
@@ -214,7 +215,41 @@ export function coerceFieldValue(
   if (field.type === "select" && field.options) {
     return field.options.some((o) => o.value === v) ? v : undefined;
   }
+  // `<input type="url">` accepts `javascript:` — it is a syntactically valid
+  // URL — so the form is no guard. Refused here, at save, as well as dropped by
+  // the VAST builder, so a script URL never reaches `config_json` at all.
+  if (field.type === "url" && isScriptUrl(v)) return undefined;
   return v;
+}
+
+/**
+ * `A → A → B` from a block id such as `AAB`. An answer path is machine text,
+ * the same string in both locales, so it needs no dictionary entry
+ * (docs/design-system.md §10). Here rather than in the configurator because the
+ * conversion report labels its exits the same way, from a server component.
+ */
+export function formatAnswerPath(block: string): string {
+  return block.split("").join(" → ");
+}
+
+/**
+ * Whether a field's value is a place to send the viewer — a destination the
+ * served tag routes through `/r`, where `{click_id}` is filled in (ADR-0023).
+ *
+ * Mirrors `click_fields` in `private.creative_serving` (supabase/schema.sql),
+ * which is the definition the serving path actually uses. This copy decides
+ * what the dashboard says about those fields — where the configurator explains
+ * the macros, and which exits the conversion report lists and warns about — so
+ * it must agree with the SQL exactly, name check included: every `url` field
+ * except the OMID script, which is a resource the player loads (ADR-0012), not
+ * a link anyone clicks.
+ */
+export function isClickField(field: ConfigField): boolean {
+  return (
+    field.type === "url" &&
+    field.name !== "verificationScriptUrl" &&
+    CLICK_FIELD_RE.test(field.name)
+  );
 }
 
 /** True when every `showWhen` clause holds against `read`. */

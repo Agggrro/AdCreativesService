@@ -13,9 +13,17 @@ import { useDict } from "@/components/i18n/LocaleProvider";
 export function CopyButton({
   value,
   size = "md",
+  labels,
 }: {
   value: string;
   size?: ButtonSize;
+  /**
+   * What is being copied, when it is not a tag — the postback URL (ADR-0023).
+   * A control names what happens (§10), and "Copy tag" under a postback URL
+   * would name the wrong thing. One prop for the pair, so a caller cannot
+   * rename the action and leave "Tag copied" as its confirmation.
+   */
+  labels?: { copy: string; copied: string };
 }) {
   const dict = useDict();
   const [copied, setCopied] = useState(false);
@@ -42,7 +50,7 @@ export function CopyButton({
           }`}
         >
           <Copy size={14} aria-hidden />
-          {dict.common.copyTag}
+          {labels?.copy ?? dict.common.copyTag}
         </span>
         <span
           className={`col-start-1 row-start-1 inline-flex items-center gap-2 ${
@@ -50,7 +58,7 @@ export function CopyButton({
           }`}
         >
           <Check size={14} aria-hidden />
-          {dict.common.tagCopied}
+          {labels?.copied ?? dict.common.tagCopied}
         </span>
       </span>
     </button>

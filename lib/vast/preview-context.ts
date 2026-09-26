@@ -35,5 +35,9 @@ export function buildPreviewServing(input: PreviewServingInput): CreativeServing
     supported_standards: [input.fmt],
     is_entitled: true,
     should_serve: true,
+    // A preview is never tracked (ADR-0023): its creative id is synthetic, so
+    // a `/r` link would 404, and a click in the configurator is not a click
+    // anyone paid for. The destination opens as configured.
+    click_fields: [],
   };
 }

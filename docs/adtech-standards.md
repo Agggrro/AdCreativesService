@@ -172,6 +172,37 @@ assumed:
 The result *screen* carries no such caveat: its heading and button label are drawn by our
 own code inside the ad slot, so those are exact on every player.
 
+## Click destinations go through our redirect
+
+Since [ADR-0023](decisions/0023-conversion-postbacks.md) every click destination in a
+served tag — `<ClickThrough>` and the per-path URLs in `<AdParameters>` — is a signed link
+to our `/r` redirect, which mints the click id a partner network posts back with a
+conversion, then 302s to the configured URL with `{click_id}`, `{creative_id}` and
+`{outcome}` filled in. What that means against the standards:
+
+- **Nothing about the per-path caveat above changes.** Whichever URL a player honours —
+  VPAID's `AdClickThru` argument or the VAST `<ClickThrough>` — both are `/r` links now,
+  and the click is recorded under the exit the player actually opened. A player that
+  collapses a quiz to the universal destination simply reports `clickThroughUrl` as the
+  exit; it cannot mis-attribute a conversion.
+- **A redirect in `<ClickThrough>` is ordinary.** Ad servers have always wrapped the
+  landing URL in their own click tracker, and VAST 4.2 places no constraint on the URL's
+  host. `<ClickTracking>` still fires our `/t` beacon alongside it, unchanged.
+- **The click count in the delivery strip and the one in the conversion report differ on
+  purpose.** The first is the `<ClickTracking>` beacon, fired by the player; the second is
+  a navigation that actually reached `/r` with a live signature, from something that did
+  not identify as a crawler. A player that fires one and not the other, or a scanner
+  posing as a browser that fetches `<ClickThrough>`, moves them apart.
+- **Only `{click_id}`, `{creative_id}` and `{outcome}` are filled in.** A VAST macro
+  written into a destination (`[TIMESTAMP]`, `[DOMAIN]`) no longer reaches the player —
+  it sees the `/r` link — and so arrives at the advertiser literally. IAB does not list
+  `<ClickThrough>` among the macro contexts, but some players expanded them there.
+- **A script-capable destination is never emitted.** `javascript:` or `data:` in a click
+  field is dropped from `<ClickThrough>` and `<AdParameters>`; any other non-http scheme
+  (an app-store deep link) passes through as configured, untracked.
+- **Previews are not rewritten**, so the configurator's players open the destination
+  directly — with any `{click_id}` left literal.
+
 ## Media fields: image, gif, or a short video
 
 Every `type: "image"` config field (background, before/after, option thumbnails,

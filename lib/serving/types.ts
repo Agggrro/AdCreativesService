@@ -44,6 +44,17 @@ export interface CreativeSnapshot {
   template_type: string;
   runtime_keys: Json;
   supported_standards: string[];
+  /**
+   * Config fields whose value is a click destination (ADR-0023), projected
+   * from the template's `config_schema` by `private.creative_serving`.
+   *
+   * Optional without a SNAPSHOT_SCHEMA_VERSION bump, on purpose: an older
+   * reader ignores it and a newer reader treats its absence as "route nothing
+   * through `/r`" — clicks then go straight to the destination, exactly as
+   * before this field existed. Bumping the version instead would have sent
+   * every creative back to Postgres until a backfill ran.
+   */
+  click_fields?: string[];
   /** Publication time. For debugging drift only — never an input to a serving decision. */
   published_at: string;
 }

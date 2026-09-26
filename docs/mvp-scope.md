@@ -31,6 +31,13 @@ product thesis is validated.
    proves the analytics foundation, rich dashboard is post-MVP). Quartiles were part of
    this line until they were removed for costing a beacon each to duplicate a number the
    buyer's DSP already reports.
+10. **Conversion postbacks** — added after the MVP line was drawn, because a media buyer
+    running CPA offers cannot judge a creative without them
+    ([ADR-0023](decisions/0023-conversion-postbacks.md)). Click destinations go through
+    the `/r` redirect, which mints a click id; partner networks post conversions to `/pb`
+    with it; the creative page reports clicks, conversions, revenue, CR and EPC over 30
+    days. **Relay** of conversions to the traffic source, pixel postbacks and custom
+    status mappings are out of scope.
 
 ## Implementation status (2026-06-30)
 
@@ -77,7 +84,10 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 ## Out of scope (post-MVP)
 
 - Additional templates (Branching Story, Lead-Gen) and additional formats.
-- Rich analytics dashboard, exports, reporting.
+- Rich analytics dashboard, exports, reporting. (The per-creative conversion report of
+  ADR-0023 is the one exception: a fixed 30-day view, no filters, no export.)
+- Postback relay to traffic sources, pixel postbacks, custom status mapping, and bot
+  filtering on the click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)).
 - The **free tools section** (`/tools/*`) was not in the MVP and is not part of the
   core loop above. It ships as an acquisition surface alongside it — see
   [ADR-0013](decisions/0013-public-free-tools-section.md). The VAST validator is

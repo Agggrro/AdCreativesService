@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import type { ConfigField } from "@/lib/config-schema";
+import { formatAnswerPath, type ConfigField } from "@/lib/config-schema";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { RAIL, StateWord } from "@/components/ui/State";
 
@@ -12,8 +12,7 @@ export interface OutcomeBlock {
 }
 
 /**
- * `A → A → B`. The path is machine text, not copy — it is the same string in
- * both locales, so it needs no dictionary entry (docs/design-system.md §10).
+ * `A → A → B` — see formatAnswerPath() in lib/config-schema.ts.
  *
  * A block whose fields declare no `block` falls back to the first field's name,
  * which is still machine text. Blocks come from the database, and the contract
@@ -22,7 +21,7 @@ export interface OutcomeBlock {
  */
 export function formatPath(block: OutcomeBlock): string {
   if (!block.id) return block.fields[0]?.name ?? "—";
-  return block.id.split("").join(" → ");
+  return formatAnswerPath(block.id);
 }
 
 /** Partition a matrix group's fields into blocks, preserving schema order. */

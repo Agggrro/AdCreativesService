@@ -44,6 +44,8 @@ const ru = {
     cancel: "Отмена",
     copyTag: "Копировать тег",
     tagCopied: "Тег скопирован",
+    copyUrl: "Копировать URL",
+    urlCopied: "URL скопирован",
     email: "Email",
     password: "Пароль",
     working: "Секунду…",
@@ -191,9 +193,11 @@ const ru = {
     // promised "сразу", which the 60s CDN cache plus 30s stale-while-revalidate
     // on /api/vast cannot deliver, and never mentioned that the whole delivery
     // history goes with the creative — the thing a media buyer would most want
-    // to be told before pressing an irreversible button.
+    // to be told before pressing an irreversible button. Conversions are named
+    // since ADR-0023: they cascade with the creative too, and they are the
+    // numbers a buyer is least prepared to lose.
     deleteConfirmBody:
-      "Вместе с креативом безвозвратно удаляются вся статистика показов и загруженные файлы. Тег перестанет отдавать интерактивный payload в течение минуты.",
+      "Вместе с креативом безвозвратно удаляются вся его статистика — показы, клики и конверсии — и загруженные файлы. Тег перестанет отдавать интерактивный payload в течение минуты.",
     deleteConfirmAction: "Удалить",
     template: "Шаблон",
     description: "Описание",
@@ -201,6 +205,110 @@ const ru = {
     status: "Статус",
     plan: "План",
     period: "Период",
+  },
+  // A creative's conversion report (ADR-0023), on its detail page.
+  conversions: {
+    heading: "Конверсии · 30 дней",
+    setUp: "Настроить постбек",
+    clicks: "Отслеженные клики",
+    clicksHint: "Переходы через трекинг-ссылку, каждому выдан `click_id`",
+    conversions: "Конверсии",
+    approved: "одобрено",
+    pending: "в ожидании",
+    rejectedNotCounted: "отклонено — не в счёт",
+    revenue: "Выручка",
+    revenueHint: "По одобренным конверсиям",
+    cr: "CR",
+    crOfClicks: "от кликов",
+    crColumn: "CR от кликов",
+    epc: "EPC",
+    epcHint: "Выручка на клик",
+    byExit: "По выходам",
+    exit: "Выход",
+    mainExit: "Основная ссылка",
+    byDay: "По дням, UTC",
+    byDayNote:
+      "Клики — по дню клика, конверсии — по дню первого постбека. Когда партнёрка позже меняет статус, конверсия остаётся в своём дне.",
+    day: "Дата",
+    missingMacro:
+      "В этих ссылках перехода нет {click_id}, поэтому партнёрка не сможет вернуть по ним конверсии. Добавьте его в настройках креатива.",
+    unavailable:
+      "Статистика конверсий сейчас недоступна. Обновите страницу через минуту.",
+  },
+  // The account's postback settings page (ADR-0023).
+  postback: {
+    title: "Постбек",
+    subtitle:
+      "Партнёрка сообщает о конверсии по этой ссылке, а CreoSmith засчитывает её креативу, с которого пришёл клик.",
+    howHeading: "Как подключить",
+    step1:
+      "В настройках креатива поставьте {click_id} в ссылку оффера — в параметр, который партнёрка возвращает в постбеке: `sub1`, `aff_sub`, `subid`.",
+    step2:
+      "Вставьте URL ниже в настройки постбека партнёрки. Замените каждое {…} после знака = на её макрос, а параметры, для которых у неё макроса нет, удалите.",
+    step3:
+      "Конверсии появятся на странице креатива, а каждый пришедший постбек — в журнале ниже.",
+    urlHeading: "Postback URL",
+    keyWarning:
+      "Ключ в ссылке работает как пароль: с ним кто угодно может отправлять конверсии в ваш аккаунт. Не публикуйте его.",
+    keyUnavailable:
+      "Не удалось получить ключ постбека. Обновите страницу через минуту.",
+    rotate: "Сменить ключ",
+    rotateTitle: "Сменить ключ постбека?",
+    rotateBody:
+      "Старый ключ перестанет работать сразу. Партнёрки со старой ссылкой начнут получать ошибку, пока вы не обновите в них URL.",
+    rotateConfirm: "Сменить",
+    rotated: "Ключ сменён. Обновите ссылку во всех партнёрках.",
+    rotateFailed: "Не удалось сменить ключ. Попробуйте ещё раз.",
+    paramsHeading: "Параметры",
+    param: "Параметр",
+    meaning: "Что передавать",
+    params: {
+      key: "Ваш ключ, уже подставлен в ссылку.",
+      click_id:
+        "Значение нашего {click_id}, которое партнёрка получила в ссылке оффера. Обязательный.",
+      status:
+        "Статус конверсии. Если его нет, конверсия считается одобренной.",
+      payout: "Выплата за конверсию, например `12.5`.",
+      currency: "Трёхбуквенный код валюты. Если его нет — `USD`.",
+      txid: "ID транзакции в партнёрке. Нужен, если у одного клика бывает несколько конверсий. Повторный постбек с тем же `txid` обновляет статус, а не создаёт дубль.",
+    },
+    statusesHeading: "Статусы",
+    statusCol: "Статус",
+    acceptedCol: "Какие значения принимаем",
+    statuses: {
+      approved: "Одобрена",
+      pending: "В ожидании",
+      rejected: "Отклонена",
+    },
+    logHeading: "Последние постбеки",
+    logRetention: "Хранятся 7 дней",
+    logEmpty:
+      "Постбеков пока не было. Первый появится здесь, даже если придёт с ошибкой.",
+    logUnavailable: "Журнал сейчас недоступен. Обновите страницу через минуту.",
+    time: "Время, UTC",
+    result: "Результат",
+    ok: "OK",
+    failed: "Ошибка",
+    results: {
+      created: "Конверсия засчитана",
+      updated: "Статус обновлён",
+      unchanged:
+        "Без изменений: это уже записано, или поздний `pending` пришёл после итогового статуса",
+      unknown_click:
+        "Клик не найден — проверьте, что в `click_id` партнёрка возвращает значение нашего {click_id}",
+      expired_click: "Клик старше 30 дней, конверсию по нему не засчитываем",
+      missing_click_id:
+        "В постбеке нет `click_id` — добавьте его в URL постбека в партнёрке",
+      bad_click_id:
+        "`click_id` не похож на наш — похоже, партнёрка прислала макрос как есть. Проверьте его название в её настройках",
+      unexpanded_macro:
+        "Партнёрка прислала макрос как есть — замените его в URL постбека на её макрос или удалите этот параметр",
+      bad_status: "Неизвестный статус — используйте значение из таблицы статусов",
+      bad_payout: "Не удалось прочитать `payout` — нужно число, например `12.5`",
+      bad_currency: "`currency` — не трёхбуквенный код. Передайте, например, `USD`",
+      bad_txid: "`txid` длиннее 128 символов — укоротите его или не передавайте",
+      unknown: "Неизвестный результат",
+    },
   },
   status: {
     active: "Live",
@@ -233,6 +341,10 @@ const ru = {
       "Не удалось сохранить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
     errDeleteFailed:
       "Не удалось удалить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
+    // Under every click-destination field (ADR-0023). Macros stay literal —
+    // they are what the user types, in either language.
+    clickMacroHint:
+      "Макросы: {click_id} — для постбека партнёрки, {creative_id}, {outcome}.",
     media: {
       sourceLabel: "Источник файла",
       uploadTab: "Загрузить",
@@ -482,6 +594,8 @@ const en: Dict = {
     cancel: "Cancel",
     copyTag: "Copy tag",
     tagCopied: "Tag copied",
+    copyUrl: "Copy URL",
+    urlCopied: "URL copied",
     email: "Email",
     password: "Password",
     working: "One moment…",
@@ -627,7 +741,7 @@ const en: Dict = {
     deleteCreative: "Delete creative",
     deleteConfirmTitle: "Delete this creative?",
     deleteConfirmBody:
-      "All delivery statistics and uploaded files are destroyed along with the creative, permanently. The tag stops serving the interactive payload within about a minute.",
+      "All of the creative's statistics — impressions, clicks and conversions — and its uploaded files are destroyed along with it, permanently. The tag stops serving the interactive payload within about a minute.",
     deleteConfirmAction: "Delete",
     template: "Template",
     description: "Description",
@@ -635,6 +749,108 @@ const en: Dict = {
     status: "Status",
     plan: "Plan",
     period: "Period",
+  },
+  conversions: {
+    heading: "Conversions · 30 days",
+    setUp: "Set up postback",
+    clicks: "Tracked clicks",
+    clicksHint: "Through the tracking link, each given a `click_id`",
+    conversions: "Conversions",
+    approved: "approved",
+    pending: "pending",
+    rejectedNotCounted: "rejected — not counted",
+    revenue: "Revenue",
+    revenueHint: "From approved conversions",
+    cr: "CR",
+    crOfClicks: "of clicks",
+    crColumn: "CR of clicks",
+    epc: "EPC",
+    epcHint: "Revenue per click",
+    byExit: "By exit",
+    exit: "Exit",
+    mainExit: "Main link",
+    byDay: "By day, UTC",
+    byDayNote:
+      "Clicks by the day of the click, conversions by the day of their first postback. A later status change keeps a conversion on its day.",
+    day: "Date",
+    missingMacro:
+      "These click-through links have no {click_id}, so your network cannot report conversions back for them. Add it in the creative's settings.",
+    unavailable:
+      "Conversion numbers are unavailable right now. Refresh in a minute.",
+  },
+  postback: {
+    title: "Postback",
+    subtitle:
+      "Your network reports each conversion to this URL, and CreoSmith credits it to the creative the click came from.",
+    howHeading: "How to connect",
+    step1:
+      "In the creative's settings, put {click_id} into the offer link — in the parameter your network returns in its postback: `sub1`, `aff_sub`, `subid`.",
+    step2:
+      "Paste the URL below into your network's postback settings. Replace each {…} after an = with that network's macro, and remove the parameters it has no macro for.",
+    step3:
+      "Conversions appear on the creative's page, and every postback that arrives shows up in the log below.",
+    urlHeading: "Postback URL",
+    keyWarning:
+      "The key in this URL works like a password: anyone holding it can post conversions to your account. Keep it private.",
+    keyUnavailable:
+      "Couldn't load your postback key. Refresh the page in a minute.",
+    rotate: "Rotate key",
+    rotateTitle: "Rotate the postback key?",
+    rotateBody:
+      "The old key stops working immediately. Every network still using the old URL gets an error until you update it there.",
+    rotateConfirm: "Rotate",
+    rotated: "Key rotated. Update the URL in every network.",
+    rotateFailed: "Couldn't rotate the key. Try again.",
+    paramsHeading: "Parameters",
+    param: "Parameter",
+    meaning: "What to send",
+    params: {
+      key: "Your key, already filled in.",
+      click_id:
+        "The value of our {click_id} your network received in the offer link. Required.",
+      status:
+        "Conversion status. Without it, the conversion counts as approved.",
+      payout: "Payout for the conversion, e.g. `12.5`.",
+      currency: "Three-letter currency code. `USD` when absent.",
+      txid: "The network's transaction id. Needed when one click can convert more than once. A repeat postback with the same `txid` updates the status instead of adding a duplicate.",
+    },
+    statusesHeading: "Statuses",
+    statusCol: "Status",
+    acceptedCol: "Accepted values",
+    statuses: {
+      approved: "Approved",
+      pending: "Pending",
+      rejected: "Rejected",
+    },
+    logHeading: "Recent postbacks",
+    logRetention: "Kept for 7 days",
+    logEmpty:
+      "No postbacks yet. The first one shows up here, even if it fails.",
+    logUnavailable: "The log is unavailable right now. Refresh in a minute.",
+    time: "Time, UTC",
+    result: "Result",
+    ok: "OK",
+    failed: "Failed",
+    results: {
+      created: "Conversion recorded",
+      updated: "Status updated",
+      unchanged:
+        "No change: already recorded, or a late `pending` arrived after a final status",
+      unknown_click:
+        "Click not found — check that `click_id` carries the value of our {click_id}",
+      expired_click: "Click older than 30 days, so the conversion wasn't recorded",
+      missing_click_id:
+        "The postback has no `click_id` — add it to the postback URL at your network",
+      bad_click_id:
+        "`click_id` doesn't look like ours — the network may have sent its macro unexpanded. Check the macro's name in its settings",
+      unexpanded_macro:
+        "The network sent a macro unexpanded — replace it in the postback URL with that network's macro, or remove the parameter",
+      bad_status: "Unknown status — use a value from the statuses table",
+      bad_payout: "Couldn't read `payout` — it needs a number, e.g. `12.5`",
+      bad_currency: "`currency` isn't a three-letter code. Send e.g. `USD`",
+      bad_txid: "`txid` is longer than 128 characters — shorten it or leave it out",
+      unknown: "Unknown result",
+    },
   },
   status: {
     active: "Live",
@@ -667,6 +883,8 @@ const en: Dict = {
       "Could not save the creative. Try again; if it keeps failing, contact us.",
     errDeleteFailed:
       "Could not delete the creative. Try again; if it keeps failing, contact us.",
+    clickMacroHint:
+      "Macros: {click_id} for your network's postback, {creative_id}, {outcome}.",
     media: {
       sourceLabel: "File source",
       uploadTab: "Upload",

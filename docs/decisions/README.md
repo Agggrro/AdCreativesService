@@ -37,6 +37,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0020](0020-validator-reports-faults-not-opinions.md) | The validator reports faults, not opinions | Accepted |
 | [0021](0021-validator-player-on-an-isolated-origin.md) | The validator's player runs on an isolated origin | Accepted |
 | [0022](0022-midnight-design-system.md) | "Midnight": one dark theme, a pastel warm accent, and creatives outside the system | Accepted |
+| [0023](0023-conversion-postbacks.md) | Conversion postbacks: a click redirect, per-click rows, and an S2S endpoint | Accepted |
 
 ## Template
 

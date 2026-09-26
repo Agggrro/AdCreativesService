@@ -24,6 +24,16 @@ const LOG_PREFIX = "[snapshot-health]";
  */
 const ROLLUP_AFTER_DAYS = 30;
 
+/**
+ * Retention for the conversion-tracking tables (ADR-0023). A click past the
+ * 30-day attribution window can no longer earn a conversion, so 90 days keeps
+ * two more months of click history for the report and nothing older. The
+ * postback log is for debugging a network's setup this week, not an archive.
+ * Conversions themselves are never purged.
+ */
+const CLICK_RETENTION_DAYS = 90;
+const POSTBACK_LOG_RETENTION_DAYS = 7;
+
 function unauthorized(): Response {
   return new Response("Unauthorized", { status: 401 });
 }
@@ -60,6 +70,20 @@ export async function GET(request: Request): Promise<Response> {
     if (data) console.log(`${LOG_PREFIX} rolled up ${data} day-bucket(s)`);
   } catch (err) {
     console.error(`${LOG_PREFIX} counter rollup failed`, err);
+  }
+
+  // Same standing as the rollup: a missed purge is a storage cost, never a
+  // reason to skip the health verdict.
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("purge_tracking_data", {
+      p_click_days: CLICK_RETENTION_DAYS,
+      p_log_days: POSTBACK_LOG_RETENTION_DAYS,
+    });
+    if (error) throw new Error(error.message);
+    if (data) console.log(`${LOG_PREFIX} purged ${data} expired click(s)`);
+  } catch (err) {
+    console.error(`${LOG_PREFIX} tracking purge failed`, err);
   }
 
   try {

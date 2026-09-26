@@ -31,5 +31,8 @@ export function snapshotToServing(
     supported_standards: snapshot.supported_standards,
     is_entitled: isEntitled(entitlement, snapshot.template_id, now),
     should_serve: shouldServe(snapshot, entitlement, now),
+    // Absent on a snapshot published before ADR-0023: nothing is routed
+    // through `/r` until the next publish or backfill carries it.
+    click_fields: Array.isArray(snapshot.click_fields) ? snapshot.click_fields : [],
   };
 }

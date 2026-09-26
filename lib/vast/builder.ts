@@ -3,6 +3,8 @@ import type { VastBuildContext } from "./types";
 import { getAdapter } from "./adapters";
 import { cdata, escapeXml, indent } from "./xml";
 import { signTrackToken } from "../track-token";
+import { clickUrl } from "../click-url";
+import { isHttpUrl, isScriptUrl, TAG_CLICK_FIELD } from "../click-destination";
 
 /** Narrow an arbitrary Json value down to a plain object, or {} otherwise. */
 function asRecord(json: Json): Record<string, Json> {
@@ -83,8 +85,38 @@ export function buildInlineVast(ctx: VastBuildContext): string {
   // advertiser's URL — never from an intermediate interaction. So this counts
   // clicks that led somewhere, not clicks on the ad. See
   // runtime/lib/vpaid-base.js's clickThrough() and its call sites.
-  const clickThrough = ctx.config.clickThroughUrl
-    ? `              <ClickThrough>${cdata(ctx.config.clickThroughUrl)}</ClickThrough>\n`
+  //
+  // Every click destination is routed through `/r` (ADR-0023), which mints the
+  // click id a partner network posts back with a conversion. Done here, on the
+  // server, rather than in the units: they already open whatever URL they are
+  // handed, so a tag-level destination and a quiz's per-exit URLs are covered
+  // without touching a template — and so is a player that ignores the unit's
+  // URL and opens <ClickThrough> itself.
+  //
+  // Only http(s) goes through `/r`. A destination in a script-capable scheme
+  // (`javascript:`, `data:` — lib/click-destination.ts) is dropped outright:
+  // the player `window.open`s it, and on a player that does so in the
+  // publisher's page that is script in someone else's site. Any other scheme —
+  // an app-store deep link such as `market://` — is passed through as before,
+  // untracked, since `/r` redirects to http(s) only.
+  const clickLinks = new Map<string, string>();
+  const rawRecord = asRecord(ctx.rawConfig);
+  const clickFields = Array.isArray(ctx.serving.click_fields)
+    ? ctx.serving.click_fields
+    : [];
+  for (const field of clickFields) {
+    const value =
+      field === TAG_CLICK_FIELD ? ctx.config.clickThroughUrl : rawRecord[field];
+    if (isHttpUrl(value)) {
+      clickLinks.set(field, clickUrl(ctx.siteUrl, cid, ctx.serving.user_id, field));
+    }
+  }
+
+  const tagClickThrough =
+    clickLinks.get(TAG_CLICK_FIELD) ??
+    (isScriptUrl(ctx.config.clickThroughUrl) ? undefined : ctx.config.clickThroughUrl);
+  const clickThrough = tagClickThrough
+    ? `              <ClickThrough>${cdata(tagClickThrough)}</ClickThrough>\n`
     : "";
   const videoClicks =
     `            <VideoClicks>\n` +
@@ -101,7 +133,7 @@ export function buildInlineVast(ctx: VastBuildContext): string {
   // fields the builder already computes so a malformed raw value can never
   // shadow the already-coerced typed one.
   const adParams: Record<string, Json> = {
-    ...asRecord(ctx.rawConfig),
+    ...rawRecord,
     durationSeconds: ctx.config.durationSeconds ?? DEFAULT_DURATION_SECONDS,
   };
   if (ctx.config.videoUrl) adParams.videoUrl = ctx.config.videoUrl;
@@ -124,6 +156,15 @@ export function buildInlineVast(ctx: VastBuildContext): string {
   // that.
   if (ctx.serving.selected_format === "vpaid") {
     adParams.viewableTrackingUrl = trackingUrl(ctx.siteUrl, cid, "viewable");
+  }
+  // Last, so the `/r` link replaces the coerced clickThroughUrl set above as
+  // well as the raw per-exit fields — the unit must never see a destination
+  // that skips the redirect while <ClickThrough> goes through it. A
+  // script-capable destination is removed here for the reason given above.
+  for (const field of new Set([...clickFields, TAG_CLICK_FIELD])) {
+    const link = clickLinks.get(field);
+    if (link) adParams[field] = link;
+    else if (isScriptUrl(adParams[field])) delete adParams[field];
   }
   const adParameters = `            <AdParameters>${cdata(
     JSON.stringify(adParams),

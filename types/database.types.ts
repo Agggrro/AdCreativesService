@@ -231,6 +231,128 @@ export type Database = {
         };
         Relationships: [];
       };
+      // ADR-0023: the per-click store behind conversion attribution. Written
+      // only by record_click(), from the `/r` redirect; no client access.
+      creative_clicks: {
+        Row: {
+          /** 24 lower-case hex characters, minted by `/r`. */
+          click_id: string;
+          creative_id: string;
+          /** The config field the viewer left through, e.g. `resultABUrl`. */
+          field: string;
+          /** ISO 3166-1 alpha-2, or null when the platform sent no geo header. */
+          country: string | null;
+          created_at: string;
+        };
+        Insert: {
+          click_id: string;
+          creative_id: string;
+          field: string;
+          country?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          click_id?: string;
+          creative_id?: string;
+          field?: string;
+          country?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "creative_clicks_creative_id_fkey";
+            columns: ["creative_id"];
+            referencedRelation: "creatives";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      // ADR-0023: written only by record_postback(); read only through
+      // get_creative_conversions().
+      conversions: {
+        Row: {
+          id: number;
+          click_id: string;
+          creative_id: string;
+          field: string;
+          txid: string;
+          status: ConversionStatus;
+          payout: number;
+          currency: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          click_id: string;
+          creative_id: string;
+          field: string;
+          txid?: string;
+          status: ConversionStatus;
+          payout?: number;
+          currency?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          click_id?: string;
+          creative_id?: string;
+          field?: string;
+          txid?: string;
+          status?: ConversionStatus;
+          payout?: number;
+          currency?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "conversions_creative_id_fkey";
+            columns: ["creative_id"];
+            referencedRelation: "creatives";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      postback_keys: {
+        Row: {
+          user_id: string;
+          key: string;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          key: string;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          key?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      postback_log: {
+        Row: {
+          id: number;
+          user_id: string;
+          received_at: string;
+          params: Json;
+          result: string;
+        };
+        Insert: {
+          user_id: string;
+          received_at?: string;
+          params?: Json;
+          result: string;
+        };
+        Update: {
+          user_id?: string;
+          received_at?: string;
+          params?: Json;
+          result?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -252,6 +374,79 @@ export type Database = {
           is_entitled: boolean;
           should_serve: boolean;
         }[];
+      };
+      // One creative's clicks through `/r` and its conversions per (UTC day,
+      // exit field). Owner-checked inside: another account's id yields no rows.
+      get_creative_conversions: {
+        Args: { p_creative_id: string; p_days?: number };
+        Returns: {
+          /** YYYY-MM-DD, UTC. */
+          day: string;
+          field: string;
+          clicks: number;
+          approved: number;
+          pending: number;
+          rejected: number;
+          /** Approved payout per ISO currency code, e.g. { USD: 12.5 }. */
+          revenue: Json;
+        }[];
+      };
+      // The caller's postback key, made on first call (ADR-0023).
+      ensure_postback_key: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      // Replaces the caller's key; the old one stops working at once.
+      rotate_postback_key: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
+      get_postback_log: {
+        Args: { p_limit?: number };
+        Returns: {
+          received_at: string;
+          params: Json;
+          result: string;
+        }[];
+      };
+      // The click redirect's only write. Service role only. False when the
+      // per-creative, per-minute cap declined the row (the redirect still ran).
+      record_click: {
+        Args: {
+          p_click_id: string;
+          p_creative_id: string;
+          p_field: string;
+          p_country: string | null;
+          p_per_minute: number;
+        };
+        Returns: boolean;
+      };
+      // Whether the caller has made a postback key yet — read-only, unlike
+      // ensure_postback_key(), which creates one.
+      has_postback_key: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      // The postback route's only write. Service role only. Returns a result
+      // code: 'created' | 'updated' | 'unchanged' on success (see
+      // isPostbackSuccess in lib/postback.ts), a rejection code otherwise.
+      record_postback: {
+        Args: {
+          p_key: string;
+          p_click_id: string | null;
+          p_status: ConversionStatus | null;
+          p_payout: number | null;
+          p_currency: string | null;
+          p_txid: string;
+          p_error: string | null;
+          p_params: Json;
+        };
+        Returns: string;
+      };
+      // Daily retention for clicks (90 days) and the postback log (7 days).
+      purge_tracking_data: {
+        Args: { p_click_days?: number; p_log_days?: number };
+        Returns: number;
       };
       // The ingest beacon's only write. Service role only.
       increment_creative_event: {
@@ -308,6 +503,11 @@ export type Database = {
           supported_standards: string[];
           is_entitled: boolean;
           should_serve: boolean;
+          /**
+           * Config fields whose value is a click destination, routed through
+           * `/r` (ADR-0023). Empty for a preview, which is never tracked.
+           */
+          click_fields: string[];
         };
         Relationships: [];
       };
@@ -338,6 +538,8 @@ export type Template = Tables<"templates">;
 export type Creative = Tables<"creatives">;
 export type Subscription = Tables<"subscriptions">;
 export type CreativeEventCounter = Tables<"creative_event_counters">;
+export type CreativeClick = Tables<"creative_clicks">;
+export type Conversion = Tables<"conversions">;
 export type CreativeServing =
   Database["private"]["Views"]["creative_serving"]["Row"];
 
@@ -353,6 +555,11 @@ export type PlanType = Enums<"plan_type">;
 export type SubscriptionStatus = Enums<"subscription_status">;
 export type CreativeStatus = Enums<"creative_status">;
 export type CreativeEventType = Enums<"creative_event_type">;
+
+// A text column with a CHECK constraint rather than an enum (ADR-0023): this
+// file's history with `alter type ... add value` inside one transaction is the
+// reason. Normalized from whatever a partner network sends by lib/postback.ts.
+export type ConversionStatus = "approved" | "pending" | "rejected";
 
 // Delivery format is open-ended TEXT in the DB (ADR-0002). This union lists the
 // standards we currently ship adapters for; widen it as new adapters are added.

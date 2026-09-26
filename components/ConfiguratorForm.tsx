@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  isClickField,
   visibleFieldNames,
   type ConfigField,
   type ConfigGroup,
@@ -19,6 +20,7 @@ import {
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { buttonClass } from "@/components/ui/Button";
 import { inputClass, Notice } from "@/components/ui/Field";
+import { MacroText } from "@/components/ui/MacroText";
 
 type ConfiguratorTemplate = {
   id: string;
@@ -244,6 +246,9 @@ export function ConfiguratorForm({
               key={field.name}
               field={field}
               requiredLabel={dict.configurator.required}
+              macroHint={
+                isClickField(field) ? dict.configurator.clickMacroHint : undefined
+              }
               value={values[field.name] ?? ""}
               onChange={(v) => setValue(field.name, v)}
             />
@@ -309,11 +314,14 @@ function Field({
   field,
   value,
   requiredLabel,
+  macroHint,
   onChange,
 }: {
   field: ConfigField;
   value: string;
   requiredLabel: string;
+  /** Product copy about `{click_id}`, under click destinations only (ADR-0023). */
+  macroHint?: string;
   onChange: (v: string) => void;
 }) {
   return (
@@ -380,6 +388,11 @@ function Field({
       )}
 
       {field.help && <span className="type-caption text-fg-muted">{field.help}</span>}
+      {macroHint && (
+        <span className="type-caption text-fg-muted">
+          <MacroText text={macroHint} />
+        </span>
+      )}
     </label>
   );
 }

@@ -90,11 +90,13 @@ for it, and these counts feed a customer-facing dashboard. See
 longer emitted into the VAST at all, so the completion funnel is gone; `error` beacons
 arrive but are dropped at ingest because the name is absent from the event map; and
 `/api/vast` writes nothing, so ad *requests* are uncounted and fill rate cannot be
-derived. **CTR is now computable** (impressions and clicks are both ingested) but is
-not displayed — see design-system.md §6 for why the denominator has to be stated.
+derived. **CTR is displayed** on the creative page, over impressions — see
+design-system.md §6 for why the denominator has to be stated.
 
 There is also no per-impression detail any more, by construction. Frequency, unique
-reach and session paths need a different store, not a different query.
+reach and session paths need a different store, not a different query. Clicks that go
+through the `/r` redirect are the one exception, and they live in their own table below
+— this counter's `click` is the `<ClickTracking>` beacon and is unchanged.
 
 **Read path.** The table has RLS enabled with **no policies**, so the session client reads
 zero rows by design. The dashboard reads aggregates through
@@ -104,6 +106,85 @@ creative, granted to `authenticated` only. Those last two are not analytics: the
 badge and the state rail depend on them. It works because the function owner is exempt
 from RLS; running `alter table public.creative_event_counters force row level security`
 would make it silently return zeros.
+
+### Conversion tracking ([ADR-0023](decisions/0023-conversion-postbacks.md))
+
+Four tables behind the click redirect (`/r`) and the S2S postback (`/pb`). All four
+have RLS on with **zero policies** and no table privileges for `anon`/`authenticated`;
+the owner reaches them only through the functions named below.
+
+#### `creative_clicks`
+One row per click through `/r` with a live signature — the only per-event store in the
+schema, because a conversion is attributed to a click id and a counter cannot hold one.
+
+| Field | Notes |
+| --- | --- |
+| `click_id` | text PK, 24 lower-case hex (12 random bytes), minted by `/r` |
+| `creative_id` | FK → creatives, `on delete cascade` |
+| `field` | the config field the viewer left through: `clickThroughUrl`, or a quiz exit such as `resultABUrl` |
+| `country` | ISO 3166-1 alpha-2 from the platform's geo header, or null. **No IP address is stored** |
+| `created_at` | ts; the 30-day attribution window is measured from it |
+
+Written only by `record_click()`, called from `app/api/click/route.ts` with the service
+role in `waitUntil`, for a fresh signed link fetched by something that is not a known
+crawler. It declines past 600 rows per creative per minute — `/v` is public, so a tag's
+links can be replayed, and each replay here would otherwise be a row. Purged after
+**90 days** by `purge_tracking_data()` from the daily cron.
+
+#### `conversions`
+What partner networks reported. Kept for good — they are the record.
+
+| Field | Notes |
+| --- | --- |
+| `id` | bigint identity PK |
+| `click_id` | the click it credits. **Not a foreign key**, on purpose: clicks are purged at 90 days and a conversion must outlive its click |
+| `creative_id` | FK → creatives, `on delete cascade`; copied off the click at insert, as is `field` |
+| `field` | the exit, as on the click |
+| `txid` | the network's transaction id, `''` when it sends none. `unique (click_id, txid)` — one conversion per click unless the network distinguishes several, and a repeat postback updates rather than duplicates |
+| `status` | `approved` \| `pending` \| `rejected` (text + CHECK, not an enum), normalized from what the network sent by `lib/postback.ts`. A late `pending` never overwrites `approved` or `rejected` |
+| `payout` | numeric(14,4), 0 when not sent |
+| `currency` | ISO 4217 code, `USD` when not sent. No FX: reports sum per currency |
+| `created_at`, `updated_at` | `created_at` is when the first postback arrived — reports bucket by it, so a conversion stays on that day while a later status change moves it between approved, pending and rejected there |
+
+Written only by `record_postback()`. Read through `get_creative_conversions()`.
+
+#### `postback_keys`
+| Field | Notes |
+| --- | --- |
+| `user_id` | PK, FK → auth user |
+| `key` | 32 lower-case hex, unique. The whole of the postback's authentication. Stored in the clear so the owner can copy the URL again; rotation is the remedy for a leak |
+| `created_at` | when this key was made (reset on rotation) |
+
+Made on first visit to the settings page by `ensure_postback_key()`, replaced by
+`rotate_postback_key()`. `has_postback_key()` asks without making one — the creative page
+warns about a destination missing `{click_id}` only for an account that has set a
+postback up.
+
+#### `postback_log`
+Every postback that named a valid key, successful or not — a network's own log shows
+only an HTTP status. A wrong key writes nothing.
+
+| Field | Notes |
+| --- | --- |
+| `id` | bigint identity PK |
+| `user_id` | FK → auth user |
+| `received_at` | ts |
+| `params` | jsonb: the five parameters `/pb` reads, as received, each truncated to 128 characters, NUL removed. CHECK ≤ 4 KB. Nothing else from the request |
+| `result` | `created`, `updated`, `unchanged` (a retry, or a late `pending` after a final status), or a rejection code (`unknown_click`, `expired_click`, `bad_click_id`, `unexpanded_macro`, …) |
+
+Read through `get_postback_log()`; purged after **7 days**. At most 3,600 rows per account
+per hour, written best-effort: past the cap, or on a failed write, the postback is still
+processed and only its log line is skipped.
+
+#### Functions
+
+| Function | Caller | Does |
+| --- | --- | --- |
+| `record_click(click_id, creative_id, field, country, per_minute)` | service role (`/r`) | Inserts the click unless the creative already has `per_minute` clicks in the last minute. Returns whether it wrote |
+| `record_postback(key, click_id, status, payout, currency, txid, error, params)` | service role (`/pb`) | Resolves the key to its owner; updates the owner's conversion for `(click_id, txid)` if there is one (no window; `unchanged` when nothing would change), else inserts if the click is the owner's and under 30 days old; logs the hit. Returns the result code |
+| `purge_tracking_data(click_days, log_days)` | service role (daily cron) | Retention for clicks and the log. Floors of 31 and 1 days, whatever is passed — a click must outlive the attribution window |
+| `get_creative_conversions(creative_id, days)` | authenticated | Clicks and approved/pending/rejected counts plus approved revenue per currency, per (UTC day, exit), for **one creative the caller owns** — the ownership check is inside |
+| `ensure_postback_key()` / `rotate_postback_key()` / `has_postback_key()` / `get_postback_log(limit)` | authenticated | The caller's own key and log, scoped to `auth.uid()` |
 
 ### `stripe_events` (webhook idempotency)
 Ledger of processed Stripe event ids. Service-role only; no client access.
@@ -120,6 +201,10 @@ Ledger of processed Stripe event ids. Service-role only; no client access.
 auth.users 1──* creatives *──1 templates
 auth.users 1──* subscriptions *──0..1 templates   (null template_id = all-access)
 creatives  1──* creative_event_counters
+creatives  1──* creative_clicks
+creatives  1──* conversions            (click_id is a soft reference — clicks expire)
+auth.users 1──0..1 postback_keys
+auth.users 1──* postback_log
 ```
 
 ## The serving read (hot path)
@@ -129,7 +214,10 @@ single fast lookup. Implemented as the view **`private.creative_serving`** (in a
 dedicated `private` schema that is **not exposed to the API**), keyed by `creative_id`,
 exposing `template_id`, `selected_format`, `config_json`, `creative_status`,
 `template_type`, `runtime_keys`, `supported_standards`, plus resolved `is_entitled`
-and `should_serve` flags.
+and `should_serve` flags, and `click_fields` — the `config_schema` fields of type `url`
+except the OMID `verificationScriptUrl`, i.e. the click destinations the VAST builder
+routes through `/r` and the only fields `/r` will redirect to
+([ADR-0023](decisions/0023-conversion-postbacks.md)).
 
 Entitlement is resolved **live** via an indexed `EXISTS` against `subscriptions`
 (active/trialing, non-expired, covering the template via all-access or matching
@@ -167,8 +255,13 @@ the underlying rows ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)):
 
 Postgres remains the source of truth; these are a projection of it, and
 `npm run snapshot:backfill` rebuilds them from it idempotently. Note that a creative
-snapshot copies `template_type`, `runtime_keys` and `supported_standards` from
-`templates` — so **`npm run db:seed` must be followed by a backfill**.
+snapshot copies `template_type`, `runtime_keys`, `supported_standards` and (derived
+from `config_schema`) `click_fields` from `templates` — so **`npm run db:seed` must be
+followed by a backfill**.
+
+`click_fields` is **optional** in the snapshot and did not bump `schema_version`: a
+reader that predates it ignores it, and a snapshot without it routes no click through
+`/r` — the behaviour before ADR-0023, not an error.
 
 `is_entitled` / `should_serve` are deliberately *not* stored. They depend on `now()`,
 and freezing them would keep a lapsed subscription serving whenever a Stripe webhook
@@ -183,6 +276,7 @@ was missed or delayed.
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
 | `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
+| `creative_clicks`, `conversions`, `postback_keys`, `postback_log` | **no direct client access** (RLS on, zero policies, table and identity-sequence privileges revoked from `anon`/`authenticated`); clicks written by `record_click()` and conversions + log by `record_postback()`, both service role only; the owner reads through `get_creative_conversions()`, `ensure_postback_key()`, `has_postback_key()` and `get_postback_log()`, each scoped to `auth.uid()` ([ADR-0023](decisions/0023-conversion-postbacks.md)) |
 | `stripe_events` | **no direct client access**; written only by the webhook (service role) |
 | `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent |
 

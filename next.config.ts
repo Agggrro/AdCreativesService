@@ -41,6 +41,13 @@ const NEUTRAL_PATHS = [
   { source: "/v", destination: "/api/vast" },
   { source: "/t", destination: "/api/track" },
   { source: "/c/s/:token", destination: "/api/creative/simid/:token" },
+  // The click redirect every served destination goes through (ADR-0023). Lives
+  // on the ad domain, since that is where the tag's links point.
+  { source: "/r", destination: "/api/click" },
+  // S2S postbacks. Registered everywhere like the rest, but only ever handed
+  // out on the app domain: a network's server is not a publisher's page, and
+  // the ad domain's catch-all below keeps answering it 404 there.
+  { source: "/pb", destination: "/api/postback" },
 ];
 
 /**
@@ -132,7 +139,7 @@ const nextConfig: NextConfig = {
           // beforeFiles entries are all evaluated in turn and can otherwise
           // chain into each other.
           source:
-            "/:path((?!v$|t$|c/|cdn$|cdn/|_next/|cdn-robots\\.txt$|favicon\\.ico$).+)",
+            "/:path((?!v$|t$|r$|c/|cdn$|cdn/|_next/|cdn-robots\\.txt$|favicon\\.ico$).+)",
           destination: "/cdn/blocked",
           has: onCdn,
         },

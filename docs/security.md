@@ -16,6 +16,8 @@
 | Creative runtime assets, via `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 120s token that names one Storage path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
 | Serving snapshots (Vercel Blob) | Read only by our own functions, never by a player | **Private store, not public.** Keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md) |
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
+| `GET /r` (click redirect) | A viewer's browser leaving an ad, from a link anyone holding the tag could have fetched | Public by necessity. The destination is read from the creative's own config by field name, never from the request, **and only a genuine signature minted by `/v` gets a redirect** — forged, missing or week-old links are 404, so no account can use the ad domain as a redirect to what it configured. See "Click redirect and postbacks" below |
+| `GET\|POST /pb` (postback) | A partner network's server | Authenticated only by the account's postback key in the URL; a wrong key writes nothing. See "Click redirect and postbacks" below |
 | UI language cookie (`creosmith_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
 | Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage (no app server in the path) | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
 | `POST /api/tools/vast/inspect`, `GET /api/tools/vast/hop` | The open internet, and **an arbitrary third-party host the caller names** | Public, unauthenticated, no rate limit. This is the only outbound-fetch boundary in the product — see "Outbound fetches to untrusted URLs" below |
@@ -24,7 +26,7 @@
 
 - `SUPABASE_SERVICE_ROLE_KEY` — **server-only**, full DB power, bypasses RLS. Must
   never reach the client bundle or any `NEXT_PUBLIC_*` var. Used only on the serving
-  read and webhook write paths.
+  read, the beacon, click and postback writes, and the webhook write path.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — server-only.
 - `PREVIEW_TOKEN_SECRET` — server-only. Signs the short-TTL live-preview tokens
   (`lib/vast/preview-token.ts`). Independent of the Supabase/Stripe secrets above —
@@ -62,9 +64,15 @@ not get talked out of a correct change by an imagined one:
 - **Only tokens in flight at deploy break** — beacons up to their 1-hour TTL, interactive
   creative URLs up to 120s. The effect is undercounted events in that window, and it
   fails closed (a dropped beacon), never open.
+- **Click links are the exception, and they fail visibly** ([ADR-0023](decisions/0023-conversion-postbacks.md)).
+  They are signed with the same key but redirect only on a genuine signature, so after a
+  rotation every click link still on a screen or in a cached tag is a `404` for the
+  viewer — for up to its eight-day life, though in practice for the minutes an ad stays
+  up, since `/v` mints fresh links on every fetch. Rotate off-peak.
 - **`TRACK_TOKEN_SECRET`, when set, bypasses its label entirely** — that derivation is
   the fallback path only. A deploy that has the dedicated secret provisioned loses
-  nothing at all on the tracking key.
+  nothing at all on the tracking key once it is in place — but **provisioning it is itself
+  a rotation**, with the click-link cost above.
 
 Bump the `:v1` suffix deliberately if a real rotation is ever wanted; do not rely on a
 rename to do it.
@@ -108,6 +116,72 @@ rename to do it.
   ever having seen a real one), not *replay* of a beacon someone actually
   captured from a live VAST response. Rate limiting per `(creative_id, event)`
   is the next layer if replay abuse is observed; not implemented yet.
+
+## Click redirect and postbacks (`/r`, `/pb` — ADR-0023)
+
+- **The request cannot point `/r` anywhere.** The link carries `cid` and a field *name*;
+  the destination comes from the creative's config (snapshot, then Postgres) and only for
+  a field in `click_fields`, and it must be an absolute http(s) URL. A field that no longer
+  resolves falls back to the creative's own `clickThroughUrl`, never to anything in the
+  request. The only request data that reaches the `Location` header is the macro values
+  we mint ourselves — the click id, the creative id and the field name — each
+  `encodeURIComponent`-ed, and the result is normalized through `URL` (punycode host,
+  percent-encoded path), since a header carries Latin-1 only.
+- **But the owner's config is not trusted either — signing up is free.** Without more,
+  any account could configure a phishing page and hand out `/r?cid=…` as a redirect from
+  our ad domain, and a domain on a blocklist takes every customer's tag down with it. So
+  `/r` redirects only on a **genuine signature**, which only `/v` mints and only for a
+  creative that may serve: fresh (≤ 24 h) redirects and records, stale (≤ 7 more days)
+  redirects without recording, anything else — forged, missing, older — is `404`. A
+  lapsed account's links therefore stop redirecting within eight days of its last served
+  tag. The signature also covers the creative's **owner**, checked against the creative as
+  read at click time: an authenticated client can insert a creative with an id of its
+  choosing, so once a creative is deleted its id can be re-registered by another account,
+  and links collected while the old one was live then fail rather than redirect to the
+  newcomer's URL.
+- **Signed under the beacon key, domain-separated.** `/r` signs `r:<field>` with
+  `signTrackToken`; `/t` accepts only its three event names and `/r` only `r:<field>`, so
+  neither route accepts the other's signature. The same residual gap as the beacons
+  applies, and it is sharper here: anyone who fetched a tag holds day-long signed click
+  links and can replay them. That can dilute click counts and CR — bounded by
+  `record_click()`'s 600 per creative per minute, and a flood past that cap denies that
+  minute's genuine clicks their ids. It cannot create a conversion. **A per-IP rate limit
+  on `/r` and `/pb` in the Vercel Firewall is the recommended next layer**; it is
+  configuration, and not yet set.
+- **Crawlers get the redirect, not a click.** Known bot, scanner and HTTP-library user
+  agents (`isLikelyBot()`), HEAD requests and stale links are redirected identically —
+  varying the answer by user agent would read as cloaking — but mint no id and write no
+  row. `no-store` on every response: a cached 302 would give the next viewer the
+  previous one's click id.
+- **No IP address is stored.** A click keeps its creative, exit, time, and a two-letter
+  country from the platform's geo header.
+- **Script-capable click destinations never reach a tag.** `<input type="url">` accepts
+  `javascript:` and `data:` — they are valid URLs — so `coerceFieldValue` refuses them at
+  save and the VAST builder drops any already stored. On a player that `window.open`s a
+  click-through inside the publisher's page, such a destination is script in someone
+  else's site.
+- **`/pb` is authenticated by the account's postback key alone** — 32 hex characters from
+  `gen_random_uuid()` (122 random bits), shape-checked before any database call. A wrong
+  key returns `403 unknown_key` and writes nothing, so it cannot be used to fill the log.
+  With the right key, a caller can only attach conversions to **that account's own**
+  clicks: `record_postback()` joins every click and conversion to `creatives.user_id`,
+  and another account's click reads exactly like one that never existed.
+- **The key is stored in the clear** because the owner has to be able to copy the URL
+  again; it is readable only through `ensure_postback_key()`, scoped to `auth.uid()`.
+  `rotate_postback_key()` replaces it and the old one stops working at once. Treat it
+  like a password; the settings page says so.
+- **Input is untrusted and parsed in one place** (`lib/postback.ts`): statuses from a
+  closed list (a `Map`, so a word like `constructor` is not accidentally "known"), an
+  unexpanded macro an error rather than "not sent", payout finite and under 1e9 (and
+  `1,234` refused as ambiguous), currency three letters, txid ≤ 128 characters, NUL
+  bytes removed (Postgres text cannot hold them, and one would fail the whole write into
+  an endless retry), logged parameters truncated to 128 characters and the jsonb capped
+  at 4 KB by a CHECK. A form body is streamed and read to 8 KB, no further; JSON bodies
+  are not read.
+- **A leaked key writes a bounded log.** `record_postback()` stops logging past 3,600
+  rows per account per hour (the postbacks themselves are still processed), and a log
+  write that fails never rolls back the conversion.
+- No per-IP rate limit on either endpoint yet — see the Firewall note above.
 
 ## Preview endpoint hardening (`/api/vast/preview*`)
 

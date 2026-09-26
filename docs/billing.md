@@ -114,6 +114,16 @@ session in [`app/api/checkout/route.ts`](../app/api/checkout/route.ts).
 | `canceled` / expired (`current_period_end` passed) | serves empty/fallback |
 | no covering subscription | serves empty/fallback |
 
+**Conversion tracking is not entitlement-gated** ([ADR-0023](decisions/0023-conversion-postbacks.md)).
+The click redirect `/r` and the postback endpoint `/pb` never read a subscription —
+and never call Stripe. The kill-switch still bounds them: a lapsed account's tag
+serves no payload, so it mints no new click links, and the links already in flight
+stop recording after their 24-hour signature and stop redirecting (404) a week after
+that.
+Postbacks for clicks recorded while the account was entitled keep being accepted —
+a network settles weeks later, and refusing a conversion the account already paid to
+generate would only make its numbers wrong.
+
 ## Security notes
 
 - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are server-only env vars.

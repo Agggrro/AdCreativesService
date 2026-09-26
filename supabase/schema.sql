@@ -365,6 +365,330 @@ end
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Conversion tracking  (click ids and S2S postbacks — ADR-0023)
+-- ---------------------------------------------------------------------------
+-- The one per-event store in this schema, and deliberately so. ADR-0016 took
+-- per-beacon rows out because impressions arrive at ad-serving rates. A click
+-- that goes through `/r` is a person leaving the ad for the advertiser's page —
+-- orders of magnitude rarer — and a conversion cannot be attributed to an
+-- aggregate: the partner network posts back one click id, and something has to
+-- remember which creative and which exit that id came from.
+create table if not exists public.creative_clicks (
+  -- Minted by `/r` (app/api/click/route.ts): 12 random bytes as lower-case hex.
+  -- Hex rather than base64url because a partner network stores it in a sub-id
+  -- field, and some of those case-fold or reject `-` and `_`.
+  click_id    text primary key check (click_id ~ '^[0-9a-f]{24}$'),
+  creative_id uuid not null references public.creatives(id) on delete cascade,
+  -- The config field the viewer left through: `clickThroughUrl`, or a quiz exit
+  -- such as `resultABUrl`. It is what lets a report say which answer path
+  -- converts.
+  field       text not null check (field ~ '^[A-Za-z][A-Za-z0-9_]{0,63}$'),
+  -- ISO 3166-1 alpha-2 from the platform's geo header. The visitor's IP address
+  -- is not stored (docs/security.md).
+  country     text check (country ~ '^[A-Z]{2}$'),
+  created_at  timestamptz not null default now()
+);
+comment on table public.creative_clicks is 'One row per click through /r (ADR-0023). Written only by record_click(), from the click redirect; purged after 90 days by purge_tracking_data().';
+
+create index if not exists creative_clicks_creative_created_idx
+  on public.creative_clicks (creative_id, created_at);
+-- The retention sweep deletes by age across every creative.
+create index if not exists creative_clicks_created_idx
+  on public.creative_clicks (created_at);
+
+create table if not exists public.conversions (
+  id          bigint generated always as identity primary key,
+  -- Not a foreign key, on purpose: clicks are purged after 90 days and
+  -- conversions are kept, so a conversion has to outlive its click. That is why
+  -- creative_id and field are copied off the click when the conversion is made.
+  click_id    text not null check (click_id ~ '^[0-9a-f]{24}$'),
+  creative_id uuid not null references public.creatives(id) on delete cascade,
+  field       text not null,
+  -- The network's own transaction id, or '' when it sends none. With '' a click
+  -- carries at most one conversion and a repeated postback is a status update;
+  -- distinct txids let one click carry several (a lead, then a deposit).
+  txid        text not null default '' check (char_length(txid) <= 128),
+  status      text not null check (status in ('approved', 'pending', 'rejected')),
+  payout      numeric(14, 4) not null default 0,
+  currency    text not null default 'USD' check (currency ~ '^[A-Z]{3}$'),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint conversions_click_txid_key unique (click_id, txid)
+);
+comment on table public.conversions is 'Conversions reported by partner-network postbacks (ADR-0023). Written only by record_postback().';
+
+create index if not exists conversions_creative_created_idx
+  on public.conversions (creative_id, created_at);
+
+drop trigger if exists conversions_set_updated_at on public.conversions;
+create trigger conversions_set_updated_at
+  before update on public.conversions
+  for each row execute function public.set_updated_at();
+
+-- One postback key per account. It is the whole of the postback's
+-- authentication: a partner network cannot hold a session, so the key in the
+-- URL is what says whose clicks a conversion may attach to. Stored in the clear
+-- because the owner has to be able to copy the URL again later; rotating it is
+-- the remedy for a leak (rotate_postback_key).
+create table if not exists public.postback_keys (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  key        text not null unique check (key ~ '^[0-9a-f]{32}$'),
+  created_at timestamptz not null default now()
+);
+comment on table public.postback_keys is 'Per-account secret for the /pb postback URL (ADR-0023). Read and rotated only through the owner-scoped functions below.';
+
+-- Every postback that named a valid key, including the ones that failed. A
+-- partner network's own postback log says only "HTTP 400"; this is what tells
+-- the owner that the network sent `{sub1}` unexpanded, or a status we do not
+-- read. Kept for 7 days (purge_tracking_data).
+create table if not exists public.postback_log (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  received_at timestamptz not null default now(),
+  -- The parameters /pb reads, as received and truncated by the route. Nothing
+  -- else from the request is kept.
+  params      jsonb not null default '{}',
+  result      text not null check (char_length(result) <= 32)
+);
+comment on table public.postback_log is 'Recent postback hits per account, for debugging a network''s setup (ADR-0023). 7-day retention.';
+
+create index if not exists postback_log_user_received_idx
+  on public.postback_log (user_id, received_at desc);
+
+-- The route truncates each parameter to 128 characters; this is the table
+-- refusing to trust that. 4096 bytes clears the worst honest case — five values
+-- of 128 four-byte characters plus the JSON around them is about 2.7 KB — with
+-- room to spare. Dropped and re-added rather than `add ... if not exists`
+-- (which Postgres does not have for constraints), so a changed bound applies
+-- on the next run of this file.
+alter table public.postback_log drop constraint if exists postback_log_params_size;
+alter table public.postback_log
+  add constraint postback_log_params_size check (pg_column_size(params) <= 4096);
+
+-- ---------------------------------------------------------------------------
+-- Click ingest: one call per signed click through `/r`
+-- ---------------------------------------------------------------------------
+-- A function rather than a plain insert for the cap. `/r` is public and its
+-- signed links are handed out by the public `/v`, so anyone can fetch a tag and
+-- replay its links for an hour — and unlike the beacons' counters, every replay
+-- here would be a new row. Past `p_per_minute` clicks on one creative in the
+-- last minute a click is still redirected (the route does that first) but not
+-- recorded. Genuine traffic above the cap loses attribution for the rest of that
+-- minute, which is the price of a table that cannot be filled from outside.
+-- Returns whether the row was written.
+create or replace function public.record_click(
+  p_click_id    text,
+  p_creative_id uuid,
+  p_field       text,
+  p_country     text,
+  p_per_minute  int
+)
+returns boolean
+language sql
+security definer
+set search_path = ''
+as $$
+  with recent as (
+    select count(*) as n
+      from public.creative_clicks k
+     where k.creative_id = p_creative_id
+       and k.created_at > now() - interval '1 minute'
+  ), ins as (
+    insert into public.creative_clicks (click_id, creative_id, field, country)
+    select p_click_id, p_creative_id, p_field, p_country
+     where (select n from recent) < greatest(coalesce(p_per_minute, 1), 1)
+    on conflict (click_id) do nothing
+    returning 1
+  )
+  select exists (select 1 from ins);
+$$;
+
+revoke all on function public.record_click(text, uuid, text, text, int) from public;
+grant execute on function public.record_click(text, uuid, text, text, int) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Postback ingest: one call per S2S hit from a partner network
+-- ---------------------------------------------------------------------------
+-- In SQL rather than as reads and writes from the route for the same reason as
+-- increment_creative_event: find-or-update-or-insert across two tables is a
+-- race when a network retries, and networks retry. The route parses and
+-- validates; a parse failure still comes here as `p_error`, so it lands in the
+-- owner's log instead of disappearing into the network's.
+--
+-- Returns a result code the route maps to an HTTP status: 'created', 'updated'
+-- and 'unchanged' succeed, everything else is a rejection the owner can read.
+create or replace function public.record_postback(
+  p_key       text,
+  p_click_id  text,
+  p_status    text,
+  p_payout    numeric,
+  p_currency  text,
+  p_txid      text,
+  p_error     text,
+  p_params    jsonb
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user     uuid;
+  v_creative uuid;
+  v_field    text;
+  v_clicked  timestamptz;
+  v_inserted boolean;
+  v_status   text;
+  v_payout   numeric;
+  v_currency text;
+  v_result   text;
+begin
+  select k.user_id into v_user from public.postback_keys k where k.key = p_key;
+  -- No owner means nobody to show a log line to. Answer without writing
+  -- anything, so a wrong key cannot be used to fill this database.
+  if v_user is null then
+    return 'unknown_key';
+  end if;
+
+  if p_error is not null then
+    v_result := p_error;
+  else
+    -- A change to a conversion already recorded: hold -> approved, or a
+    -- reversal. Matched on (click, txid) and never held to the click window:
+    -- networks settle long after the click, and by then the click row itself
+    -- may have been purged.
+    --
+    -- A late `pending` never overwrites a settled status. Networks retry, and a
+    -- retried hold that lands after its own approval would otherwise un-approve
+    -- the conversion and take its revenue with it. Approved -> rejected (a
+    -- chargeback) and rejected -> approved still go through. Either way the
+    -- owner's log has to say what happened, so a report that changed nothing is
+    -- `unchanged`, not `updated`.
+    select v.status, v.payout, v.currency
+      into v_status, v_payout, v_currency
+      from public.conversions v
+      join public.creatives c on c.id = v.creative_id
+     where v.click_id = p_click_id
+       and v.txid = p_txid
+       and c.user_id = v_user
+       for update of v;
+    if found then
+      if (p_status = 'pending' and v_status <> 'pending')
+         or (p_status = v_status
+             and coalesce(p_payout, v_payout) = v_payout
+             and coalesce(p_currency, v_currency) = v_currency) then
+        v_result := 'unchanged';
+      else
+        update public.conversions v
+           set status   = p_status,
+               payout   = coalesce(p_payout, v.payout),
+               currency = coalesce(p_currency, v.currency)
+         where v.click_id = p_click_id
+           and v.txid = p_txid;
+        v_result := 'updated';
+      end if;
+    else
+      select k.creative_id, k.field, k.created_at
+        into v_creative, v_field, v_clicked
+        from public.creative_clicks k
+        join public.creatives c on c.id = k.creative_id
+       where k.click_id = p_click_id
+         and c.user_id = v_user;
+      if v_creative is null then
+        -- Another account's click reads exactly like one that never existed.
+        v_result := 'unknown_click';
+      elsif v_clicked < now() - interval '30 days' then
+        -- The attribution window. A first report this late is not credible
+        -- evidence that this ad caused it.
+        v_result := 'expired_click';
+      else
+        -- `on conflict` covers the network that fires the same postback twice
+        -- at once: both miss the update above, and the second insert becomes
+        -- the update instead of a duplicate — under the same no-downgrade rule.
+        -- The `where` is the one ownership check this write would otherwise
+        -- lack; a click belongs to one creative, so it always holds today.
+        -- `xmax = 0` is how Postgres tells a fresh row from an updated one.
+        insert into public.conversions as v
+          (click_id, creative_id, field, txid, status, payout, currency)
+        values
+          (p_click_id, v_creative, v_field, p_txid, p_status,
+           coalesce(p_payout, 0), coalesce(p_currency, 'USD'))
+        on conflict (click_id, txid) do update
+          set status   = case when excluded.status = 'pending' and v.status <> 'pending'
+                              then v.status else excluded.status end,
+              payout   = case when excluded.status = 'pending' and v.status <> 'pending'
+                              then v.payout else coalesce(p_payout, v.payout) end,
+              currency = case when excluded.status = 'pending' and v.status <> 'pending'
+                              then v.currency else coalesce(p_currency, v.currency) end
+          where v.creative_id = v_creative
+        returning (xmax = 0) into v_inserted;
+        v_result := case
+          when v_inserted is null then 'unknown_click'
+          when v_inserted then 'created'
+          else 'updated'
+        end;
+      end if;
+    end if;
+  end if;
+
+  -- Bounded, because the key sits in every network's configuration and a leaked
+  -- one could otherwise write log rows without limit. Past the cap the postback
+  -- is still processed; only the debugging trail pauses.
+  --
+  -- Best-effort, in its own sub-block: the log is a debugging aid, and a row it
+  -- cannot take must not roll back the conversion above it — the route would
+  -- answer 503 and the network would retry a postback that had in fact landed.
+  begin
+    if (select count(*) from public.postback_log l
+         where l.user_id = v_user
+           and l.received_at > now() - interval '1 hour') < 3600 then
+      insert into public.postback_log (user_id, params, result)
+      values (v_user, coalesce(p_params, '{}'::jsonb), v_result);
+    end if;
+  exception when others then
+    null;
+  end;
+  return v_result;
+end;
+$$;
+
+revoke all on function public.record_postback(text, text, text, numeric, text, text, text, jsonb) from public;
+grant execute on function public.record_postback(text, text, text, numeric, text, text, text, jsonb) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Retention for the tracking tables. Called by the daily cron beside
+-- rollup_creative_events. Conversions are not purged: they are the record.
+-- ---------------------------------------------------------------------------
+create or replace function public.purge_tracking_data(
+  p_click_days int default 90,
+  p_log_days   int default 7
+)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_clicks bigint;
+begin
+  -- Floors, not trust: this is the one function here that deletes across every
+  -- account, and a click must outlive the 30-day attribution window whatever a
+  -- caller passes.
+  delete from public.creative_clicks
+   where created_at < now() - make_interval(days => greatest(coalesce(p_click_days, 90), 31));
+  get diagnostics v_clicks = row_count;
+
+  delete from public.postback_log
+   where received_at < now() - make_interval(days => greatest(coalesce(p_log_days, 7), 1));
+
+  return v_clicks;
+end;
+$$;
+
+revoke all on function public.purge_tracking_data(int, int) from public;
+grant execute on function public.purge_tracking_data(int, int) to service_role;
+
+-- ---------------------------------------------------------------------------
 -- stripe_events  (webhook idempotency ledger)
 -- ---------------------------------------------------------------------------
 create table if not exists public.stripe_events (
@@ -388,6 +712,10 @@ alter table public.creatives       enable row level security;
 alter table public.subscriptions   enable row level security;
 alter table public.creative_event_counters enable row level security;
 alter table public.stripe_events   enable row level security;
+alter table public.creative_clicks enable row level security;
+alter table public.conversions     enable row level security;
+alter table public.postback_keys   enable row level security;
+alter table public.postback_log    enable row level security;
 -- stripe_events: no policy => no client access; only the service role (webhook) touches it.
 
 -- profiles: owner reads/updates own row (insert handled by trigger).
@@ -434,6 +762,14 @@ create policy subscriptions_select_own on public.subscriptions
 -- creative_event_counters: no direct client access. RLS enabled with no policy =>
 -- the anon/authenticated roles are denied. Writes go through the service role
 -- (increment_creative_event); reads go through get_creative_overview().
+
+-- creative_clicks, conversions, postback_keys, postback_log: the same shape
+-- (ADR-0023). No policy, so no direct client access. Clicks are written only by
+-- record_click() (from `/r`), conversions and the log only by record_postback(),
+-- both with the service role. The owner reads through
+-- get_creative_conversions(), ensure_postback_key(), has_postback_key() and
+-- get_postback_log(), and rotates the key with rotate_postback_key() — each
+-- scoped to auth.uid() inside.
 
 -- ---------------------------------------------------------------------------
 -- Storage: creative-media (advertiser-uploaded creative assets)
@@ -512,6 +848,14 @@ grant all on all sequences in schema public to anon, authenticated, service_role
 -- not stop it. SECURITY DEFINER functions are unaffected: they are checked
 -- against their owner, not the caller.
 revoke all on public.creative_event_counters, public.stripe_events from anon, authenticated;
+-- The same for the conversion-tracking tables (ADR-0023): no client contract,
+-- so no table privilege for a missing policy to be the only thing guarding.
+revoke all on public.creative_clicks, public.conversions,
+              public.postback_keys, public.postback_log
+  from anon, authenticated;
+-- Their identity sequences too, which the blanket sequence grant above handed out.
+revoke all on sequence public.conversions_id_seq, public.postback_log_id_seq
+  from anon, authenticated;
 
 -- Default-closed for future tables. The previous `grant all on tables` default
 -- meant any table created later was born readable AND writable by anon until
@@ -584,7 +928,29 @@ select
   private.is_entitled(c.user_id, c.template_id)                as is_entitled,
   -- Convenience: only serve the payload for an active creative that is entitled.
   (c.status = 'active' and private.is_entitled(c.user_id, c.template_id))
-                                                               as should_serve
+                                                               as should_serve,
+  -- The config fields whose value is a place to send the viewer, in schema
+  -- order (ADR-0023). The VAST builder routes each one through `/r` so the
+  -- click gets a click id, and `/r` refuses any field not on this list — which
+  -- is what keeps it from being an open redirect.
+  --
+  -- Every `url`-typed field except the OMID script: the adapter emits that into
+  -- <AdVerifications> as a resource for the player to load (ADR-0012), and
+  -- routing it through `/r` would count every verification load as a click.
+  -- Appended last because `create or replace view` can only add columns at the
+  -- end.
+  coalesce(
+    (select array_agg(f.value->>'name' order by f.ordinality)
+       from jsonb_array_elements(
+              case when jsonb_typeof(t.config_schema->'fields') = 'array'
+                   then t.config_schema->'fields'
+                   else '[]'::jsonb end
+            ) with ordinality as f(value, ordinality)
+      where f.value->>'type' = 'url'
+        and f.value->>'name' ~ '^[A-Za-z][A-Za-z0-9_]{0,63}$'
+        and f.value->>'name' <> 'verificationScriptUrl'),
+    '{}'::text[]
+  )                                                            as click_fields
 from public.creatives c
 join public.templates  t on t.id = c.template_id;
 
@@ -607,7 +973,13 @@ grant select on private.creative_serving to service_role;
 -- is the single read path: it runs as its owner (reads private), returns an
 -- explicit TABLE (self-contained for PostgREST introspection — no dependency on
 -- a private composite type), and EXECUTE is restricted to the service role.
-create or replace function public.get_creative_serving(p_creative_id uuid)
+--
+-- Drop-then-create because `click_fields` (ADR-0023) changed the RETURNS TABLE,
+-- which `create or replace` refuses. Nothing depends on this function, and the
+-- grants below re-apply unconditionally; inside this file's single transaction
+-- a caller never observes it missing.
+drop function if exists public.get_creative_serving(uuid);
+create function public.get_creative_serving(p_creative_id uuid)
 returns table (
   creative_id         uuid,
   user_id             uuid,
@@ -619,16 +991,19 @@ returns table (
   runtime_keys        jsonb,
   supported_standards text[],
   is_entitled         boolean,
-  should_serve        boolean
+  should_serve        boolean,
+  click_fields        text[]
 )
 language sql
 security definer
-set search_path = public, private
+-- Empty, like every other definer function here: the body names
+-- `private.creative_serving` in full, so nothing needs resolving by path.
+set search_path = ''
 stable
 as $$
   select creative_id, user_id, template_id, selected_format, config_json,
          creative_status, template_type, runtime_keys, supported_standards,
-         is_entitled, should_serve
+         is_entitled, should_serve, click_fields
   from private.creative_serving
   where creative_id = p_creative_id;
 $$;
@@ -725,6 +1100,190 @@ comment on function public.get_creative_overview() is
 
 revoke all on function public.get_creative_overview() from public;
 grant execute on function public.get_creative_overview() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Conversion report for one creative (ADR-0023)
+-- ---------------------------------------------------------------------------
+-- Unlike get_creative_overview() this takes a creative id, which is exactly the
+-- shape that note warns about: a parameter is how an ownership check gets lost.
+-- The `owned` CTE is that check, and every other CTE reads through it — a
+-- creative the caller does not own yields no rows, not somebody else's numbers.
+--
+-- One row per (UTC day, exit field) over the last `p_days` days, today
+-- included. Clicks count by click time and conversions by the time the postback
+-- arrived: a network reports days later, and bucketing by click time would
+-- keep rewriting days the owner has already read. `revenue` is approved payout
+-- per currency, since summing across currencies would be a number in none.
+create or replace function public.get_creative_conversions(
+  p_creative_id uuid,
+  p_days        int default 30
+)
+returns table (
+  day      date,
+  field    text,
+  clicks   bigint,
+  approved bigint,
+  pending  bigint,
+  rejected bigint,
+  revenue  jsonb
+)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with owned as (
+    select c.id from public.creatives c
+     where c.id = p_creative_id
+       and c.user_id = (select auth.uid())
+  ), since as (
+    select date_trunc('day', now(), 'UTC')
+             - make_interval(days => least(greatest(coalesce(p_days, 30), 1), 90) - 1) as t
+  ), k as (
+    select (x.created_at at time zone 'UTC')::date as day, x.field, count(*) as clicks
+      from public.creative_clicks x
+     where x.creative_id = (select id from owned)
+       and x.created_at >= (select t from since)
+     group by 1, 2
+  ), v as (
+    select (x.created_at at time zone 'UTC')::date as day, x.field,
+           count(*) filter (where x.status = 'approved') as approved,
+           count(*) filter (where x.status = 'pending')  as pending,
+           count(*) filter (where x.status = 'rejected') as rejected
+      from public.conversions x
+     where x.creative_id = (select id from owned)
+       and x.created_at >= (select t from since)
+     group by 1, 2
+  ), r as (
+    select y.day, y.field, jsonb_object_agg(y.currency, y.amount) as revenue
+      from (
+        select (x.created_at at time zone 'UTC')::date as day, x.field, x.currency,
+               sum(x.payout) as amount
+          from public.conversions x
+         where x.creative_id = (select id from owned)
+           and x.created_at >= (select t from since)
+           and x.status = 'approved'
+         group by 1, 2, 3
+      ) y
+     group by y.day, y.field
+  )
+  select coalesce(k.day, v.day),
+         coalesce(k.field, v.field),
+         coalesce(k.clicks, 0),
+         coalesce(v.approved, 0),
+         coalesce(v.pending, 0),
+         coalesce(v.rejected, 0),
+         coalesce(r.revenue, '{}'::jsonb)
+    from k
+    full join v on v.day = k.day and v.field = k.field
+    left join r on r.day = coalesce(k.day, v.day)
+               and r.field = coalesce(k.field, v.field)
+   order by 1, 2;
+$$;
+
+comment on function public.get_creative_conversions(uuid, int) is
+  'Clicks through /r and postback conversions per day and exit for one creative the caller owns (ADR-0023).';
+
+revoke all on function public.get_creative_conversions(uuid, int) from public;
+grant execute on function public.get_creative_conversions(uuid, int) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- The owner's postback key and log (ADR-0023)
+-- ---------------------------------------------------------------------------
+-- The key is made on first sight rather than at sign-up: most accounts never
+-- set up a postback, and a trigger on auth.users is one more thing a signup
+-- can fail on. 32 hex characters from gen_random_uuid(), whose 122 random bits
+-- come from the server's CSPRNG — no extension needed.
+create or replace function public.ensure_postback_key()
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := (select auth.uid());
+  v_key  text;
+begin
+  if v_user is null then
+    raise exception 'not signed in' using errcode = '28000';
+  end if;
+
+  insert into public.postback_keys (user_id, key)
+  values (v_user, replace(gen_random_uuid()::text, '-', ''))
+  on conflict (user_id) do nothing;
+
+  select k.key into v_key from public.postback_keys k where k.user_id = v_user;
+  return v_key;
+end;
+$$;
+
+-- The remedy for a key that leaked. The old key stops working at once, so every
+-- network holding the old URL has to be updated — the page says so beside the
+-- button.
+create or replace function public.rotate_postback_key()
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := (select auth.uid());
+  v_key  text;
+begin
+  if v_user is null then
+    raise exception 'not signed in' using errcode = '28000';
+  end if;
+
+  insert into public.postback_keys (user_id, key)
+  values (v_user, replace(gen_random_uuid()::text, '-', ''))
+  on conflict (user_id) do update
+    set key = excluded.key, created_at = now()
+  returning key into v_key;
+  return v_key;
+end;
+$$;
+
+-- Read-only, unlike ensure_postback_key(): the creative page asks whether the
+-- account has set a postback up at all before warning that a link lacks
+-- {click_id}, and merely viewing that page must not make a key.
+create or replace function public.has_postback_key()
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1 from public.postback_keys k where k.user_id = (select auth.uid())
+  );
+$$;
+
+create or replace function public.get_postback_log(p_limit int default 50)
+returns table (
+  received_at timestamptz,
+  params      jsonb,
+  result      text
+)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select l.received_at, l.params, l.result
+    from public.postback_log l
+   where l.user_id = (select auth.uid())
+   order by l.received_at desc
+   limit least(greatest(coalesce(p_limit, 50), 1), 200);
+$$;
+
+revoke all on function public.ensure_postback_key() from public;
+revoke all on function public.rotate_postback_key() from public;
+revoke all on function public.has_postback_key() from public;
+revoke all on function public.get_postback_log(int) from public;
+grant execute on function public.ensure_postback_key() to authenticated;
+grant execute on function public.rotate_postback_key() to authenticated;
+grant execute on function public.has_postback_key() to authenticated;
+grant execute on function public.get_postback_log(int) to authenticated;
 
 commit;
 
