@@ -15,7 +15,10 @@ document.
   mandatory close control — ADR-0005 / ADR-0009 — a self-reported,
   non-OMID-accredited viewability observer that fires once the slot has been
   ≥50% on-screen for a continuous 2s — ADR-0012 — and the telemetry channel,
-  below). A template implements only `onStart(slot, params, api)`.
+  below). A template implements only `onStart(slot, params, api)`; what it starts that
+  does not end by itself (animations, observers, audio) it stops in an
+  `api.onStop(fn)` cleanup, which the base runs on every terminal path — and after
+  which `api.clickThrough()` does nothing ([ADR-0024](../docs/decisions/0024-pick-message-template.md)).
 - `templates/<name>/vpaid.js` — one render module per template, defining `var
   TEMPLATE = { name, duration, onStart }`.
 - `build.mjs` concatenates each render module with the shared base, then
@@ -42,6 +45,7 @@ document.
 | `dist/slider/vpaid.js` | `slider/vpaid.js` | VPAID 2.0 |
 | `dist/quiz/vpaid.js` | `quiz/vpaid.js` | VPAID 2.0 |
 | `dist/age-gate/vpaid.js` | `age-gate/vpaid.js` | VPAID 2.0 |
+| `dist/pick-message/vpaid.js` | `pick-message/vpaid.js` | VPAID 2.0 |
 
 These keys match `templates.runtime_keys` in [`../supabase/seed.sql`](../supabase/seed.sql)
 and are what `runtime/manifest.ts` maps to real CDN URLs. The **object** key on the
@@ -90,6 +94,17 @@ worse, because it is silent. Serving snapshots copy `template_type`, `runtime_ke
 so a seed that moves a runtime key leaves every snapshot for that template pointing at
 the old object — which fails closed to an empty ad, with nothing in the logs to say
 why. The backfill is idempotent, so running it after every seed is the safe habit.
+
+**A new template goes in as a draft first** ([ADR-0024](../docs/decisions/0024-pick-message-template.md)).
+Its seed row carries `is_published = false`, which RLS and every app query hide, so it can
+sit in the database before any deployed app knows its unit key. Apply just that row —
+the seed's own statement restricted to it — rather than the whole seed, after checking
+that the live rows still match `seed.sql`. `/dev/harness` lists drafts (marked `· draft`),
+which is what lets the mandatory `creative-check` run before the template is visible
+anywhere. Publishing is then the last step of the order above: flip `is_published` to
+`true` in `seed.sql` in the same commit as the unit's manifest entry, deploy, and only then
+apply the seed. A draft that is published before the deploy shows up in the live catalog
+with no demo, and a creative made from it points at a unit the CDN does not have.
 
 ## How config reaches the unit
 

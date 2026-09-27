@@ -13,6 +13,8 @@ export interface HarnessTemplate {
   id: string;
   name: string;
   unitKey: string;
+  /** Not yet published — seeded, running here, invisible everywhere else. */
+  draft: boolean;
   config: Record<string, unknown>;
 }
 
@@ -31,8 +33,8 @@ const SIZES = [
 type SizeKey = (typeof SIZES)[number]["value"];
 
 /**
- * Short enough that a five-template sweep finishes in about twenty seconds
- * rather than two minutes. The base reads this straight from AdParameters, so
+ * Short enough that a sweep costs about four seconds a template rather than
+ * half a minute. The base reads this straight from AdParameters, so
  * the quartile timer honours it; a creative with a base video paces itself off
  * the video instead and simply takes longer.
  */
@@ -49,7 +51,7 @@ function parseSize(key: SizeKey): { width: number; height: number } {
  *
  * Templates run **one at a time**, and that is a correctness constraint rather
  * than a layout preference — VPAID units share the `window.getVPAIDAd` global,
- * so a grid of live units would render the last one loaded five times over
+ * so a grid of live units would render the last one loaded in every cell
  * (docs/design-system.md §11). A sweep is therefore sequential: each template is
  * mounted, allowed to complete its lifecycle, judged, and unmounted before the
  * next one starts.
@@ -100,7 +102,7 @@ export function HarnessRunner({
       // Hand the manual selection the template the sweep ended on before
       // clearing it. `currentId` falls back to `manualId` the moment
       // `sweepIndex` is null, so leaving it pointing at whatever was selected
-      // before the sweep changes the stage's key and silently starts a sixth
+      // before the sweep changes the stage's key and silently starts one more
       // run — of a template whose verdict has already been recorded.
       setManualId(templates[sweepIndex].id);
       setSweepIndex(null);
@@ -133,7 +135,7 @@ export function HarnessRunner({
               onChange={startRun}
               options={templates.map((t) => ({
                 value: t.id,
-                label: t.unitKey,
+                label: t.draft ? `${t.unitKey} · draft` : t.unitKey,
                 disabled: sweeping,
               }))}
             />
@@ -266,7 +268,12 @@ function VerdictTable({
             return (
               <tr key={template.id} className={ROW}>
                 <td className={railCell(verdict?.tone ?? null)}>
-                  <span className="data-instr">{template.unitKey}</span>
+                  {/* Draft is §3's `idle` state, so it wears the state word;
+                      the rail stays the verdict's alone. */}
+                  <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="data-instr">{template.unitKey}</span>
+                    {template.draft ? <StateWord tone="idle" label="draft" /> : null}
+                  </span>
                 </td>
                 <td className={CELL}>
                   {verdict ? (

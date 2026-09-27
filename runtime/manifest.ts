@@ -15,31 +15,35 @@ export interface RuntimeManifest {
 }
 
 export const RUNTIME_MANIFEST: RuntimeManifest = {
-  "generatedAt": "2026-08-17T22:07:24.997Z",
+  "generatedAt": "2026-09-27T14:06:51.405Z",
   "assets": {
     "age-gate/vpaid.js": {
-      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/age-gate/vpaid.f84be42e.js",
-      "sha256": "f84be42eb504551b94ee135995c649b14cb200ec258e1e95d9f3edcf3e04fe4a"
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/age-gate/vpaid.4520da19.js",
+      "sha256": "4520da199483c2fb85975daa32bcc218bd3d77fd0b3a04582b7fc25fa5429a4e"
+    },
+    "pick-message/vpaid.js": {
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/pick-message/vpaid.175f2616.js",
+      "sha256": "175f26163a575ef55c62b5584ccf0c5d0f2682e560fef17c6e0e5010ed6b5c3a"
     },
     "quiz/vpaid.js": {
-      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/quiz/vpaid.ba4fff41.js",
-      "sha256": "ba4fff41e988049746e63db76ec3c7d44961614f05f513cbad741fc82805aa93"
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/quiz/vpaid.37dcc1db.js",
+      "sha256": "37dcc1db7984268a6fb85e9a82b2096c8596e15c78943577b25eb2bac7fd1f2d"
     },
     "scratch-reveal/vpaid.js": {
-      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/scratch-reveal/vpaid.c7b9c1d4.js",
-      "sha256": "c7b9c1d4b72821ef13017a4ca9da8b9159e9dcdebcfdd04a065df6bea0d6678c"
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/scratch-reveal/vpaid.8e6a22e7.js",
+      "sha256": "8e6a22e7d3fe4fd0d6ef96c4afbc1120fd7b374a1d397a2a8ce6920c844d1752"
     },
     "shoppable/simid/index.html": {
       "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/shoppable/simid/index.ede9a3a6.html",
       "sha256": "ede9a3a68d0cde4ce17cca4c227d069d8ac56907149048f8eff79c2b7818f77c"
     },
     "shoppable/vpaid/unit.js": {
-      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/shoppable/vpaid/unit.9ba1ab6d.js",
-      "sha256": "9ba1ab6d878ffefad99ede1acf5f37bd68ad42d4281e6c508974247f474e0757"
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/shoppable/vpaid/unit.92d15ed5.js",
+      "sha256": "92d15ed5620e02a3e989c154e91ecfa65788570c03d10d9ab7eb12d31398f082"
     },
     "slider/vpaid.js": {
-      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/slider/vpaid.51fb48a6.js",
-      "sha256": "51fb48a6eeefd2f6f2d461bd4ff9cbf5156959b724e0bee1a53be328ecb156fe"
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/slider/vpaid.cd0d0d0e.js",
+      "sha256": "cd0d0d0ed63b076bbdd746172568fa69ed096f51717462867af6aa389725a1de"
     }
   }
 };

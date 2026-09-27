@@ -1,5 +1,6 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getStripe, PLANS, isPlanKey, TRIAL_PERIOD_DAYS } from "@/lib/stripe";
+import { isUuid } from "@/lib/uuid";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,11 +31,40 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: "invalid plan" }, { status: 400 });
   }
   const plan = PLANS[body.planKey];
+  // Only a single-template plan names a template; on all-access the webhook
+  // ignores the key, so it is not read — or written to Stripe — at all.
   const templateId =
-    typeof body.templateId === "string" ? body.templateId : undefined;
+    plan.requiresTemplate && typeof body.templateId === "string"
+      ? body.templateId
+      : undefined;
 
   if (plan.requiresTemplate && !templateId) {
     return Response.json({ error: "template required" }, { status: 400 });
+  }
+
+  // The template a subscription entitles must be one a subscriber could actually
+  // configure: real and published. Read on the session client, so RLS
+  // (`templates_select_published`) answers for both — a draft seeded ahead of its
+  // deploy (ADR-0024) and a made-up id come back empty alike. Without this, a
+  // signed-in user could buy the draft, and a bogus id would ride into Stripe
+  // metadata only to fail the webhook's foreign key on every retry.
+  if (templateId) {
+    if (!isUuid(templateId)) {
+      return Response.json({ error: "invalid template" }, { status: 400 });
+    }
+    const { data: template, error: templateError } = await supabase
+      .from("templates")
+      .select("id")
+      .eq("id", templateId)
+      .eq("is_published", true)
+      .maybeSingle();
+    // A failed read is an outage, not an unknown template — say which.
+    if (templateError) {
+      return Response.json({ error: "checkout unavailable" }, { status: 503 });
+    }
+    if (!template) {
+      return Response.json({ error: "template not found" }, { status: 404 });
+    }
   }
 
   const priceId = process.env[plan.priceEnv];

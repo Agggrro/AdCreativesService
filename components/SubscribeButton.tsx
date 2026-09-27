@@ -30,12 +30,15 @@ export function SubscribeButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planKey, templateId }),
       });
-      const data = (await res.json()) as { url?: string; error?: string };
+      const data = (await res.json()) as { url?: string };
       if (data.url) {
         window.location.href = data.url;
         return;
       }
-      setError(data.error ?? dict.common.checkoutError);
+      // The API's `error` is a code for logs, not copy: it answers in English
+      // literals ("template not found"), which a Russian buyer would otherwise
+      // read as-is. Every failure shows the dictionary's message.
+      setError(dict.common.checkoutError);
     } catch {
       setError(dict.common.checkoutError);
     }

@@ -78,7 +78,11 @@ Remaining before a true end-to-end demo (needs external setup / assets):
       config) now gives a fast in-product way to do this ad hoc — Sandbox,
       Google IMA SDK, and Fluid Player tabs — but the checked-off
       state here still refers to validating the real, published Shoppable
-      Video assets end-to-end at least once.
+      Video assets end-to-end at least once. Pick & Message adds the first
+      creative sound ([ADR-0024](decisions/0024-pick-message-template.md)):
+      confirm the chime plays inside IMA's cross-origin iframe after a tap,
+      stays silent when the player mutes the ad, and what iOS does with it
+      under the hardware silent switch.
 - [ ] **`/security-review`** on payments, auth, and the public endpoints before push.
 
 ## Out of scope (post-MVP)

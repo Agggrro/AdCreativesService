@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { isLocalHeaders } from "@/lib/dev-only";
 import { demoConfig, demoUnitKey } from "@/lib/template-demo";
 import { HarnessRunner, type HarnessTemplate } from "@/components/dev/HarnessRunner";
@@ -29,6 +29,19 @@ export const dynamic = "force-dynamic";
  * reasoning as the catalog's demos (`lib/template-demo.ts`): hand-written
  * fixtures drift from the schema, and a template added tomorrow should appear
  * here with no change to this file.
+ *
+ * Draft templates (`is_published = false`) are listed too, and that is the
+ * reason this page reads with the service role rather than the visitor's
+ * session: RLS shows anon and authenticated callers published rows only
+ * (`templates_select_published`). A new template has to be run here *before*
+ * it is published — it is seeded as a draft until its unit is on the CDN and an
+ * app that knows its key is deployed (runtime/README.md) — or the mandatory
+ * harness check could only ever happen after it was already live. Safe because
+ * nothing off this machine can reach the page — `npm run dev` binds 127.0.0.1,
+ * which is the actual control, and the header gate above is the second lock
+ * that 404s before this read (lib/dev-only.ts, docs/security.md) — and because
+ * the read is catalog rows, which carry no user data, narrowed to the columns
+ * this page uses.
  */
 export default async function HarnessPage({
   searchParams,
@@ -38,12 +51,11 @@ export default async function HarnessPage({
   if (!isLocalHeaders(await headers())) notFound();
 
   const { t, size } = await searchParams;
-  const supabase = await createServerSupabase();
+  const supabase = createServiceClient();
 
   const { data: rows, error } = await supabase
     .from("templates")
-    .select("id, name, type, runtime_keys, config_schema")
-    .eq("is_published", true)
+    .select("id, name, runtime_keys, config_schema, is_published")
     .order("name");
 
   // Surfaced rather than swallowed: an empty `rows` from a failed read renders
@@ -64,6 +76,7 @@ export default async function HarnessPage({
         id: row.id,
         name: row.name,
         unitKey,
+        draft: !row.is_published,
         // Neutral self-hosted placeholders, not the landing page's photographic
         // ones: this surface should not fail because a third-party image host
         // is unreachable, and it must not need the network to render.

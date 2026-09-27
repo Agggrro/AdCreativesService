@@ -25,8 +25,13 @@
 ## Secrets
 
 - `SUPABASE_SERVICE_ROLE_KEY` — **server-only**, full DB power, bypasses RLS. Must
-  never reach the client bundle or any `NEXT_PUBLIC_*` var. Used only on the serving
-  read, the beacon, click and postback writes, and the webhook write path.
+  never reach the client bundle or any `NEXT_PUBLIC_*` var. Used only on: the serving
+  read (`/api/vast`) and its Storage fallback for a unit not yet in the manifest
+  (`lib/runtime-bytes.ts`); the beacon, click and postback writes; the Stripe webhook
+  write path; serving-snapshot publishing and its health check (`lib/serving/publish.ts`,
+  `lib/serving/health.ts`, `/api/cron/health`, `scripts/snapshot-backfill.mjs`); and,
+  on loopback only, `/dev/harness`'s read of draft templates (below). A new use is a
+  change to this list.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — server-only.
 - `PREVIEW_TOKEN_SECRET` — server-only. Signs the short-TTL live-preview tokens
   (`lib/vast/preview-token.ts`). Independent of the Supabase/Stripe secrets above —
@@ -440,6 +445,16 @@ Notes that bind any change here:
   from the URL directly.
 - **`/api/dev/*` is excluded from the middleware matcher**, so `updateSession()` does not
   write session cookies on the same response the session route writes its own.
+- **`/dev/harness` reads `templates` with the service role**, so it can list draft
+  templates (`is_published = false`) that RLS hides from every session — a new template has
+  to pass the harness before it is published ([ADR-0024](decisions/0024-pick-message-template.md)).
+  It is safe for three reasons that must all stay true: nothing off this machine can reach
+  the page (the `127.0.0.1` listener above is the control, and the `isLocalHeaders()` gate
+  that 404s *before* the query runs is the second lock); the read is the catalog table
+  alone, which holds no user data, narrowed to the columns the page uses; and only what
+  the harness already needed leaves the server, as the same schema-derived demo config it
+  passed before. Never move this read above the gate, and never widen it to another table
+  on the strength of this exception.
 - **Adding a fourth dev surface means using the same gate**, not a new ad-hoc check.
 
 ## Creative telemetry channel (ADR-0019)

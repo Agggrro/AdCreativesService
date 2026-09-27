@@ -8,7 +8,8 @@
  * helper (image or video URL → a rendered element), and the mandatory close
  * control (ADR-0009).
  *
- * `api` given to onStart: { params, slot, videoSlot, clickThrough(url?), emit(e,a) }
+ * `api` given to onStart: { params, slot, videoSlot, clickThrough(url?), emit(e,a),
+ * stop(), debug(name, data), volume(), onStop(fn) }
  * Config arrives via VAST <AdParameters> (creativeData.AdParameters). ADR-0005.
  */
 
@@ -156,6 +157,10 @@ function CreoSmithVpaid(template) {
   this._timer = null;
   this._startedAt = 0;
   this._closed = false;
+  // Set by every terminal path (_teardown). After it the ad is over, whatever a
+  // host leaves on screen, and the template's own cleanups have run.
+  this._stopped = false;
+  this._onStop = [];
   this._viewObserver = null;
   this._viewTimer = null;
   this._viewableFired = false;
@@ -185,6 +190,9 @@ CreoSmithVpaid.prototype.initAd = function (
   } catch (e) {
     this._params = {};
   }
+  // `"null"` or a bare number parses without throwing, and the next line would
+  // then throw before AdLoaded. AdParameters that are not an object are absent.
+  if (!this._params || typeof this._params !== "object") this._params = {};
   var d = Number(this._params.durationSeconds) || this._t.duration || 15;
   this._attributes.duration = d;
   this._attributes.remainingTime = d;
@@ -212,6 +220,9 @@ CreoSmithVpaid.prototype._api = function () {
     slot: this._slot,
     videoSlot: this._videoSlot,
     clickThrough: function (url) {
+      // A host may leave the slot up after AdStopped; a tap on what is left must
+      // not raise a click-through for an ad that has already ended.
+      if (self._stopped) return;
       self._emit("AdClickThru", [
         url || self._params.clickThroughUrl || "",
         "",
@@ -240,6 +251,21 @@ CreoSmithVpaid.prototype._api = function () {
     // straight into a click handler.
     debug: function (name, data) {
       self._report("tpl:" + String(name), data);
+    },
+    // The player's current ad volume (VPAID setAdVolume), 0–1, read at the
+    // moment of use rather than cached. For a template that makes a sound of its
+    // own — pick-message's chime — so a player that has muted the ad keeps it
+    // silent: a sound the viewer triggered is still the ad's audio.
+    volume: function () {
+      return self._attributes.volume;
+    },
+    // Run fn when the ad ends, however it ends — the close control, the player's
+    // stopAd/skipAd, a template's own api.stop(). For whatever a template started
+    // that does not end by itself: Web Animations, observers, audio. Neither an
+    // animation nor an observer stops when its target leaves the DOM, and in a
+    // same-document player that DOM is the publisher's page.
+    onStop: function (fn) {
+      if (typeof fn === "function") self._onStop.push(fn);
     },
   };
 };
@@ -414,11 +440,24 @@ CreoSmithVpaid.prototype._stopViewabilityObserver = function () {
 
 /** Shared by every terminal path (stop, skip, the mandatory close, a template's own early-end UI) so the quartile timer never outlives the ad it was tracking. */
 CreoSmithVpaid.prototype._teardown = function () {
+  this._stopped = true;
   if (this._timer) {
     clearInterval(this._timer);
     this._timer = null;
   }
   this._stopViewabilityObserver();
+  // Taken before running, so a second terminal call (stopAd after skipAd) runs
+  // nothing twice, and one throwing cleanup cannot stop the rest — nor the
+  // AdStopped the caller emits next.
+  var fns = this._onStop;
+  this._onStop = [];
+  for (var i = 0; i < fns.length; i++) {
+    try {
+      fns[i]();
+    } catch (e) {
+      this._report("error", { at: "onStop", message: String((e && e.message) || e) });
+    }
+  }
 };
 CreoSmithVpaid.prototype.stopAd = function () {
   this._teardown();
@@ -550,7 +589,9 @@ CreoSmithVpaid.prototype._mountCloseControl = function () {
   ring.style.strokeDashoffset = "0";
 
   setTimeout(function () {
-    if (self._closed) return;
+    // Stopped counts as closed: a host that leaves the slot up after AdStopped
+    // must not get a live × whose tap ends the ad a second time.
+    if (self._closed || self._stopped) return;
     btn.disabled = false;
     btn.style.cursor = "pointer";
     btn.style.opacity = "1";
@@ -558,7 +599,9 @@ CreoSmithVpaid.prototype._mountCloseControl = function () {
 };
 
 CreoSmithVpaid.prototype._closeCreative = function () {
-  if (this._closed) return;
+  // After stopAd the ad is over, and so is the videoSlot's being ours to pause —
+  // by then it may be the host's own content video.
+  if (this._closed || this._stopped) return;
   this._closed = true;
   if (this._videoSlot) {
     try {

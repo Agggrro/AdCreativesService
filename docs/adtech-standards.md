@@ -202,6 +202,11 @@ conversion, then 302s to the configured URL with `{click_id}`, `{creative_id}` a
   (an app-store deep link) passes through as configured, untracked.
 - **Previews are not rewritten**, so the configurator's players open the destination
   directly — with any `{click_id}` left literal.
+- **A link that is not a destination is never a `url` field.** The click-field list is
+  every `url`-typed field bar `verificationScriptUrl`, so a resource the unit *loads* —
+  Pick & Message's `soundUrl` — would be routed through `/r` and record a click on every
+  load. Such a field is `text`, and the unit validates the scheme itself
+  ([ADR-0024](decisions/0024-pick-message-template.md)).
 
 ## Media fields: image, gif, or a short video
 
@@ -246,6 +251,37 @@ was always true of every template; multi-step just makes the gap visible. Do not
 creatives and would break players that gate their own teardown on it. SIMID does not get this yet (it runs in a sandboxed iframe over a
 different, postMessage-based runtime, not the VPAID base) — a known gap, not a design
 decision.
+
+## Sound in a creative
+
+Pick & Message is the first template that makes a sound of its own — a chime when the
+viewer picks a picture ([ADR-0024](decisions/0024-pick-message-template.md)). Two rules
+bind it, and any template that follows:
+
+- **User-initiated only.** Audio starts inside the viewer's own tap on the creative or not
+  at all — never on load, on a timer, or late: a file that has not begun within 800ms of
+  the tap is stopped rather than left to sound seconds after it. That is also what
+  browsers require of an `AudioContext` or an unmuted `play()` in a frame nobody has
+  touched.
+- **At the player's volume, for as long as it sounds.** VPAID 2.0 gives the player the
+  ad's volume through `setAdVolume`; the base keeps it, and a template reads it with
+  `api.volume()` — when it starts a sound and again while it plays. `0` means silent,
+  even for a sound the viewer triggered: on muted outstream inventory the mechanic runs
+  without its chime. Anything that is not a volume reads as `0`, not as full blast. The
+  reference unit this template was modelled on ignores the player's volume; ours does
+  not. A player that mutes its own `<video>` instead of calling `setAdVolume` — Fluid —
+  does not mute the chime.
+- **Stopped with the ad.** A sound, like everything else a template starts, ends through
+  `api.onStop` on every terminal path, and nothing sounds or reports after `AdStopped`.
+
+The default chime is synthesised with Web Audio rather than shipped as a file: nothing to
+fetch per impression, and no one else's recording inside the ad. An advertiser's own
+sound is an **https** link (an http file is mixed content on an https page) the unit
+loads with `preload="auto"`, attached inside the ad so the close control's teardown
+detaches — and so pauses — it; one that fails to load in time falls back to the chime
+while the tap is still the reason. MP3 or M4A: Safari does not reliably play OGG. Each
+attempt is reported as a `tpl:sound` record saying whether it played and why not
+(`muted`, `late`, `no-webaudio`, or the browser's error name).
 
 ## What a running unit reports about itself
 

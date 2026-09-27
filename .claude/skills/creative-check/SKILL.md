@@ -36,6 +36,10 @@ rather than skipping silently.
 2. **Read the template you are about to change**, plus `runtime/lib/vpaid-base.js` — the
    base already provides quartiles, the click helper, the media-layer helper and the
    mandatory close control. A template that reimplements any of them is the defect.
+   **A new template** has no row for the harness to read until one exists: seed it as a
+   draft (`is_published = false`), applying only that row, and it appears in the harness
+   marked `· draft` while staying invisible everywhere else. Publishing comes after the
+   deploy — [`runtime/README.md`](../../../runtime/README.md), "Order matters".
 
 ### Running it
 
@@ -46,8 +50,8 @@ rather than skipping silently.
    npm run build:runtime
    ```
 
-4. **Start the dev server** with `preview_start {name: "dev"}` — never `npm run dev` in a
-   shell. It binds `127.0.0.1`.
+4. **Start the dev server** with `preview_start {name: "creosmith"}` (the configuration in
+   `.claude/launch.json`) — never `npm run dev` in a shell. It binds `127.0.0.1`.
    If it exits with *"Another next dev server is already running"*, another session owns
    the port: do **not** kill it. Open its URL directly with
    `preview_start {url: "http://localhost:3000/dev/harness"}` — it is the same working
@@ -56,7 +60,7 @@ rather than skipping silently.
    buffer is not cleared by navigation, so a reused tab carries every error from earlier in
    the session into step 11 and makes a clean run look broken.
    Deep-link when you want a specific case: `?t=<unit-key>&size=300x250`.
-6. **Press `Run all`** and wait for the sweep (about 20s for five templates; a template
+6. **Press `Run all`** and wait for the sweep (about 25s for six templates; a template
    with a base video paces itself off the video and takes longer).
 
 ### Reading the result
@@ -104,9 +108,20 @@ rather than skipping silently.
    you did — a drag to 22% that reports 80% is the bug you came for. If a gesture changed
    the screen but produced no record at all, the template is under-instrumented; fix that
    as part of the work (see "Rules").
+
+   **A rect measured mid-transition is not a layout bug.** CSS transitions and
+   `ResizeObserver` callbacks only advance while the page is producing frames, and a
+   Browser pane that is not being drawn produces none — `screenshot` then times out with
+   "the page did not finish rendering". In that state an element sits at its *start*
+   position indefinitely while its inline style already holds the target. Before calling a
+   layout wrong, compare the inline `left/top/width/height/transform` with the measured
+   rect; if they disagree, take a screenshot (retry once — it drives the frames) and
+   measure again. Observed with pick-message, whose card looked parked above the slot
+   until a frame was drawn.
 10. **Check all four slot sizes**, not just 640×360. `300x250` is the one that breaks
     layouts, because it is the only non-16:9 size and most templates derive their geometry
-    from a measured width.
+    from a measured width. `320x180` is the one where content lands under the close
+    control, because a one-line heading leaves the least room above it.
 11. **Read the console** (`read_console_messages`). A running creative must produce
     nothing. The runtime never logs by design — anything there is a real fault.
 

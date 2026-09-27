@@ -170,6 +170,41 @@ insert into public.templates (
      ]}'::jsonb,
     'standard',
     true
+  ),
+  -- Pick & Message (ADR-0024). `soundUrl` is `text`, not `url`, on purpose:
+  -- every `url` field is a click destination (ADR-0023) that the VAST builder
+  -- routes through `/r`, so a sound link typed `url` would count every sound
+  -- load as a click. It was seeded as a draft (is_published = false) until its
+  -- unit was on the CDN and an app that knows its key was deployed, and is
+  -- published by this commit — see runtime/README.md, "Order matters when
+  -- shipping a template change".
+  (
+    '00000000-0000-4000-8000-000000000006',
+    'Pick & Message',
+    'Two pictures to choose from; the pick is answered by a chat-style message with a sound, and the message drives the click.',
+    'pick_message',
+    'interactive',
+    array['vpaid'],
+    '{"vpaid":"pick-message/vpaid.js"}'::jsonb,
+    '{"groups":[
+       {"id":"pickChoice"},
+       {"id":"pickMessage"},
+       {"id":"pickSound"},
+       {"id":"pickClick"}
+     ],"fields":[
+       {"name":"questionText","label":"Question","type":"text","required":true,"default":"Which one do you like better?","group":"pickChoice"},
+       {"name":"option1ImageUrl","label":"Picture A","type":"image","required":true,"group":"pickChoice"},
+       {"name":"option2ImageUrl","label":"Picture B","type":"image","required":true,"group":"pickChoice"},
+       {"name":"highlightColor","label":"Ring color (hex)","type":"text","default":"#e11d48","group":"pickChoice","help":"The ring that blinks around each picture in turn, and stays on the one picked."},
+       {"name":"senderName","label":"Message title","type":"text","required":true,"default":"New message","group":"pickMessage","help":"Bold, at the top of the message. The picked picture is the avatar beside it."},
+       {"name":"messageText","label":"Message text","type":"text","required":true,"default":"Nice choice! Tap to see more","group":"pickMessage","help":"Up to two lines are shown. Tapping the message opens the click-through URL."},
+       {"name":"timeLabel","label":"Time label","type":"text","default":"now","group":"pickMessage","help":"Beside the title. Leave it empty for none."},
+       {"name":"soundMode","label":"Sound","type":"select","required":true,"default":"chime","group":"pickSound","options":[{"value":"chime","label":"Built-in chime"},{"value":"custom","label":"My sound file"},{"value":"off","label":"No sound"}],"help":"Plays when the viewer taps a picture, never on load, at the ad volume the player sets over VPAID: setAdVolume(0) keeps it silent."},
+       {"name":"soundUrl","label":"Sound file URL","type":"text","required":true,"group":"pickSound","placeholder":"https://cdn.example.com/ding.mp3","help":"A direct https link to a short MP3 or M4A file. It has to start within the tap: if it will not load in time, it is skipped, and if it will not load at all, the built-in chime plays instead.","showWhen":[{"field":"soundMode","equals":["custom"]}]},
+       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true,"group":"pickClick"}
+     ]}'::jsonb,
+    'standard',
+    true
   )
 on conflict (id) do update set
   name                = excluded.name,

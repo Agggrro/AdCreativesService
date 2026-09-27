@@ -45,3 +45,6 @@ pipeline, as new runtime units + template rows — no new display line.
   mechanics. Impersonation of a real call/OS (fake video call, fake system dialog)
   and fabricated data (fake "N profiles found") are **out** — policy-banned by ad
   networks/DSPs and deceptive. Age gate is a *real* 18+ confirm, not a fake dialog.
+  [ADR-0024](0024-pick-message-template.md) applies this boundary to a message-style
+  card: a message inside the ad is in, an imitation of a real messenger's or OS
+  notification is out.

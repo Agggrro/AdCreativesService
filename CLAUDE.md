@@ -135,7 +135,10 @@ the control, because request headers are spoofable. See [docs/security.md](docs/
   forced rather than stylistic: VPAID units share the `window.getVPAIDAd` global, so two
   live units on a page render as one. It serves the unit from `runtime/dist/` off disk,
   so **run `npm run build:runtime` before looking** — `/api/preview-unit/*` deliberately
-  serves the *published* unit instead and would hide a local edit.
+  serves the *published* unit instead and would hide a local edit. It lists **draft**
+  templates too: a new template is seeded with `is_published = false`, checked here, and
+  published only after the deploy that knows its key
+  ([ADR-0024](docs/decisions/0024-pick-message-template.md), `runtime/README.md`).
 - **The telemetry channel ([ADR-0019](docs/decisions/0019-creative-telemetry-channel.md))**
   — every VPAID lifecycle event, plus whatever a template declares through
   `api.debug(name, data)`, posted to our own origin and readable on any of our pages as

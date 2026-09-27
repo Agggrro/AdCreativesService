@@ -11,6 +11,7 @@ export const PREVIEW_UNIT_PATHS: Record<string, string> = {
   slider: "slider/vpaid.js",
   quiz: "quiz/vpaid.js",
   "age-gate": "age-gate/vpaid.js",
+  "pick-message": "pick-message/vpaid.js",
   shoppable: "shoppable/vpaid/unit.js",
 };
 

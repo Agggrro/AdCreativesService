@@ -18,6 +18,17 @@ A user may hold several single subscriptions. Single-template subs carry the
 `plan_type` + `current_period_end` are what the entitlement gate uses; the weekly vs
 monthly interval is only a Stripe price detail that determines the next `period_end`.
 
+`POST /api/checkout` reads the request's `templateId` for a single-template plan only,
+and accepts it only as a UUID naming a **published** template, read on the caller's
+session so RLS answers (`templates_select_published`): a non-UUID gets 400, a draft or
+unknown UUID 404, and a failed read 503 — all before any Stripe call. Drafts are real
+rows — a new template is seeded unpublished ahead of its deploy
+([ADR-0024](decisions/0024-pick-message-template.md)) — so without this a signed-in user
+could buy a subscription for a template nobody can configure, and a made-up id would
+reach the `template_id` metadata key only to fail the webhook's upsert on every retry.
+The button shows the dictionary's checkout error whatever the code; the API's `error`
+strings are for logs, not for a buyer to read.
+
 > **Margin note:** at $2, Stripe fees (~$0.30 + 2.9% ≈ $0.36) take ~18% of the charge.
 > Acceptable for MVP; revisit low price points before scaling. Prices are draft and
 > changed in the Stripe dashboard without code changes.

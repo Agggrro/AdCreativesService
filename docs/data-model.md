@@ -272,7 +272,7 @@ was missed or delayed.
 | Table | Policy intent |
 | --- | --- |
 | `profiles` | owner can read/update own row |
-| `templates` | **published** templates readable by anon + authenticated (public showcase); drafts hidden; writes admin-only (service role) |
+| `templates` | **published** templates readable by anon + authenticated (public showcase); drafts hidden; writes admin-only (service role). A new template is seeded as a draft and only the local-only `/dev/harness` reads drafts, with the service role ([ADR-0024](decisions/0024-pick-message-template.md)) |
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
 | `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |

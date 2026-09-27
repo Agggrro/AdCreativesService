@@ -8,9 +8,9 @@
  *
  * **Drawn entirely in neutrals, and that is a rule rather than a taste.** §6 puts
  * the accent budget on the catalog index at **zero** — a tile is a link, not an
- * action — and §3 forbids the accent on decoration anywhere. Five tiles drawn in
- * apricot would have been fifteen accent appearances against a budget of none, and
- * the same component runs in the landing gallery. The mechanic has to read from
+ * action — and §3 forbids the accent on decoration anywhere. Tiles drawn in
+ * apricot would have spent three accent appearances apiece against a budget of
+ * none, and the same component runs in the landing gallery. The mechanic has to read from
  * *shape*: a divider, a pair of options, a cover, a card. That is what a diagram
  * is for.
  *
@@ -64,6 +64,29 @@ function Mechanic({ type }: { type: string }) {
         <div className="absolute inset-0 flex items-center justify-center gap-3">
           <div className="h-[46%] w-[28%] rounded-ctl border border-line bg-surface-2" />
           <div className="h-[46%] w-[28%] rounded-ctl border border-line bg-surface" />
+        </div>
+      );
+
+    case "pick_message":
+      // Two options, one taken — the stronger edge — and the message it brought
+      // in above them. One flex column with a gap, not three separate offsets:
+      // the card is a fixed height, so offsets let it close onto the tiles in
+      // the narrowest previews. The avatar is square on purpose: nothing but the
+      // status dot, the brand stage's halo and a drag knob is drawn as a circle
+      // (§2), even where the creative itself uses one.
+      return (
+        <div className="absolute inset-x-0 inset-y-[10%] flex flex-col items-center gap-2">
+          <div className="flex w-[54%] items-center gap-2 rounded-ctl border border-line bg-surface p-2">
+            <div className="size-6 shrink-0 rounded-ctl bg-fg-disabled" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="h-2 w-2/5 bg-fg-muted" />
+              <div className="h-2 w-4/5 bg-fg-disabled" />
+            </div>
+          </div>
+          <div className="flex min-h-0 w-full flex-1 justify-center gap-3">
+            <div className="h-full w-[18%] rounded-ctl border-2 border-fg-muted bg-surface-2" />
+            <div className="h-full w-[18%] rounded-ctl border border-line bg-surface" />
+          </div>
         </div>
       );
 

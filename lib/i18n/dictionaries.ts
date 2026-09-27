@@ -80,7 +80,7 @@ const ru = {
       "От первого шага до готового тега — ничего, кроме браузера.",
     step1Title: "Выберите шаблон",
     step1Body:
-      "Пять механик: шоппинг, скретч, до/после, квиз и возрастной гейт.",
+      "Шесть механик: шоппинг, скретч, до/после, квиз, возрастной гейт и выбор с сообщением.",
     step2Title: "Настройте под кампанию",
     step2Body:
       "Медиафайлы, ссылка перехода, тексты кнопок. Превью обновляется сразу.",
@@ -369,6 +369,10 @@ const ru = {
       quizResult: "Результат",
       quizOutcomes: "Исход по каждому пути",
       quizTag: "Переход по клику",
+      pickChoice: "Выбор",
+      pickMessage: "Сообщение",
+      pickSound: "Звук",
+      pickClick: "Переход по клику",
       viewability: "Верификация просмотра (OMID)",
     },
     outcomes: {
@@ -630,7 +634,7 @@ const en: Dict = {
       "From the first step to a working tag — nothing but a browser.",
     step1Title: "Pick a template",
     step1Body:
-      "Five mechanics: shoppable, scratch, before/after, quiz, and an age gate.",
+      "Six mechanics: shoppable, scratch, before/after, quiz, an age gate, and pick-and-message.",
     step2Title: "Tune it to the campaign",
     step2Body:
       "Media, click-through, button copy. The preview updates as you type.",
@@ -905,6 +909,10 @@ const en: Dict = {
       quizResult: "Result",
       quizOutcomes: "Result per answer path",
       quizTag: "Click-through",
+      pickChoice: "Choice",
+      pickMessage: "Message",
+      pickSound: "Sound",
+      pickClick: "Click-through",
       viewability: "Viewability verification (OMID)",
     },
     outcomes: {
