@@ -46,11 +46,12 @@ export const dynamic = "force-dynamic";
 export default async function HarnessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ t?: string; size?: string }>;
+  searchParams: Promise<{ t?: string; size?: string; set?: string | string[] }>;
 }) {
   if (!isLocalHeaders(await headers())) notFound();
 
-  const { t, size } = await searchParams;
+  const { t, size, set } = await searchParams;
+  const overrides = parseSet(set);
   const supabase = createServiceClient();
 
   const { data: rows, error } = await supabase
@@ -80,7 +81,12 @@ export default async function HarnessPage({
         // Neutral self-hosted placeholders, not the landing page's photographic
         // ones: this surface should not fail because a third-party image host
         // is unreachable, and it must not need the network to render.
-        config: demoConfig(row.config_schema, unitKey, "placeholder"),
+        config: demoConfig(
+          row.config_schema,
+          unitKey,
+          "placeholder",
+          unitKey === t ? overrides : undefined,
+        ),
       },
     ];
   });
@@ -115,4 +121,21 @@ export default async function HarnessPage({
       />
     </Container>
   );
+}
+
+/**
+ * `?set=direction:vertical`, repeatable, laid over the config of the
+ * deep-linked template (`?t=`) and no other. The sweep runs every template on
+ * its schema defaults, which leaves the other branches of a mode switch — the
+ * slider's vertical divider, the quiz's per-path results — no way to run here
+ * at all. Split on the first colon, so a value may hold more of them. How the
+ * values are resolved against the schema is `demoConfig`'s business.
+ */
+function parseSet(set: string | string[] | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pair of typeof set === "string" ? [set] : (set ?? [])) {
+    const at = pair.indexOf(":");
+    if (at > 0) out[pair.slice(0, at)] = pair.slice(at + 1);
+  }
+  return out;
 }

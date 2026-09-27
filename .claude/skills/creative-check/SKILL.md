@@ -60,6 +60,13 @@ rather than skipping silently.
    buffer is not cleared by navigation, so a reused tab carries every error from earlier in
    the session into step 11 and makes a clean run look broken.
    Deep-link when you want a specific case: `?t=<unit-key>&size=300x250`.
+   **A template with a mode switch is checked in every mode**, because the sweep only ever
+   runs schema defaults. `&set=<field>:<value>`, repeatable, lays values over the
+   deep-linked template's config — `?t=slider&set=direction:vertical`,
+   `?t=quiz&set=resultMode:branching` — and a switched mode brings its own dependent fields
+   with it. It also reaches a field the database row does not declare yet, which is the
+   normal state of a schema change under test: the seed is applied last, after the deploy
+   (`runtime/README.md`, "Order matters").
 6. **Press `Run all`** and wait for the sweep (about 25s for six templates; a template
    with a base video paces itself off the video and takes longer).
 
@@ -144,6 +151,12 @@ rather than skipping silently.
   record for every state transition that has no VPAID event of its own — the quiz's answer
   path, the scratch coverage, the slider position. This is not optional polish: it is what
   makes the next bug in that template diagnosable without a human reading it out.
+- **The harness shares one document between the unit and its slot; Fluid Player does
+  not.** It runs the unit in an iframe and builds the slot in the host page, so a
+  listener or observer bound to the unit's `window` passes here and breaks there — bind
+  to `slot.ownerDocument.defaultView` (`runtime/README.md`, "Layout"). To reproduce
+  Fluid's model, load the unit into a same-origin iframe and create the slot in the
+  page.
 - **Never `console.log` from a render module.** The unit's records go over the telemetry
   channel; the receiver does the logging. A publisher's console stays clean (ADR-0019).
 - **The verdict is the check, not the screenshot.** A creative can look right and have

@@ -51,6 +51,10 @@ insert into public.templates (
     'standard',
     true
   ),
+  -- Before / After Slider. `direction` arrived after creatives had been saved
+  -- without it, and needs no migration: the unit reads an absent value as
+  -- horizontal, and the edit form starts a select missing from `config_json` at
+  -- its default. Keep both true, or those creatives change under their owners.
   (
     '00000000-0000-4000-8000-000000000003',
     'Before / After Slider',
@@ -63,7 +67,8 @@ insert into public.templates (
        {"name":"imageBeforeUrl","label":"Before image URL","type":"image","required":true},
        {"name":"imageAfterUrl","label":"After image URL","type":"image","required":true},
        {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true},
-       {"name":"startPercent","label":"Start position (%)","type":"range","min":0,"max":100,"default":50},
+       {"name":"direction","label":"Divider movement","type":"select","required":true,"default":"horizontal","options":[{"value":"horizontal","label":"Horizontal — left and right"},{"value":"vertical","label":"Vertical — up and down"}],"help":"Horizontal puts the after image to the left of the divider; vertical puts it above."},
+       {"name":"startPercent","label":"Start position (%)","type":"range","min":0,"max":100,"default":50,"help":"Where the divider starts: from the left edge, or from the top edge when it moves vertically."},
        {"name":"ctaText","label":"Button text","type":"text","default":"See more"}
      ]}'::jsonb,
     'standard',

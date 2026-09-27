@@ -1,5 +1,6 @@
 import type { Json } from "@/types/database.types";
 import {
+  coerceFieldValue,
   isFieldVisible,
   parseConfigSchema,
   type ConfigField,
@@ -129,11 +130,21 @@ function demoValue(
  * always a configuration a user could really have saved. Without that, the
  * landing page would carry every one of the quiz's 42 branching-exit fields,
  * populated with their own labels, for a demo that never reads them.
+ *
+ * `set` is the creative harness's `?set=field:value` (app/dev/harness), and
+ * outranks all of the above. It goes through the same walk, so a switched mode
+ * brings its own fields with it — `resultMode: branching` gets the per-path
+ * exits instead of the shared one. A declared field is coerced the way a save
+ * would coerce it; a value the form would refuse is kept as typed, and so is a
+ * name the schema does not declare at all, because a field added in `seed.sql`
+ * reaches the row only after the deploy (runtime/README.md) and the unit has to
+ * be run against it before then.
  */
 export function demoConfig(
   configSchema: Json,
   unitKey: string,
   imageStyle: DemoImageStyle = "placeholder",
+  set: Record<string, string> = {},
 ): Record<string, unknown> {
   const { fields } = parseConfigSchema(configSchema);
   const config: Record<string, unknown> = {};
@@ -144,9 +155,17 @@ export function demoConfig(
   const resolved: Record<string, string> = {};
   for (const field of fields) {
     if (!isFieldVisible(field, (n) => resolved[n] ?? "")) continue;
-    const value = demoValue(field, unitKey, imageStyle);
+    const raw = Object.hasOwn(set, field.name) ? set[field.name] : undefined;
+    const value =
+      raw === undefined
+        ? demoValue(field, unitKey, imageStyle)
+        : (coerceFieldValue(field, raw) ?? raw);
     config[field.name] = value;
     resolved[field.name] = String(value);
+  }
+  const declared = new Set(fields.map((f) => f.name));
+  for (const [name, raw] of Object.entries(set)) {
+    if (!declared.has(name)) config[name] = raw;
   }
   return config;
 }

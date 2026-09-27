@@ -21,6 +21,14 @@ document.
   which `api.clickThrough()` does nothing ([ADR-0024](../docs/decisions/0024-pick-message-template.md)).
 - `templates/<name>/vpaid.js` — one render module per template, defining `var
   TEMPLATE = { name, duration, onStart }`.
+  **The slot is not always in the document the unit runs in.** Fluid Player loads the
+  unit into an iframe of its own and builds the slot in the host page
+  (`fluid-player/src/modules/vpaid.js` `loadVpaid`, `adsupport.js`
+  `switchPlayerToVpaidMode`). So anything a template binds to a window — a drag's
+  `mouseup`, a `resize` fallback, the `ResizeObserver` constructor — belongs to
+  `slot.ownerDocument.defaultView`, not to `window`: bound to the unit's own window, a
+  drag in Fluid never ends. The harness loads the unit into the slot's own document and
+  cannot show this.
 - `build.mjs` concatenates each render module with the shared base, then
   minifies the result with `terser` (mangle + compress, comments stripped —
   deliberately no control-flow-flattening/self-defending obfuscation, which

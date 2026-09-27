@@ -12,7 +12,9 @@ VAST endpoint we already built:
 
 1. **Scratch & Reveal** — cover layer the user rubs away to reveal an image; at a
    reveal threshold → CTA / click-through.
-2. **Dress/Undress Slider** — two images + a drag slider (before/after).
+2. **Dress/Undress Slider** — two images + a drag slider (before/after). The divider
+   moves left–right or up–down, chosen per creative (`direction`; absent means
+   horizontal, so creatives saved before the option existed are unchanged).
 3. **Quick Setup Quiz** — one to three A/B questions with image options → honest
    "see results" CTA (no fabricated match data). Since
    [ADR-0011](../decisions/0011-conditional-grouped-config-schemas.md) the exit is

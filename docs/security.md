@@ -453,8 +453,9 @@ Notes that bind any change here:
   that 404s *before* the query runs is the second lock); the read is the catalog table
   alone, which holds no user data, narrowed to the columns the page uses; and only what
   the harness already needed leaves the server, as the same schema-derived demo config it
-  passed before. Never move this read above the gate, and never widen it to another table
-  on the strength of this exception.
+  passed before — with, at most, the `?set=` values the request itself carried laid over
+  it. Never move this read above the gate, and never widen it to another table on the
+  strength of this exception.
 - **Adding a fourth dev surface means using the same gate**, not a new ad-hoc check.
 
 ## Creative telemetry channel (ADR-0019)
