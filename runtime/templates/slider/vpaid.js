@@ -9,6 +9,8 @@
  * horizontal, absent included: every creative saved before the setting existed
  * has no `direction` at all, and must keep rendering the way it did.
  * `startPercent` is measured along that axis, from the left edge or the top.
+ * The CTA sits at the bottom centre; in vertical mode, where the divider sweeps
+ * the whole height, it sits at the right edge instead, centred in the height.
  */
 var TEMPLATE = {
   name: "slider",
@@ -25,7 +27,7 @@ var TEMPLATE = {
     var win = (slot.ownerDocument && slot.ownerDocument.defaultView) || window;
     var KNOB = 34; // knob diameter, px
     var KNOB_GAP = 8; // clear space the knob keeps from the CTA, px
-    var CTA_BOTTOM = 14; // the CTA's offset from the bottom edge, px
+    var CTA_EDGE = 14; // the CTA's offset from the slot edge it sits against, px
 
     // The axis is reported with the size, because every later `position`
     // record means something different on each: 80% from the left edge, or
@@ -77,14 +79,27 @@ var TEMPLATE = {
     slot.appendChild(handle);
 
     // CTA. Above the handle, so a divider crossing it never covers the click.
+    // At the bottom centre it would sit in the vertical divider's path for the
+    // whole lower stretch of the drag, so in vertical mode it moves to the right
+    // edge, centred in the height, and keeps to the right half: the knob rides
+    // down the centre.
     var btn = document.createElement("button");
     // Not the default "submit": in a player that builds the slot in the host
     // page, a page-wide <form> around it would be submitted by the CTA.
     btn.type = "button";
     btn.textContent = params.ctaText || "See more";
+    // border-box stated rather than inherited: the right-half cap is the button's
+    // outer width only then, whatever a host page's own button rules say. The
+    // cap wraps a label at its spaces; min-content keeps it from squeezing one
+    // long word ("Зарегистрироваться") narrower than the word, which overflowed
+    // the button and the slot. A button that widens past the centre that way is
+    // one the knob already steps around (knobLeft reads its real width).
     btn.style.cssText =
-      "position:absolute;left:50%;bottom:" + CTA_BOTTOM + "px;" +
-      "transform:translateX(-50%);z-index:4;" +
+      "position:absolute;z-index:4;box-sizing:border-box;" +
+      (vertical
+        ? "right:" + CTA_EDGE + "px;top:50%;transform:translateY(-50%);" +
+          "max-width:calc(50% - " + CTA_EDGE + "px);min-width:min-content;"
+        : "left:50%;bottom:" + CTA_EDGE + "px;transform:translateX(-50%);") +
       "padding:11px 20px;border:0;border-radius:8px;background:#e11d48;color:#fff;" +
       "font:700 15px sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.5)";
     btn.addEventListener("click", function () {
@@ -92,21 +107,24 @@ var TEMPLATE = {
     });
     slot.appendChild(btn);
 
-    // The vertical divider travels through the CTA, and a knob centred on it
-    // sinks behind the button there — a white rim showing over the CTA's top
-    // edge. Where the two would meet, the knob steps aside to the left of the
-    // button instead, and back once the line has passed. Worked out in pixels,
-    // because that is how the CTA is anchored, on every move and on every
-    // resize: a player can resize the slot under a divider left parked there.
-    // With no room beside the CTA, the knob stays centred behind it.
+    // The vertical divider still crosses the CTA at mid-height, and a knob that
+    // met the button there would sink behind it — a white rim showing past the
+    // CTA's edge. The two only meet when a long label reaches toward the centre
+    // column; then the knob steps aside to the left of the button, and back once
+    // the line has passed. Worked out in pixels, because that is how the CTA is
+    // anchored, on every move and on every resize: a player can resize the slot
+    // under a divider left parked there. With no room beside the CTA, the knob
+    // stays centred behind it.
     function knobLeft() {
       var w = slot.clientWidth;
       var h = slot.clientHeight;
       var y = (pct / 100) * h;
       var reach = KNOB / 2 + KNOB_GAP;
-      var aside = w / 2 - btn.offsetWidth / 2 - reach;
+      var ctaLeft = w - CTA_EDGE - btn.offsetWidth;
+      var ctaHalf = btn.offsetHeight / 2;
       var meets =
-        y + reach > h - CTA_BOTTOM - btn.offsetHeight && y - reach < h - CTA_BOTTOM;
+        w / 2 + reach > ctaLeft && y + reach > h / 2 - ctaHalf && y - reach < h / 2 + ctaHalf;
+      var aside = ctaLeft - reach;
       return meets && aside >= KNOB / 2 ? aside + "px" : "50%";
     }
     function placeKnob() {
@@ -171,8 +189,7 @@ var TEMPLATE = {
     }
     // A press on a button in the slot — the CTA, or the base's close control —
     // belongs to that button. Taken as a grab, it moved the divider to wherever
-    // the button sits before the click landed, and reported that as a drag; and
-    // the vertical divider travels straight through the CTA.
+    // the button sits before the click landed, and reported that as a drag.
     function startDrag(e) {
       if (stopped) return;
       var target = e.target;
