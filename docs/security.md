@@ -91,6 +91,16 @@ rename to do it.
 - **No RLS reliance:** there is no session here. Use a service-role client scoped to a
   single narrow read of the denormalized serving record — nothing else.
 - **No Stripe calls / no heavy joins** on this path (perf + blast radius).
+- **CORS echoes the origin, with credentials — safe only because nothing here reads
+  them.** VAST 4.2 requires `Access-Control-Allow-Origin: <Origin>` plus
+  `Access-Control-Allow-Credentials: true` (`lib/vast/cors.ts`,
+  [ADR-0026](decisions/0026-vast-cors-credentialed-requests.md)). The usual danger of that
+  pair — any site reading a response made with the visitor's cookies — does not arise:
+  `/v`, `/api/vast` and the preview route read no cookie and no session on any host, and
+  the ad domain never sets one. That is a property to keep, not an accident: a route that
+  ever reads a session or a cookie must not use this helper. `null` is never echoed (it
+  gets `*` without credentials — every sandboxed frame shares it), and a value that is not
+  a serialized origin is treated as absent.
 - **Rate limiting / abuse:** plan for per-IP / per-creative limits and cache to absorb
   spikes (post-MVP hardening, but design for it). Applies to `POST /api/vast/preview`
   too: it requires a session (a materially higher bar than the fully public

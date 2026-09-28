@@ -13,3 +13,4 @@ export {
 } from "./builder";
 export { getAdapter, supportedFormats } from "./adapters";
 export { parseCreativeConfig } from "./config";
+export { vastCorsHeaders, vastPreflightHeaders } from "./cors";

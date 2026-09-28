@@ -1,6 +1,6 @@
 # 0018. A dedicated ad-serving domain, with neutral paths
 
-- Status: Accepted
+- Status: Accepted — its CORS consequence is superseded by [ADR-0026](0026-vast-cors-credentialed-requests.md)
 - Date: 2026-08-16
 
 ## Context
@@ -67,6 +67,10 @@ public ad path.
 - The tag names one hostname. Ad ops whitelist one thing.
 - CORS is `*` with **no `Vary: Origin`** on the ad paths: varying would shard the CDN
   cache per publisher, paying an origin miss for every new site a tag appears on.
+  **Superseded for the tag by [ADR-0026](0026-vast-cors-credentialed-requests.md):** `*`
+  fails every player that fetches with credentials, and VAST 4.2 requires the origin echoed
+  with `Access-Control-Allow-Credentials`. `/v` now varies on `Origin`; `/t` and `/c/…`
+  keep `*`.
 - **Two more places that must stay in step.** The `beforeFiles` lockdown's negative
   lookahead has to list the rewrite *targets* as well as the ad paths, because
   `beforeFiles` entries are all evaluated in turn and can otherwise chain into one

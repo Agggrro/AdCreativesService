@@ -164,11 +164,17 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // The tag and the assets are read cross-origin by players on publishers'
-        // pages. `*` with no `Vary: Origin`: varying would shard a CDN cache
-        // that exists precisely to absorb this traffic. Never with
-        // `Allow-Credentials` — invalid with `*`, and there are no cookies here.
-        source: "/:path(v|t|c/.*)",
+        // The beacons and the creative assets. `*` is all they need: a beacon
+        // is a simple GET, delivered whether or not its response is readable,
+        // and the assets load by navigation and `<script src>`, which never
+        // read a response through CORS. No `Vary: Origin` — varying would
+        // shard a CDN cache that exists precisely to absorb this traffic.
+        //
+        // Not the tag. VAST 4.2 requires `/v` to echo the request's origin and
+        // allow credentials, which a static header cannot do, so its handler
+        // owns its CORS outright (lib/vast/cors.ts, ADR-0026). A rule here
+        // would be a second source that could only override or duplicate it.
+        source: "/:path(t|c/.*)",
         headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
       },
       {

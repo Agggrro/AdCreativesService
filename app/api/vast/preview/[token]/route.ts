@@ -2,7 +2,14 @@ import { getRequestOrigin } from "@/lib/site";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { buildPreviewServing } from "@/lib/vast/preview-context";
 import { verifyPreviewToken } from "@/lib/vast/preview-token";
-import { buildInlineVast, emptyVast, getAdapter, parseCreativeConfig } from "@/lib/vast";
+import {
+  buildInlineVast,
+  emptyVast,
+  getAdapter,
+  parseCreativeConfig,
+  vastCorsHeaders,
+  vastPreflightHeaders,
+} from "@/lib/vast";
 
 // Public by necessity — third-party players (Google IMA, Video.js) fetch this
 // URL directly with no session cookie. Self-authorizing via the token's HMAC
@@ -13,12 +20,13 @@ import { buildInlineVast, emptyVast, getAdapter, parseCreativeConfig } from "@/l
 //
 // CORS: player SDKs (Google IMA in particular) fetch the ad tag URL via XHR
 // from their own script context, which browsers treat as cross-origin even
-// though the tag URL is same-origin with the page — the IMA SDK docs require
-// Access-Control-Allow-Origin (reflecting the request's Origin) and
-// Access-Control-Allow-Credentials, or the request silently fails and
-// surfaces as a generic VAST_LOAD_TIMEOUT (code 1005) with no CORS error
-// logged. Safe to reflect any origin here: the token in the URL is already
-// the sole access control, and this response carries no cookie-based session.
+// though the tag URL is same-origin with the page. Get the headers wrong and
+// IMA logs no CORS error at all — it surfaces a generic VAST_LOAD_TIMEOUT
+// (code 1005). The headers are the same VAST 4.2 rule the real endpoint
+// answers with — one implementation for both, lib/vast/cors.ts (ADR-0026) — so
+// a preview cannot pass where the served tag would fail. Safe to reflect any
+// origin here: the token in the URL is already the sole access control, and
+// this response carries no cookie-based session.
 //
 // Deliberately NOT sent: Access-Control-Allow-Private-Network. IMA cannot reach
 // a `localhost` tag from its public-origin bridge no matter what this endpoint
@@ -29,33 +37,19 @@ import { buildInlineVast, emptyVast, getAdapter, parseCreativeConfig } from "@/l
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function corsHeaders(request: Request): HeadersInit {
-  const origin = request.headers.get("origin");
-  return origin
-    ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true" }
-    : {};
-}
-
 function vastResponse(body: string, request: Request): Response {
   return new Response(body, {
     status: 200,
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
       "Cache-Control": "no-store",
-      ...corsHeaders(request),
+      ...vastCorsHeaders(request),
     },
   });
 }
 
 export async function OPTIONS(request: Request): Promise<Response> {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      ...corsHeaders(request),
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  });
+  return new Response(null, { status: 204, headers: vastPreflightHeaders(request) });
 }
 
 export async function GET(

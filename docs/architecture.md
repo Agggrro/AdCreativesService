@@ -142,8 +142,9 @@ Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
   kept fresh by webhooks.
 - **No RLS dependency.** Use a scoped service-role client; never expose the service
   key to the client.
-- **Cache deliberately.** Short-TTL edge cache keyed by `creative_id` (+ format),
-  with explicit invalidation when the creative config or subscription status changes.
+- **Cache deliberately.** Short-TTL edge cache keyed by `creative_id` (+ format) and
+  the requesting `Origin` (see the CORS rule below), with explicit invalidation when
+  the creative config or subscription status changes.
 - **Fail closed.** Any error or ambiguity → empty/fallback VAST, never the payload.
 - **Answer by reason, not uniformly.** A settled "no ad" (unknown id, lapsed
   subscription, archived creative) is a 200 with empty VAST and the full
@@ -152,10 +153,16 @@ Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
   player the last good document instead of an empty one. Both used to be an empty
   200, which made a one-second blip indistinguishable from "no ad" and cached it as
   a valid answer for a full minute on every PoP that missed during it.
-- **CORS on the response, and no `Vary: Origin`.** The tag is read cross-origin by
-  players on publishers' pages, so `Access-Control-Allow-Origin: *` is required for
-  the ad to render at all. Varying on origin would shard this cache per publisher —
-  an origin miss for every new site the tag appears on.
+- **CORS by the VAST 4.2 rule, with `Vary: Origin`.** The tag is read cross-origin by
+  players on publishers' pages, and some fetch it with credentials — the player's
+  choice, not ours. VAST 4.2 requires the request's `Origin` echoed with
+  `Access-Control-Allow-Credentials: true`, and `*` only when `Origin` is null or absent;
+  a bare `*` fails every credentialed player (`lib/vast/cors.ts`,
+  [ADR-0026](decisions/0026-vast-cors-credentialed-requests.md)). `Vary: Origin` is on
+  every response so the CDN keeps a copy per origin — the cache sharding ADR-0018 had
+  avoided by sending `*`, and paid for in players that could not read the tag. The
+  handler is the only source of these headers; `next.config.ts` sets `*` for `/t` and
+  `/c/…` only.
 - **No database write on the beacon path.** `GET /api/track` hands its insert to
   `waitUntil` and returns 204 immediately — up to seven beacons fire per impression.
 
@@ -239,7 +246,10 @@ surface**, not a variant of the public serving path above:
    `resolveInteractiveUrl()` + `buildInlineVast()` directly (not `generateVast()`,
    which gates on `should_serve`) against a synthetic `CreativeServing`-shaped context
    built from the token (`lib/vast/preview-context.ts`). Response is
-   `Cache-Control: no-store` — never cached, unlike the real endpoint.
+   `Cache-Control: no-store` — never cached, unlike the real endpoint. Its CORS headers
+   come from the same `lib/vast/cors.ts` as the real endpoint's, so a preview cannot
+   pass where the served tag would fail
+   ([ADR-0026](decisions/0026-vast-cors-credentialed-requests.md)).
 
 Because the panel POSTs the whole form state, that shared build is also what prunes
 fields a `showWhen` has switched off ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)) —

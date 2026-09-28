@@ -32,7 +32,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0015](0015-serving-snapshots-on-cdn.md) | Serving snapshots on the CDN, not a live database read | Accepted |
 | [0016](0016-three-events-hourly-counters.md) | Three ingested events, counted into hourly buckets | Accepted |
 | [0017](0017-runtime-assets-on-public-cdn.md) | Creative runtime assets on a public, content-addressed CDN | Accepted |
-| [0018](0018-dedicated-ad-serving-domain.md) | A dedicated ad-serving domain, with neutral paths | Accepted |
+| [0018](0018-dedicated-ad-serving-domain.md) | A dedicated ad-serving domain, with neutral paths | Accepted (CORS superseded by 0026) |
 | [0019](0019-creative-telemetry-channel.md) | Creative telemetry over an origin-locked postMessage channel | Accepted |
 | [0020](0020-validator-reports-faults-not-opinions.md) | The validator reports faults, not opinions | Accepted |
 | [0021](0021-validator-player-on-an-isolated-origin.md) | The validator's player runs on an isolated origin | Accepted |
@@ -40,6 +40,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0023](0023-conversion-postbacks.md) | Conversion postbacks: a click redirect, per-click rows, and an S2S endpoint | Accepted |
 | [0024](0024-pick-message-template.md) | Pick & Message: a message card inside the ad, and sound only on the viewer's tap | Accepted |
 | [0025](0025-media-fit-by-height.md) | Advertiser media fit by height, with a blurred fill | Accepted |
+| [0026](0026-vast-cors-credentialed-requests.md) | VAST responses answer credentialed requests, as VAST 4.2 requires | Accepted |
 
 ## Template
 

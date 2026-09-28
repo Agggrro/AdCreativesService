@@ -55,6 +55,25 @@ The adapter layer hides these differences from the endpoint. Each adapter is
 responsible for spec-conformant output — validate with the **`vast-spec-reviewer`**
 subagent.
 
+### Serving VAST to a browser: CORS
+
+A VAST document is read by JavaScript on someone else's page, so the browser applies
+CORS to it, and VAST 4.2 fixes the answer (§ "Browser Security → Cross Origin Resource
+Sharing (CORS) for JavaScript", just before §3.1):
+
+- `Access-Control-Allow-Origin` = the request's `Origin`, with
+  `Access-Control-Allow-Credentials: true`;
+- for a null or absent `Origin`, `*` and no credentials header (iOS WKWebView and other
+  originless requests).
+
+A bare `*` for everyone is **not** a simplification of this rule. It fails every player
+that fetches the tag with credentials (`withCredentials = true`) — the player's choice,
+not ours: the browser receives the document and tells the player the load failed. Google
+IMA fetches without credentials, so a test that only ever runs IMA never sees it. Every
+route that answers a player with VAST takes its headers from `lib/vast/cors.ts`, with
+`Vary: Origin` so a shared cache cannot hand one site's header to another — see
+[ADR-0026](decisions/0026-vast-cors-credentialed-requests.md).
+
 **Implemented in** [`lib/vast/`](../lib/vast): `builder.ts` (VAST 4.2 envelope,
 `<AdParameters>` config injection, tracking, fail-closed `generateVast`),
 `adapters/{simid,vpaid}.ts` (per-format `<MediaFiles>` nodes), `adapters/index.ts`

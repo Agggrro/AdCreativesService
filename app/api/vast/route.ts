@@ -1,6 +1,12 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveInteractiveUrl } from "@/lib/storage";
-import { generateVast, emptyVast, parseCreativeConfig } from "@/lib/vast";
+import {
+  generateVast,
+  emptyVast,
+  parseCreativeConfig,
+  vastCorsHeaders,
+  vastPreflightHeaders,
+} from "@/lib/vast";
 import { snapshots, snapshotToServing } from "@/lib/serving";
 import { UUID_RE } from "@/lib/uuid";
 import { getCdnUrl } from "@/lib/site";
@@ -35,26 +41,21 @@ const STABLE_MAX_AGE = 60;
 const STALE_IF_ERROR = 300;
 
 /**
- * The tag is fetched cross-origin by players running on publishers' pages, so
- * the response has to be readable there. `*` rather than a reflected origin,
- * and deliberately **no `Vary: Origin`**: this endpoint is high-QPS and CDN
- * cached, and varying on origin would shard that cache per publisher — paying
- * an origin miss for every new site the tag appears on. Safe because the
- * response carries no credentials and nothing user-specific.
- *
- * `Access-Control-Allow-Credentials` must never be added here: it is invalid
- * with `*`, and there are no cookies on this path to want it for.
+ * The tag is fetched cross-origin by players on publishers' pages, and some of
+ * them fetch it with credentials. Every response here — served, empty, failed,
+ * preflight — carries the CORS headers VAST 4.2 requires: the request's origin
+ * echoed with `Access-Control-Allow-Credentials`, and `Vary: Origin` so the CDN
+ * keeps one copy per origin (lib/vast/cors.ts, ADR-0026). `next.config.ts`
+ * deliberately sets none for `/v`: this handler is the only source.
  */
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-} as const;
+type Cors = Record<string, string>;
 
 /** A servable answer: 200 with a VAST body — players expect that even when empty. */
-function vastResponse(body: string): Response {
+function vastResponse(body: string, cors: Cors): Response {
   return new Response(body, {
     status: 200,
     headers: {
-      ...CORS_HEADERS,
+      ...cors,
       "Content-Type": "application/xml; charset=utf-8",
       "Cache-Control":
         `public, s-maxage=${STABLE_MAX_AGE}, stale-while-revalidate=30, ` +
@@ -64,8 +65,8 @@ function vastResponse(body: string): Response {
 }
 
 /** A settled "no ad": correct, stable, and cacheable for the normal window. */
-function noAd(): Response {
-  return vastResponse(emptyVast());
+function noAd(cors: Cors): Response {
+  return vastResponse(emptyVast(), cors);
 }
 
 /**
@@ -82,11 +83,11 @@ function noAd(): Response {
  * parses something sane rather than garbage. `no-store` keeps the failure itself
  * out of the cache.
  */
-function unavailable(): Response {
+function unavailable(cors: Cors): Response {
   return new Response(emptyVast(), {
     status: 503,
     headers: {
-      ...CORS_HEADERS,
+      ...cors,
       "Content-Type": "application/xml; charset=utf-8",
       "Cache-Control": "no-store",
     },
@@ -97,16 +98,8 @@ function unavailable(): Response {
  * Preflight. A plain VAST fetch is a simple request and never triggers this,
  * but players that add a header (or use `fetch` with custom options) do.
  */
-export function OPTIONS(): Response {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      ...CORS_HEADERS,
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "*",
-      "Access-Control-Max-Age": "86400",
-    },
-  });
+export function OPTIONS(request: Request): Response {
+  return new Response(null, { status: 204, headers: vastPreflightHeaders(request) });
 }
 
 type Load =
@@ -153,24 +146,25 @@ async function loadServing(creativeId: string): Promise<Load> {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  const cors = vastCorsHeaders(request);
   const url = new URL(request.url);
   const creativeId = url.searchParams.get("creative_id");
 
   // Validate input before any read; fail closed on junk. A malformed id is a
   // settled answer, so it caches for the normal window.
   if (!creativeId || !UUID_RE.test(creativeId)) {
-    return noAd();
+    return noAd(cors);
   }
 
   try {
     const loaded = await loadServing(creativeId);
-    if (loaded.status === "missing") return noAd();
-    if (loaded.status === "unavailable") return unavailable();
+    if (loaded.status === "missing") return noAd(cors);
+    if (loaded.status === "unavailable") return unavailable(cors);
 
     const serving = loaded.serving;
 
     // Subscription gate: not entitled / not active => empty VAST.
-    if (!serving.should_serve) return noAd();
+    if (!serving.should_serve) return noAd(cors);
 
     // The ad domain, not the app domain (ADR-0018): every URL inside this
     // document — beacons, the SIMID document, the unit — inherits it, and they
@@ -184,7 +178,7 @@ export async function GET(request: Request): Promise<Response> {
     // here means the template has no asset for the selected format — a settled
     // configuration fact, not a transient outage.
     const interactiveUrl = resolveInteractiveUrl(serving, siteUrl);
-    if (!interactiveUrl) return noAd();
+    if (!interactiveUrl) return noAd(cors);
 
     const config = parseCreativeConfig(serving.config_json);
 
@@ -195,10 +189,10 @@ export async function GET(request: Request): Promise<Response> {
       interactiveUrl,
       siteUrl,
     });
-    return vastResponse(vast);
+    return vastResponse(vast, cors);
   } catch {
     // Any unexpected error: never leak a partial payload, and never let the
     // failure itself get cached for a full minute.
-    return unavailable();
+    return unavailable(cors);
   }
 }
