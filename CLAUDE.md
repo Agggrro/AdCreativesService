@@ -41,9 +41,10 @@ bug even if the code "works". Details in [docs/adtech-standards.md](docs/adtech-
    - **Never call Stripe on this path.** Subscription state is denormalized and
      refreshed via Stripe webhooks.
    - Prefer edge runtime + short-TTL cache with explicit invalidation.
-   - **CORS is the VAST 4.2 rule, never a bare `*`:** echo the `Origin` with
-     `Access-Control-Allow-Credentials: true`, plus `Vary: Origin` — through
-     `lib/vast/cors.ts`. See [ADR-0026](docs/decisions/0026-vast-cors-credentialed-requests.md).
+   - **CORS is the VAST 4.2 rule:** echo the `Origin` with
+     `Access-Control-Allow-Credentials: true` — `*` only for a request with no origin —
+     plus `Vary: Origin`, all through `lib/vast/cors.ts` and pinned by `npm run test:cors`.
+     See [ADR-0026](docs/decisions/0026-vast-cors-credentialed-requests.md).
    See [docs/architecture.md](docs/architecture.md) and [docs/security.md](docs/security.md).
 
 ## Non-negotiable design rules

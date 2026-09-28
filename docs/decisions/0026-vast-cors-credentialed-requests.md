@@ -78,6 +78,11 @@ answers only our IMA player.
   line to hold.
 - **`Origin: null` is no longer echoed with credentials** by the preview route, which it
   used to be. Per the spec — and every sandboxed frame shares that origin.
+- **Pinned by `npm run test:cors`** (`lib/vast/cors.test.ts`): every Origin case, the
+  preflight, and that no `next.config.ts` header rule matches `/v` — under `next dev` a
+  static rule's value beats the handler's, so a leftover `*` would sit beside
+  `Access-Control-Allow-Credentials: true`, a pair browsers reject, while Vercel let the
+  handler win. An IMA-only test cannot catch any of this.
 - Checked by fetching, not by reading: a credentialed XHR and `fetch` from another origin,
   a preflighted request with a custom header, the `null` and absent cases, and — after
   deploy — two origins in turn against one CDN entry.

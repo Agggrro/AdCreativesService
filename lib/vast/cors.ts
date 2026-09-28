@@ -1,13 +1,14 @@
 /**
  * CORS for a VAST response — the rule VAST 4.2 sets in "Browser Security →
- * Cross Origin Resource Sharing (CORS) for JavaScript", which Google's IMA docs
- * repeat word for word:
+ * Cross Origin Resource Sharing (CORS) for JavaScript". Google's IMA docs ask
+ * for the same two headers:
  *
  *   Access-Control-Allow-Origin: <the request's Origin>
  *   Access-Control-Allow-Credentials: true
  *
- * and, for a request whose Origin is `null` or absent, `*` with no credentials
- * header, so originless requests (iOS WKWebView, a `file:` page) still read it.
+ * The spec adds one carve-out of its own: a request whose Origin is `null` or
+ * absent gets `*` with no credentials header, so originless requests (iOS
+ * WKWebView, a `file:` page) still read it.
  *
  * Why not simply `*`: whether a request carries credentials is the *player's*
  * choice (`XMLHttpRequest.withCredentials`, `fetch`'s `credentials: "include"`),
@@ -34,8 +35,15 @@
  * not match and gets the originless answer, as the spec asks. Non-http schemes
  * are allowed on purpose: an app webview's `capacitor://localhost` is a real
  * origin a player runs on.
+ *
+ * Control characters and commas are refused as well as whitespace. Node's
+ * parser already rejects the bytes that would make `new Response` throw, but
+ * this value is echoed into a header, and it should not take the parser's word
+ * for that: a throw here happens before the handler's `try`, and would turn the
+ * designed empty VAST into Next's bare 500. A comma means several origins were
+ * merged into one value, which is not an origin either.
  */
-const SERIALIZED_ORIGIN = /^[a-z][a-z0-9+.-]*:\/\/[^\s/?#]+$/i;
+const SERIALIZED_ORIGIN = /^[a-z][a-z0-9+.-]*:\/\/[^\s\p{Cc}/?#,]+$/iu;
 
 export function vastCorsHeaders(request: Request): Record<string, string> {
   const origin = request.headers.get("origin");
