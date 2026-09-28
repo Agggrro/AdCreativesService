@@ -16,7 +16,7 @@ var TEMPLATE = {
     var bg = document.createElement("div");
     bg.style.cssText =
       "position:absolute;inset:0;overflow:hidden;filter:blur(10px);transform:scale(1.1);";
-    bg.appendChild(adInteractMediaLayer(params.backgroundImageUrl));
+    bg.appendChild(adInteractFitMedia(params.backgroundImageUrl, api, "background").el);
     slot.appendChild(bg);
 
     var panel = document.createElement("div");

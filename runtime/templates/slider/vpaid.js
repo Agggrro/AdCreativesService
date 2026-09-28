@@ -38,10 +38,10 @@ var TEMPLATE = {
       direction: vertical ? "vertical" : "horizontal",
     });
 
-    function layer(url) {
+    function layer(url, name) {
       var d = document.createElement("div");
       d.style.cssText = "position:absolute;inset:0;overflow:hidden;";
-      d.appendChild(adInteractMediaLayer(url));
+      d.appendChild(adInteractFitMedia(url, api, name).el);
       return d;
     }
 
@@ -51,8 +51,8 @@ var TEMPLATE = {
     // shrank instead, which meant pinning the picture inside it to the slot's
     // width in pixels at mount — a pin that went stale when a player resized the
     // slot, and one that would have needed a second, height-pinned twin here.
-    slot.appendChild(layer(params.imageBeforeUrl));
-    var after = layer(params.imageAfterUrl);
+    slot.appendChild(layer(params.imageBeforeUrl, "before"));
+    var after = layer(params.imageAfterUrl, "after");
     slot.appendChild(after);
 
     // Divider handle: a line across the slot, centred on the edge it reveals.

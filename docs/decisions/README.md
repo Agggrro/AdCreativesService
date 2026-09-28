@@ -39,6 +39,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0022](0022-midnight-design-system.md) | "Midnight": one dark theme, a pastel warm accent, and creatives outside the system | Accepted |
 | [0023](0023-conversion-postbacks.md) | Conversion postbacks: a click redirect, per-click rows, and an S2S endpoint | Accepted |
 | [0024](0024-pick-message-template.md) | Pick & Message: a message card inside the ad, and sound only on the viewer's tap | Accepted |
+| [0025](0025-media-fit-by-height.md) | Advertiser media fit by height, with a blurred fill | Accepted |
 
 ## Template
 

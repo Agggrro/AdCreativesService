@@ -5,8 +5,9 @@
  * by runtime/build.mjs. The template only implements `onStart(slot, params, api)`;
  * this base provides the full VPAID interface, quartile events (video- OR
  * timer-driven when there is no video), the click helper, a shared media-layer
- * helper (image or video URL → a rendered element), and the mandatory close
- * control (ADR-0009).
+ * helper (image or video URL → a rendered element) and the rule every picture
+ * field is fitted by (adInteractFitMedia: height-fitted, blurred sides —
+ * ADR-0025), and the mandatory close control (ADR-0009).
  *
  * `api` given to onStart: { params, slot, videoSlot, clickThrough(url?), emit(e,a),
  * stop(), debug(name, data), volume(), onStop(fn) }
@@ -35,10 +36,11 @@ function adInteractCssUrl(url) {
 
 /**
  * One image/gif/video URL → a filled (`width:100%;height:100%`) element ready
- * to drop into a positioned wrapper. Every template's "picture" fields
- * (background, before/after, option thumbnails, reveal image, …) go through
- * this so gif/webm/mp4 "instead of a picture" works everywhere without each
- * template reimplementing the type sniff.
+ * to drop into a positioned wrapper, cropped to cover it. The type sniff lives
+ * here once, so gif/webm/mp4 "instead of a picture" works everywhere. Picture
+ * fields go through adInteractFitMedia below, which builds on this; called
+ * directly it is for a medium that should fill its box whatever its shape —
+ * pick-message's round avatar.
  */
 function adInteractMediaLayer(url) {
   var el;
@@ -61,6 +63,209 @@ function adInteractMediaLayer(url) {
     if (url) el.style.backgroundImage = adInteractCssUrl(url);
   }
   return el;
+}
+
+/** Blur radius of the copy behind a fitted medium, px. */
+var ADINTERACT_BLUR = 16;
+/**
+ * How far that copy reaches past its frame on every side, px. A blur fades to
+ * transparent over about three radii at an element's edge; kept inside the
+ * frame, that fade showed the black floor through as a dark rim — worst in a
+ * small frame, where a proportional overhang is only a few pixels.
+ */
+var ADINTERACT_BLEED = 3 * ADINTERACT_BLUR;
+var ADINTERACT_BACKDROP =
+  "position:absolute;left:-" + ADINTERACT_BLEED + "px;top:-" + ADINTERACT_BLEED + "px;" +
+  "width:calc(100% + " + 2 * ADINTERACT_BLEED + "px);" +
+  "height:calc(100% + " + 2 * ADINTERACT_BLEED + "px);max-width:none;max-height:none;" +
+  "filter:blur(" + ADINTERACT_BLUR + "px) brightness(.7);";
+
+/**
+ * The rule every template's picture fields follow (ADR-0025): a medium always
+ * fits its frame's height. Wider than the frame, it is cropped at the sides,
+ * centred; narrower, the space at its sides is filled by a blurred copy of the
+ * same medium — the look social feeds give a vertical video. Returns
+ * `{ el, media }`: `el` fills any container of definite size, and `media` is
+ * the element adInteractMediaLayer built, for a caller that listens to it
+ * (pick-message learns a tile's shape from its metadata).
+ *
+ * An image's copy is a second CSS background: one decode, no script. A video's
+ * is a small canvas repainted from the playing element (adInteractPaintBackdrop)
+ * — drawn, never read, so it needs no CORS and costs no second download or
+ * decode, which a second <video> would.
+ */
+function adInteractFitMedia(url, api, name) {
+  var el = document.createElement("div");
+  el.style.cssText =
+    "position:relative;width:100%;height:100%;overflow:hidden;background:#000;";
+  var media = adInteractMediaLayer(url);
+  var back;
+  if (adInteractIsVideoUrl(url)) {
+    // Height 100%, width from the video's own ratio: pure CSS, so it follows any
+    // resize of the frame by itself. Positioned, like the image below, so it
+    // paints over the backdrop that precedes it. `cover` changes nothing while
+    // the box has the video's own shape; should a host page's `!important`
+    // rule clamp the width, it crops the picture instead of squeezing it.
+    media.style.cssText =
+      "position:absolute;top:0;left:50%;display:block;height:100%;width:auto;" +
+      "max-width:none;transform:translateX(-50%);object-fit:cover;";
+    back = document.createElement("canvas");
+    back.style.cssText = ADINTERACT_BACKDROP + "object-fit:cover;display:none;";
+    adInteractPaintBackdrop(media, back, el, api, name);
+  } else {
+    media.style.position = "absolute";
+    media.style.top = "0";
+    media.style.left = "0";
+    media.style.backgroundColor = "transparent";
+    media.style.backgroundSize = "auto 100%";
+    back = document.createElement("div");
+    back.style.cssText = ADINTERACT_BACKDROP + "background:center/cover no-repeat;";
+    if (url) back.style.backgroundImage = adInteractCssUrl(url);
+  }
+  el.appendChild(back);
+  el.appendChild(media);
+  return { el: el, media: media };
+}
+
+/**
+ * Keep a fitted video's blurred copy (adInteractFitMedia) current, at about
+ * 15 fps, while the ad lives. requestVideoFrameCallback where the browser has
+ * it, so a paused video costs nothing; otherwise rAF of the element's own
+ * window — Fluid Player runs the unit in an iframe but puts the slot in the
+ * host page (runtime/README.md). The copy stops for good when the video's
+ * source is taken away (a template releasing a tile or a quiz screen) or the ad
+ * ends, and freezes on its last frame if drawing turns out to be expensive.
+ */
+function adInteractPaintBackdrop(video, canvas, frame, api, name) {
+  var ctx = null;
+  var shown = null;
+  var last = -1e9;
+  var done = false;
+  var rafWin = null;
+  var rafId = 0;
+  var warm = true;
+  var timed = 0;
+  var spent = 0;
+  var clock = typeof performance !== "undefined" && performance.now ? performance : Date;
+
+  function halt() {
+    done = true;
+    if (rafWin && rafId) rafWin.cancelAnimationFrame(rafId);
+  }
+  /**
+   * A canvas the browser keeps on the CPU — small ones on some Android
+   * WebViews, or a GPU-blocklisted device — copies the whole decoded frame back
+   * from the GPU on every draw: tens of milliseconds, where a GPU canvas records
+   * the draw in a fraction of one. Measured over ten draws after the first —
+   * which also sets the canvas up, and would make a fast device look slow; past
+   * 4ms the copy freezes on its last frame rather than tax the page it runs in.
+   */
+  function account(ms) {
+    if (warm) {
+      warm = false;
+      return;
+    }
+    if (timed >= 10) return;
+    spent += ms;
+    if (++timed < 10) return;
+    var mean = spent / 10;
+    if (mean > 4) halt();
+    if (api) {
+      api.debug("backdrop", { name: name, ms: Math.round(mean * 10) / 10, frozen: mean > 4 });
+    }
+  }
+
+  function paint() {
+    if (done || !video.videoWidth) return;
+    // Side space exists only while the height-fitted video is narrower than its
+    // frame. Asked again before every paint, so a resize needs no observer.
+    var blur = video.offsetWidth + 1 < frame.clientWidth;
+    if (blur !== shown) {
+      shown = blur;
+      canvas.style.display = blur ? "block" : "none";
+      if (api) {
+        api.debug("media", {
+          name: name,
+          w: video.videoWidth,
+          h: video.videoHeight,
+          blur: blur,
+        });
+      }
+    }
+    if (!blur) return;
+    try {
+      ctx = ctx || canvas.getContext("2d");
+      var t0 = clock.now();
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      account(clock.now() - t0);
+    } catch (e) {
+      /* a frame the browser will not hand over: the last one stays */
+    }
+  }
+  function tick(now) {
+    if (done) return;
+    if (now - last >= 66) {
+      last = now;
+      paint();
+    }
+    schedule();
+  }
+  function schedule() {
+    if (typeof video.requestVideoFrameCallback === "function") {
+      video.requestVideoFrameCallback(tick);
+    } else if (!video.paused && !video.ended) {
+      rafWin = (video.ownerDocument && video.ownerDocument.defaultView) || window;
+      rafId = rafWin.requestAnimationFrame(tick);
+    } else {
+      // rAF, unlike a frame callback, would keep firing for a video that shows
+      // no new frame — and forever for one a host detached without stopAd,
+      // which the browser pauses. Idle instead; "playing" below re-arms it.
+      rafId = 0;
+    }
+  }
+  video.addEventListener("loadedmetadata", function () {
+    // Short side 144px: some engines keep a canvas under 128px on a side on the
+    // CPU (see account), and the blur, not the pixels, is what shows anyway.
+    var k = 144 / Math.min(video.videoWidth, video.videoHeight);
+    canvas.width = Math.max(1, Math.round(video.videoWidth * k));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * k));
+  });
+  // The first frame is painted even when autoplay is refused and no later frame
+  // ever arrives to drive the loop.
+  video.addEventListener("loadeddata", paint);
+  video.addEventListener("playing", function () {
+    if (!done && !rafId && typeof video.requestVideoFrameCallback !== "function") {
+      schedule();
+    }
+  });
+  // Only a video whose source was taken away is finished with — the quiz and
+  // pick-message release theirs that way. `emptied` alone is not proof: older
+  // Chromium also fires it when an element that has a source moves to another
+  // document, which is what happens to every fitted video in Fluid Player (the
+  // unit's iframe builds it, the host page's slot adopts it).
+  video.addEventListener("emptied", function () {
+    if (!video.getAttribute("src")) halt();
+  });
+  // The one failure worth a record: a video that never plays leaves a black
+  // frame and nothing else to say why (an HEVC .mov is the usual one).
+  video.addEventListener("error", function () {
+    if (!done && api) {
+      api.debug("media", { name: name, error: (video.error && video.error.code) || 0 });
+    }
+  });
+  if (api && typeof api.onStop === "function") {
+    api.onStop(function () {
+      halt();
+      // A host may leave the slot up after the ad: a frozen frame, rather than a
+      // clip that keeps playing over a copy that has stopped.
+      try {
+        video.pause();
+      } catch (e) {
+        /* nothing to pause */
+      }
+    });
+  }
+  schedule();
 }
 
 /**

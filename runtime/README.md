@@ -11,7 +11,8 @@ document.
 ## Layout
 
 - `lib/vpaid-base.js` — the shared VPAID 2.0 base (lifecycle, quartile/click
-  plumbing, the shared media-layer helper for image/gif/video URLs, the
+  plumbing, the shared media helpers for image/gif/video URLs — every picture field is
+  fitted by height, blurred sides filled, through `adInteractFitMedia` (ADR-0025) — the
   mandatory close control — ADR-0005 / ADR-0009 — a self-reported,
   non-OMID-accredited viewability observer that fires once the slot has been
   ≥50% on-screen for a continuous 2s — ADR-0012 — and the telemetry channel,

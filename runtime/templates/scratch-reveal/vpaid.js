@@ -21,7 +21,7 @@ var TEMPLATE = {
     // Reveal image (or gif/video) underneath.
     var img = document.createElement("div");
     img.style.cssText = "position:absolute;inset:0;overflow:hidden;";
-    img.appendChild(adInteractMediaLayer(params.imageUrl));
+    img.appendChild(adInteractFitMedia(params.imageUrl, api, "reveal").el);
     slot.appendChild(img);
 
     // Scratchable cover.

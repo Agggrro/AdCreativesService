@@ -114,7 +114,7 @@ var TEMPLATE = {
         var im = document.createElement("div");
         im.style.cssText =
           "width:110px;height:110px;border-radius:8px;overflow:hidden;";
-        im.appendChild(adInteractMediaLayer(img));
+        im.appendChild(adInteractFitMedia(img, api, "step" + step + ":" + letter).el);
         b.appendChild(im);
       }
       var cap = document.createElement("span");

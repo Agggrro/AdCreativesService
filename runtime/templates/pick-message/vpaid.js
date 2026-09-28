@@ -179,13 +179,12 @@ var TEMPLATE = {
         "position:absolute;padding:0;overflow:hidden;background:#111;" +
         BUTTON_RESET +
         "box-shadow:" + RING_OFF + ";";
-      var media = adInteractMediaLayer(url);
-      // Upper-biased crop: when a picture does get cropped it is almost always
-      // a person, and the face sits in the top third.
-      media.style.backgroundPosition = "50% 30%";
-      media.style.objectPosition = "50% 30%";
-      b.appendChild(media);
-      probe(i, url, media);
+      // Fitted by height (ADR-0025): a picture is never cropped at the top or the
+      // bottom, so the face-first crop bias this tile used to carry has nothing
+      // left to do.
+      var fit = adInteractFitMedia(url, api, "tile:" + LETTERS[i]);
+      b.appendChild(fit.el);
+      probe(i, url, fit.media);
       b.addEventListener("click", function () {
         onTileTap(i);
       });

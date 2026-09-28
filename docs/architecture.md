@@ -418,8 +418,8 @@ discovering that externally hosted media routinely breaks via hotlink protection
   `creatives_*_own` policy pattern.
 - **Downstream:** the resulting public URL is just a string written into the same
   `config_json`/`<AdParameters>` field a pasted URL would occupy — `lib/vast/builder.ts`
-  and the runtime's `adInteractMediaLayer` (`runtime/lib/vpaid-base.js`) need no
-  awareness of where the URL came from.
+  and the runtime's media helpers (`adInteractMediaLayer` / `adInteractFitMedia` in
+  `runtime/lib/vpaid-base.js`, ADR-0025) need no awareness of where the URL came from.
 
 ## Runtime placement summary
 

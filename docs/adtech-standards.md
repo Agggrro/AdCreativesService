@@ -215,12 +215,22 @@ reveal image) accepts any of those interchangeably — the advertiser pastes one
 the runtime decides how to render it. Static raster/vector formats and animated GIF
 render as a CSS `background-image` (GIF animates natively there); a URL that looks
 like a video file (`.webm`, `.mp4`, `.m4v`, `.mov`, `.ogv`) gets a real `<video>`
-element instead (autoplay, loop, muted, `object-fit: cover`) since a background-image
-cannot play one. One shared helper (`adInteractMediaLayer` in
+element instead (autoplay, loop, muted) since a background-image cannot play one. One
+shared helper (`adInteractMediaLayer` in
 [`runtime/lib/vpaid-base.js`](../runtime/lib/vpaid-base.js)) makes this decision once
 for every template rather than each one re-implementing a type sniff. The
 configurator's field stays a plain URL input — there is no separate "is this a
 video" toggle to keep in sync.
+
+**How a medium sits in its frame** ([ADR-0025](decisions/0025-media-fit-by-height.md)):
+it always fits the frame's height. Wider than the frame, it is cropped at the sides,
+centred; narrower — a vertical clip in a landscape slot — the space at its sides is
+filled by a blurred, darkened copy of itself. Every picture field goes through
+`adInteractFitMedia`, which builds on the helper above: an image's copy is a second CSS
+background, a video's a small canvas repainted from the playing element (no CORS, no
+second download or decode). Black bars baked into a file are part of the picture and
+stay. Two exceptions: pick-message's round avatar keeps `cover`, and Shoppable Video's
+clip is the player's own element, which the unit does not draw.
 
 ## Mandatory close control
 
