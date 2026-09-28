@@ -268,13 +268,15 @@ export type Database = {
         ];
       };
       // ADR-0023: written only by record_postback(); read only through
-      // get_creative_conversions().
+      // get_creative_conversions() and get_creative_conversion_goals().
       conversions: {
         Row: {
           id: number;
           click_id: string;
           creative_id: string;
           field: string;
+          /** '' when the network sent none (ADR-0027). */
+          goal: string;
           txid: string;
           status: ConversionStatus;
           payout: number;
@@ -286,6 +288,7 @@ export type Database = {
           click_id: string;
           creative_id: string;
           field: string;
+          goal?: string;
           txid?: string;
           status: ConversionStatus;
           payout?: number;
@@ -297,6 +300,7 @@ export type Database = {
           click_id?: string;
           creative_id?: string;
           field?: string;
+          goal?: string;
           txid?: string;
           status?: ConversionStatus;
           payout?: number;
@@ -391,6 +395,20 @@ export type Database = {
           revenue: Json;
         }[];
       };
+      // The same window and owner check, per goal the network reported
+      // (ADR-0027). No clicks: a click has no goal until it converts.
+      get_creative_conversion_goals: {
+        Args: { p_creative_id: string; p_days?: number };
+        Returns: {
+          /** '' for conversions that came without a goal. */
+          goal: string;
+          approved: number;
+          pending: number;
+          rejected: number;
+          /** Approved payout per ISO currency code, e.g. { USD: 12.5 }. */
+          revenue: Json;
+        }[];
+      };
       // The caller's postback key, made on first call (ADR-0023).
       ensure_postback_key: {
         Args: Record<string, never>;
@@ -440,6 +458,8 @@ export type Database = {
           p_txid: string;
           p_error: string | null;
           p_params: Json;
+          /** ADR-0027. Defaulted to '' in SQL, so a caller without it still resolves. */
+          p_goal?: string;
         };
         Returns: string;
       };

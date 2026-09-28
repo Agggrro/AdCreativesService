@@ -557,11 +557,14 @@ column header, a section heading — and never floats free of one.
 44px stays the default, and stays mandatory wherever a row represents **a thing the user
 owns** — a creative, a template, a subscription. A second, narrower density exists for
 **machine readouts**: tables whose rows the system emits rather than the user authors, and
-which are read as a stream rather than acted on. The validator's run timeline, feature
-matrix, wrapper chain and parser-versus-player comparison, and — since
+which are read as a stream rather than acted on. Today that is the validator's run
+timeline, feature matrix, wrapper chain and parser-versus-player comparison, and — since
 [ADR-0023](decisions/0023-conversion-postbacks.md) — the postback log and the conversion
-report's by-day table are the entire list today. The report's by-exit table is not: an
-exit is something the user configured, so it keeps 44px.
+report's by-day table. The report's by-exit table is not: an exit is something the user
+configured, so it keeps 44px. Nor is its by-goal table
+([ADR-0027](decisions/0027-conversion-goals.md)): a goal comes from the network rather than
+from the user, but it is a handful of rows read against the network's own report, not a
+stream, so it keeps the default 44px beside the by-exit table.
 
 - Row height **32px** — `px-3 py-1.5` on `data` 13/20 type, which the cell class sets
   itself rather than leaving to each call site. The rail stays 3px, so the left padding
@@ -573,8 +576,9 @@ exit is something the user configured, so it keeps 44px.
   entirely the other.
 - 32px is the height of a single-line row, not a promise. A cell that stacks a value over a
   qualifier is taller, and that is correct.
-- That list of four tables is illustrative, not exhaustive: the distinction — system-emitted
-  and scanned, versus user-owned and acted on — decides every case.
+- That list is illustrative, not exhaustive: the distinction — system-emitted and read as a
+  stream, versus user-owned or acted on — decides every case. Both halves count: a
+  system-emitted table of a handful of summary rows is not a stream, and keeps 44px.
 
 The justification is legibility of the whole, not fitting more in. A sixty-row event
 timeline at 44px is 2,640px of scrolling, and the reader loses the shape of the run — which
@@ -761,11 +765,28 @@ Counting rules, because a metric that lies costs more than a metric that is miss
     counted, with every number in mono.
   - **Money is an amount plus an ISO code, one line per currency.** There is no FX, and a
     sum across currencies is a number in none of them. With nothing approved the reading
-    is a real `0.00`, not a dash.
+    is a real `0.00`, not a dash. Inside a table cell, which is one line tall, the
+    currencies share the line instead, separated by ` · ` — still one amount and one code
+    each, never a total.
   - **Conversion statuses are state and take the state vocabulary:** approved `live`,
     pending `info`, rejected `idle` — not `dead`, since nothing about the account is
     failing when an advertiser declines a lead. A **postback that failed** is `dead`: it
     is a setup fault the owner has to act on.
+  - **Goals split the strip, they do not replace it**
+    ([ADR-0027](decisions/0027-conversion-goals.md)). The strip stays the sum over every
+    goal; a by-goal table directly under it — conversions, approved, rejected, CR of all
+    clicks, revenue — appears once any conversion carries a goal, even a single one, since
+    a goal's name is information nothing else on the page shows. It has **no clicks
+    column**: a click has no goal, so each row's CR is over all the creative's tracked
+    clicks, and a column repeating one number down every row would read as a per-goal
+    count. For the same reason its ratio column is headed **"CR of all clicks"**, not the
+    by-exit table's "CR of clicks", whose denominator is that row's own clicks — two
+    denominators, two labels. It does have a **rejected column**, which the other report
+    tables leave to the strip's qualifier: a goal the advertiser declined outright is
+    otherwise a row of zeros with nothing to say why it is there. The goal is machine text
+    in mono, sorted by a fixed collation so the order does not change with the interface
+    language; "No goal", for conversions that came without one, is copy and sorts last. No
+    rail — a goal has no state.
 
 ## 7. The player well
 
@@ -947,7 +968,7 @@ Movement is slow and few. Nothing bounces, nothing springs.
 | ✕ | Flags for language. |
 | ✕ | A layout that exists at one width. Every surface is checked at 390 / 768 / 1280 / 1920 / 2560. |
 | ✕ | Motion that ignores `prefers-reduced-motion`, or a `transition` on `all`. |
-| ✓ | Density as respect: 44px rows, spacing in multiples of 4 — and the 32px readout density (§6) for system-emitted tables that are read rather than acted on. |
+| ✓ | Density as respect: 44px rows, spacing in multiples of 4 — and the 32px readout density (§6) for system-emitted tables that are read as a stream rather than acted on. |
 | ✓ | State encoded in form as well as colour. |
 | ✓ | Both locales supplied for every new string — except on a developer-only surface, which no user reaches in either language (§10, and that carve-out only). |
 | ✓ | Full-bleed section colour with contained prose. That is what owns a wide monitor (§5). |

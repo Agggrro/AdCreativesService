@@ -195,7 +195,9 @@ Conversion attribution, the way trackers do it
   account's postback key and the click id. `lib/postback.ts` parses; `record_postback()`
   does find-or-update-or-insert atomically in SQL and logs the hit for the owner. It is on
   the app domain — a network's server is not a publisher's page.
-- **Reporting** is `get_creative_conversions()` per (UTC day, exit), rendered by
+- **Reporting** is `get_creative_conversions()` per (UTC day, exit) and
+  `get_creative_conversion_goals()` per goal the network reported
+  ([ADR-0027](decisions/0027-conversion-goals.md)), rendered by
   `components/ConversionReport.tsx` on the creative page. The key and the log live on
   `/dashboard/creatives/postback`.
 

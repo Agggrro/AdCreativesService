@@ -188,11 +188,14 @@ rename to do it.
 - **Input is untrusted and parsed in one place** (`lib/postback.ts`): statuses from a
   closed list (a `Map`, so a word like `constructor` is not accidentally "known"), an
   unexpanded macro an error rather than "not sent", payout finite and under 1e9 (and
-  `1,234` refused as ambiguous), currency three letters, txid ≤ 128 characters, NUL
+  `1,234` refused as ambiguous), currency three letters, txid ≤ 128 characters, goal ≤ 64
+  (refused rather than truncated, which would merge two goals into one row — ADR-0027), NUL
   bytes removed (Postgres text cannot hold them, and one would fail the whole write into
-  an endless retry), logged parameters truncated to 128 characters and the jsonb capped
-  at 4 KB by a CHECK. A form body is streamed and read to 8 KB, no further; JSON bodies
-  are not read.
+  an endless retry), logged parameters truncated to 128 characters — never inside a
+  surrogate pair, since a lone half is invalid JSON to PostgREST and fails the whole call
+  into the same retry — and the jsonb capped at 4 KB by a CHECK. A form body is streamed
+  and read to 8 KB, no further; JSON bodies are not read. `npm run test:postback` pins
+  all of it.
 - **A leaked key writes a bounded log.** `record_postback()` stops logging past 3,600
   rows per account per hour (the postbacks themselves are still processed), and a log
   write that fails never rolls back the conversion.

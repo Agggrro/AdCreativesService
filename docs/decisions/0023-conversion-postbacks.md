@@ -1,6 +1,7 @@
 # 0023. Conversion postbacks: a click redirect, per-click rows, and an S2S endpoint
 
-- Status: Accepted
+- Status: Accepted — a conversion's identity, `(click_id, txid)` below, is widened to
+  `(click_id, goal, txid)` by [ADR-0027](0027-conversion-goals.md)
 - Date: 2026-09-27
 
 ## Context

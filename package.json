@@ -19,7 +19,8 @@
     "snapshot:backfill": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/snapshot-backfill.mjs",
     "check:snapshots": "node --env-file-if-exists=.env.local --import ./scripts/register-app-imports.mjs scripts/check-snapshots.mjs",
     "test:entitlement": "node --test lib/serving/entitlement.test.ts",
-    "test:cors": "node --import ./scripts/register-app-imports.mjs --test lib/vast/cors.test.ts"
+    "test:cors": "node --import ./scripts/register-app-imports.mjs --test lib/vast/cors.test.ts",
+    "test:postback": "node --import ./scripts/register-app-imports.mjs --test lib/postback.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

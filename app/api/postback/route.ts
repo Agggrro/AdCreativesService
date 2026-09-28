@@ -91,6 +91,7 @@ async function handle(request: Request): Promise<Response> {
     p_txid: input.txid,
     p_error: input.error,
     p_params: input.params,
+    p_goal: input.goal,
   });
 
   // 503, not 400: the network did nothing wrong, and most of them retry a 5xx.

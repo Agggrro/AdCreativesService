@@ -19,15 +19,26 @@ import type { Database } from "@/types/database.types";
 
 /**
  * A creative's conversion report (ADR-0023): clicks that went through `/r`,
- * and what the partner network posted back about them.
+ * and what the partner network posted back about them — split by the goal the
+ * network reported, when it reports one (ADR-0027).
  *
- * Server-only rendering of rows `get_creative_conversions()` already
- * aggregated; the database does the counting, this does the reading.
+ * Server-only rendering of rows `get_creative_conversions()` and
+ * `get_creative_conversion_goals()` already aggregated; the database does the
+ * counting, this does the reading.
  */
 
 /** One row of get_creative_conversions(): a UTC day and an exit. */
 type ConversionRow =
   Database["public"]["Functions"]["get_creative_conversions"]["Returns"][number];
+
+/** One row of get_creative_conversion_goals(): a goal, '' for none. */
+type GoalRow =
+  Database["public"]["Functions"]["get_creative_conversion_goals"]["Returns"][number];
+
+/** What both readers count. A goal row has no clicks: a click has no goal. */
+type Counted = Pick<ConversionRow, "approved" | "pending" | "rejected" | "revenue"> & {
+  clicks?: number;
+};
 
 /** An exit the creative is configured with, in schema order. */
 export interface ExitLabel {
@@ -59,8 +70,8 @@ function emptyTotals(): Totals {
 }
 
 /** Fold one row in. `revenue` is jsonb, so it is read defensively. */
-function addRow(into: Totals, row: ConversionRow): void {
-  into.clicks += row.clicks;
+function addRow(into: Totals, row: Counted): void {
+  into.clicks += row.clicks ?? 0;
   into.approved += row.approved;
   into.pending += row.pending;
   into.rejected += row.rejected;
@@ -90,6 +101,7 @@ export function ConversionReport({
   dict,
   locale,
   rows,
+  goals,
   available,
   exits,
   exitsMissingMacro,
@@ -98,6 +110,8 @@ export function ConversionReport({
   dict: Dict;
   locale: Locale;
   rows: ConversionRow[];
+  /** The same window's conversions per goal (ADR-0027). */
+  goals: GoalRow[];
   /** False when the report could not be read — every number becomes a dash. */
   available: boolean;
   exits: ExitLabel[];
@@ -158,6 +172,26 @@ export function ConversionReport({
 
   const hasActivity = total.clicks > 0 || converted(total) + total.rejected > 0;
   const dash = "—";
+
+  // Goals as the network named them, in natural order (`2` before `10`), with
+  // the conversions that came without one last. A fixed collation rather than
+  // the interface's: Russian collation puts Cyrillic before Latin, and a mixed
+  // set (`депозит`, `FTD`) should not reorder when the owner switches RU/EN.
+  // The table appears once any conversion carries a goal — even a single one,
+  // unlike the by-exit table: the owner configured every exit here and knows
+  // them, but a goal's name is information nothing else on this page shows.
+  const collator = new Intl.Collator("en", { numeric: true });
+  const goalRows = [...goals]
+    .sort(
+      (a, b) =>
+        Number(a.goal === "") - Number(b.goal === "") || collator.compare(a.goal, b.goal),
+    )
+    .map((row) => {
+      const totals = emptyTotals();
+      addRow(totals, row);
+      return { goal: row.goal, totals };
+    });
+  const hasGoals = goalRows.some((row) => row.goal !== "");
 
   /** A count inside a caption is still a count: mono, tabular (§4). */
   const n = (value: number) => <span className="data-instr">{count.format(value)}</span>;
@@ -286,6 +320,63 @@ export function ConversionReport({
         </div>
       </div>
 
+      {available && hasGoals && (
+        <div className="flex flex-col gap-2">
+          <h3 className="label-instr">{c.byGoal}</h3>
+          <p className="max-w-prose type-caption text-fg-muted">
+            <MacroText text={c.byGoalNote} />
+          </p>
+          {/* 44px, like the by-exit table below it: a handful of rows read
+              against the network's own report, not a stream (§6). No rail — a
+              goal has no state. No clicks column either: every goal would
+              repeat the same number, since a click has no goal. Rejected has a
+              column here, unlike in the tables below it: a goal the advertiser
+              declined outright is a row of zeros, and without the count the
+              reader cannot tell why the row is there at all. */}
+          <TableFrame>
+            <table className="w-full min-w-[640px] border-collapse type-small">
+              <TableHead>
+                <th className={HEAD}>{c.goal}</th>
+                <th className={NUM_HEAD}>{c.conversions}</th>
+                <th className={NUM_HEAD}>{c.approved}</th>
+                <th className={NUM_HEAD}>{c.rejected}</th>
+                {/* Not the by-exit table's "CR of clicks": there the
+                    denominator is the row's own clicks, here it is all of
+                    them, and the header is where the reader learns which. */}
+                <th className={NUM_HEAD}>{c.crOfAllClicksColumn}</th>
+                <th className={NUM_HEAD}>{c.revenue}</th>
+              </TableHead>
+              <tbody>
+                {goalRows.map(({ goal, totals: t }) => (
+                  <tr key={goal} className={ROW}>
+                    <td className={CELL}>
+                      {/* The network's label is machine text, the same in both
+                          locales; the absence of one is our copy. */}
+                      {goal ? <code className="data-instr">{goal}</code> : c.noGoal}
+                    </td>
+                    <td className={`${CELL} data-instr text-right`}>
+                      {count.format(converted(t))}
+                    </td>
+                    <td className={`${CELL} data-instr text-right`}>
+                      {count.format(t.approved)}
+                    </td>
+                    <td className={`${CELL} data-instr text-right`}>
+                      {count.format(t.rejected)}
+                    </td>
+                    <td className={`${CELL} data-instr text-right`}>
+                      {total.clicks > 0 ? percent.format(converted(t) / total.clicks) : dash}
+                    </td>
+                    <td className={`${CELL} data-instr text-right whitespace-nowrap`}>
+                      {moneyLines(t.revenue, money).join(" · ")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableFrame>
+        </div>
+      )}
+
       {available && hasActivity && exitRows.length > 1 && (
         <div className="flex flex-col gap-2">
           <h3 className="label-instr">{c.byExit}</h3>
@@ -330,7 +421,7 @@ export function ConversionReport({
       {available && hasActivity && (
         <div className="flex flex-col gap-2">
           <h3 className="label-instr">{c.byDay}</h3>
-          <p className="type-caption text-fg-muted">{c.byDayNote}</p>
+          <p className="max-w-prose type-caption text-fg-muted">{c.byDayNote}</p>
           {/* Readout density (§6): system-emitted, scanned for its shape, no
               row actions. Every day of the window, zeros included — a gap in
               the series is information, and hiding it would redraw the curve. */}

@@ -404,18 +404,65 @@ create table if not exists public.conversions (
   click_id    text not null check (click_id ~ '^[0-9a-f]{24}$'),
   creative_id uuid not null references public.creatives(id) on delete cascade,
   field       text not null,
+  -- The goal the network reported (ADR-0027) — its goal id or name, `reg`,
+  -- `deposit` — or '' when it sends none. One click converts once per goal: a
+  -- registration and then a deposit on the same click are two rows, and each
+  -- one's later status change finds its own. Its length bound is the named
+  -- conversions_goal_length below, not an inline CHECK, so a changed bound
+  -- reaches a table that already exists.
+  goal        text not null default '',
   -- The network's own transaction id, or '' when it sends none. With '' a click
-  -- carries at most one conversion and a repeated postback is a status update;
-  -- distinct txids let one click carry several (a lead, then a deposit).
+  -- carries at most one conversion per goal and a repeated postback is a status
+  -- update; distinct txids let one goal convert several times (repeat deposits).
   txid        text not null default '' check (char_length(txid) <= 128),
   status      text not null check (status in ('approved', 'pending', 'rejected')),
   payout      numeric(14, 4) not null default 0,
   currency    text not null default 'USD' check (currency ~ '^[A-Z]{3}$'),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
-  constraint conversions_click_txid_key unique (click_id, txid)
+  constraint conversions_click_goal_txid_key unique (click_id, goal, txid)
 );
-comment on table public.conversions is 'Conversions reported by partner-network postbacks (ADR-0023). Written only by record_postback().';
+comment on table public.conversions is 'Conversions reported by partner-network postbacks (ADR-0023, goals ADR-0027). Written only by record_postback().';
+
+-- ADR-0027 on a table made before it: the goal column, then the identity
+-- widened from (click, txid) to (click, goal, txid). Every existing row has
+-- goal '', so the wider key cannot collide where the narrower one did not. A
+-- no-op on a fresh database, which the create above made whole. The narrower
+-- key is dropped further down, once record_postback() no longer upserts on it.
+alter table public.conversions
+  add column if not exists goal text not null default '';
+
+-- The bound in force is always the one written here, like
+-- postback_log_params_size — but replaced only when it differs, because adding
+-- a CHECK re-reads the whole table under an exclusive lock, and conversions,
+-- unlike the log, are never purged: a drop-and-re-add on every apply would
+-- stall postbacks for longer each month. Must match GOAL_MAX_LENGTH in
+-- lib/postback.ts and the check in record_postback().
+do $$
+begin
+  if coalesce((select pg_get_constraintdef(k.oid) from pg_constraint k
+                where k.conrelid = 'public.conversions'::regclass
+                  and k.conname = 'conversions_goal_length'), '')
+     <> 'CHECK ((char_length(goal) <= 64))' then
+    alter table public.conversions drop constraint if exists conversions_goal_length;
+    alter table public.conversions
+      add constraint conversions_goal_length check (char_length(goal) <= 64);
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.conversions'::regclass
+       and conname = 'conversions_click_goal_txid_key'
+  ) then
+    alter table public.conversions
+      add constraint conversions_click_goal_txid_key unique (click_id, goal, txid);
+  end if;
+end
+$$;
 
 create index if not exists conversions_creative_created_idx
   on public.conversions (creative_id, created_at);
@@ -456,8 +503,8 @@ create index if not exists postback_log_user_received_idx
   on public.postback_log (user_id, received_at desc);
 
 -- The route truncates each parameter to 128 characters; this is the table
--- refusing to trust that. 4096 bytes clears the worst honest case — five values
--- of 128 four-byte characters plus the JSON around them is about 2.7 KB — with
+-- refusing to trust that. 4096 bytes clears the worst honest case — six values
+-- of 128 four-byte characters plus the JSON around them is about 3.2 KB — with
 -- room to spare. Dropped and re-added rather than `add ... if not exists`
 -- (which Postgres does not have for constraints), so a changed bound applies
 -- on the next run of this file.
@@ -517,6 +564,15 @@ grant execute on function public.record_click(text, uuid, text, text, int) to se
 --
 -- Returns a result code the route maps to an HTTP status: 'created', 'updated'
 -- and 'unchanged' succeed, everything else is a rejection the owner can read.
+--
+-- `p_goal` (ADR-0027) is last and defaulted so that a deployment still calling
+-- with the eight earlier arguments resolves to this function unchanged: the
+-- schema lands before the code that sends a goal, and a postback in between
+-- records exactly what it did before, with goal ''. The eight-argument
+-- signature is dropped rather than kept beside it, because two candidates for
+-- the same eight named arguments would make every call ambiguous.
+drop function if exists public.record_postback(text, text, text, numeric, text, text, text, jsonb);
+
 create or replace function public.record_postback(
   p_key       text,
   p_click_id  text,
@@ -525,7 +581,8 @@ create or replace function public.record_postback(
   p_currency  text,
   p_txid      text,
   p_error     text,
-  p_params    jsonb
+  p_params    jsonb,
+  p_goal      text default ''
 )
 returns text
 language plpgsql
@@ -533,6 +590,8 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_goal     text := coalesce(p_goal, '');
+  v_id       bigint;
   v_user     uuid;
   v_creative uuid;
   v_field    text;
@@ -552,11 +611,18 @@ begin
 
   if p_error is not null then
     v_result := p_error;
+  elsif char_length(v_goal) > 64 then
+    -- The route refuses this first (lib/postback.ts). Here as well so that a
+    -- caller who skipped the route gets the code the owner can read, not the
+    -- CHECK's exception — which the route would answer 503, and a network
+    -- would retry for ever.
+    v_result := 'bad_goal';
   else
     -- A change to a conversion already recorded: hold -> approved, or a
-    -- reversal. Matched on (click, txid) and never held to the click window:
-    -- networks settle long after the click, and by then the click row itself
-    -- may have been purged.
+    -- reversal. Matched on (click, goal, txid) — a deposit's approval must not
+    -- land on the same click's registration (ADR-0027) — and never held to the
+    -- click window: networks settle long after the click, and by then the click
+    -- row itself may have been purged.
     --
     -- A late `pending` never overwrites a settled status. Networks retry, and a
     -- retried hold that lands after its own approval would otherwise un-approve
@@ -564,11 +630,12 @@ begin
     -- chargeback) and rejected -> approved still go through. Either way the
     -- owner's log has to say what happened, so a report that changed nothing is
     -- `unchanged`, not `updated`.
-    select v.status, v.payout, v.currency
-      into v_status, v_payout, v_currency
+    select v.id, v.status, v.payout, v.currency
+      into v_id, v_status, v_payout, v_currency
       from public.conversions v
       join public.creatives c on c.id = v.creative_id
      where v.click_id = p_click_id
+       and v.goal = v_goal
        and v.txid = p_txid
        and c.user_id = v_user
        for update of v;
@@ -579,12 +646,13 @@ begin
              and coalesce(p_currency, v_currency) = v_currency) then
         v_result := 'unchanged';
       else
+        -- By the id of the row just locked and owner-checked, so the update
+        -- cannot reach any other row whatever the table's keys become.
         update public.conversions v
            set status   = p_status,
                payout   = coalesce(p_payout, v.payout),
                currency = coalesce(p_currency, v.currency)
-         where v.click_id = p_click_id
-           and v.txid = p_txid;
+         where v.id = v_id;
         v_result := 'updated';
       end if;
     else
@@ -609,11 +677,11 @@ begin
         -- lack; a click belongs to one creative, so it always holds today.
         -- `xmax = 0` is how Postgres tells a fresh row from an updated one.
         insert into public.conversions as v
-          (click_id, creative_id, field, txid, status, payout, currency)
+          (click_id, creative_id, field, goal, txid, status, payout, currency)
         values
-          (p_click_id, v_creative, v_field, p_txid, p_status,
+          (p_click_id, v_creative, v_field, v_goal, p_txid, p_status,
            coalesce(p_payout, 0), coalesce(p_currency, 'USD'))
-        on conflict (click_id, txid) do update
+        on conflict (click_id, goal, txid) do update
           set status   = case when excluded.status = 'pending' and v.status <> 'pending'
                               then v.status else excluded.status end,
               payout   = case when excluded.status = 'pending' and v.status <> 'pending'
@@ -652,8 +720,35 @@ begin
 end;
 $$;
 
-revoke all on function public.record_postback(text, text, text, numeric, text, text, text, jsonb) from public;
-grant execute on function public.record_postback(text, text, text, numeric, text, text, text, jsonb) to service_role;
+revoke all on function public.record_postback(text, text, text, numeric, text, text, text, jsonb, text) from public;
+grant execute on function public.record_postback(text, text, text, numeric, text, text, text, jsonb, text) to service_role;
+
+-- The pre-ADR-0027 identity, dropped only after record_postback() stops
+-- upserting on it, so a statement-by-statement apply never leaves the current
+-- function naming a key that is gone. One case remains: a call to the old
+-- function already waiting on this file's locks re-plans after the commit,
+-- finds its conflict key dropped, and fails once — a 503 that the network's
+-- retry answers on the new function.
+alter table public.conversions drop constraint if exists conversions_click_txid_key;
+
+-- record_postback()'s `on conflict` names (click_id, goal, txid) and nothing
+-- else. Any other unique key — the old one under a name this file did not
+-- give it, say — would turn a registration and a deposit on one click into a
+-- unique violation the upsert cannot absorb: a 503 retried for ever. Fail the
+-- apply instead, loudly, before it commits.
+do $$
+begin
+  if exists (
+    select 1 from pg_index i
+     where i.indrelid = 'public.conversions'::regclass
+       and i.indisunique
+       and not i.indisprimary
+       and i.indexrelid <> 'public.conversions_click_goal_txid_key'::regclass
+  ) then
+    raise exception 'public.conversions has a unique key other than (click_id, goal, txid)';
+  end if;
+end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Retention for the tracking tables. Called by the daily cron beside
@@ -767,9 +862,9 @@ create policy subscriptions_select_own on public.subscriptions
 -- (ADR-0023). No policy, so no direct client access. Clicks are written only by
 -- record_click() (from `/r`), conversions and the log only by record_postback(),
 -- both with the service role. The owner reads through
--- get_creative_conversions(), ensure_postback_key(), has_postback_key() and
--- get_postback_log(), and rotates the key with rotate_postback_key() — each
--- scoped to auth.uid() inside.
+-- get_creative_conversions(), get_creative_conversion_goals() (ADR-0027),
+-- ensure_postback_key(), has_postback_key() and get_postback_log(), and rotates
+-- the key with rotate_postback_key() — each scoped to auth.uid() inside.
 
 -- ---------------------------------------------------------------------------
 -- Storage: creative-media (advertiser-uploaded creative assets)
@@ -1188,6 +1283,72 @@ revoke all on function public.get_creative_conversions(uuid, int) from public;
 grant execute on function public.get_creative_conversions(uuid, int) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Conversions by goal for one creative (ADR-0027)
+-- ---------------------------------------------------------------------------
+-- The same window, the same bucketing by the first postback's time and the same
+-- `owned` check as get_creative_conversions(): the report's by-goal table has
+-- to add up to the strip above it. One row per goal, '' included when some
+-- conversions came without one. No clicks: a click does not know which goal it
+-- will reach, so every goal shares the creative's tracked clicks as its
+-- denominator, and the page already has those.
+create or replace function public.get_creative_conversion_goals(
+  p_creative_id uuid,
+  p_days        int default 30
+)
+returns table (
+  goal     text,
+  approved bigint,
+  pending  bigint,
+  rejected bigint,
+  revenue  jsonb
+)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with owned as (
+    select c.id from public.creatives c
+     where c.id = p_creative_id
+       and c.user_id = (select auth.uid())
+  ), since as (
+    select date_trunc('day', now(), 'UTC')
+             - make_interval(days => least(greatest(coalesce(p_days, 30), 1), 90) - 1) as t
+  ), x as (
+    select v.goal, v.status, v.payout, v.currency
+      from public.conversions v
+     where v.creative_id = (select id from owned)
+       and v.created_at >= (select t from since)
+  ), g as (
+    select x.goal,
+           count(*) filter (where x.status = 'approved') as approved,
+           count(*) filter (where x.status = 'pending')  as pending,
+           count(*) filter (where x.status = 'rejected') as rejected
+      from x
+     group by x.goal
+  ), r as (
+    select y.goal, jsonb_object_agg(y.currency, y.amount) as revenue
+      from (
+        select x.goal, x.currency, sum(x.payout) as amount
+          from x
+         where x.status = 'approved'
+         group by 1, 2
+      ) y
+     group by y.goal
+  )
+  select g.goal, g.approved, g.pending, g.rejected, coalesce(r.revenue, '{}'::jsonb)
+    from g
+    left join r on r.goal = g.goal
+   order by 1;
+$$;
+
+comment on function public.get_creative_conversion_goals(uuid, int) is
+  'Postback conversions per goal for one creative the caller owns, over the same window as get_creative_conversions() (ADR-0027).';
+
+revoke all on function public.get_creative_conversion_goals(uuid, int) from public;
+grant execute on function public.get_creative_conversion_goals(uuid, int) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- The owner's postback key and log (ADR-0023)
 -- ---------------------------------------------------------------------------
 -- The key is made on first sight rather than at sign-up: most accounts never
@@ -1284,6 +1445,11 @@ grant execute on function public.ensure_postback_key() to authenticated;
 grant execute on function public.rotate_postback_key() to authenticated;
 grant execute on function public.has_postback_key() to authenticated;
 grant execute on function public.get_postback_log(int) to authenticated;
+
+-- PostgREST caches the schema it exposes. Supabase reloads it on DDL by itself;
+-- saying so here costs nothing and does not depend on that trigger, so a new
+-- function or argument (ADR-0027's `p_goal`) is callable the moment this commits.
+notify pgrst, 'reload schema';
 
 commit;
 

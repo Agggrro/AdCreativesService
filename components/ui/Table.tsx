@@ -58,9 +58,11 @@ export function railRow(tone: Tone | null): string {
 /**
  * 32px row, for machine readouts only.
  *
- * A readout is a table the system emits and the reader scans — the validator's
- * run timeline, feature matrix, wrapper chain and parser-versus-player table.
- * A list of things the user owns stays at 44px, always.
+ * A readout is a table the system emits and the reader scans as a stream — the
+ * validator's run timeline, feature matrix, wrapper chain and parser-versus-player
+ * table, the postback log, the conversion report's by-day table. A list of things
+ * the user owns stays at 44px, always, and so does a handful of summary rows the
+ * system emits (the report's by-goal table): that is not a stream.
  *
  * The bar this density has to clear is legibility of the whole run, not fitting
  * more in: a sixty-row timeline at 44px is 2,640px of scrolling and the reader

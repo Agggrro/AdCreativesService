@@ -36,8 +36,10 @@ product thesis is validated.
     ([ADR-0023](decisions/0023-conversion-postbacks.md)). Click destinations go through
     the `/r` redirect, which mints a click id; partner networks post conversions to `/pb`
     with it; the creative page reports clicks, conversions, revenue, CR and EPC over 30
-    days. **Relay** of conversions to the traffic source, pixel postbacks and custom
-    status mappings are out of scope.
+    days, and splits conversions by the goal the network reports — a registration and a
+    deposit on one click are two conversions
+    ([ADR-0027](decisions/0027-conversion-goals.md)). **Relay** of conversions to the
+    traffic source, pixel postbacks and custom status mappings are out of scope.
 
 ## Implementation status (2026-06-30)
 

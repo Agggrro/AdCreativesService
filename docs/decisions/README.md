@@ -37,10 +37,11 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0020](0020-validator-reports-faults-not-opinions.md) | The validator reports faults, not opinions | Accepted |
 | [0021](0021-validator-player-on-an-isolated-origin.md) | The validator's player runs on an isolated origin | Accepted |
 | [0022](0022-midnight-design-system.md) | "Midnight": one dark theme, a pastel warm accent, and creatives outside the system | Accepted |
-| [0023](0023-conversion-postbacks.md) | Conversion postbacks: a click redirect, per-click rows, and an S2S endpoint | Accepted |
+| [0023](0023-conversion-postbacks.md) | Conversion postbacks: a click redirect, per-click rows, and an S2S endpoint | Accepted (conversion identity amended by 0027) |
 | [0024](0024-pick-message-template.md) | Pick & Message: a message card inside the ad, and sound only on the viewer's tap | Accepted |
 | [0025](0025-media-fit-by-height.md) | Advertiser media fit by height, with a blurred fill | Accepted |
 | [0026](0026-vast-cors-credentialed-requests.md) | VAST responses answer credentialed requests, as VAST 4.2 requires | Accepted |
+| [0027](0027-conversion-goals.md) | Conversion goals: a goal on the postback, one conversion per goal per click | Accepted |
 
 ## Template
 

@@ -140,13 +140,15 @@ What partner networks reported. Kept for good — they are the record.
 | `click_id` | the click it credits. **Not a foreign key**, on purpose: clicks are purged at 90 days and a conversion must outlive its click |
 | `creative_id` | FK → creatives, `on delete cascade`; copied off the click at insert, as is `field` |
 | `field` | the exit, as on the click |
-| `txid` | the network's transaction id, `''` when it sends none. `unique (click_id, txid)` — one conversion per click unless the network distinguishes several, and a repeat postback updates rather than duplicates |
+| `goal` | the goal the network reported — its goal id or name, kept as sent — or `''` when it sends none; CHECK ≤ 64 characters ([ADR-0027](decisions/0027-conversion-goals.md)) |
+| `txid` | the network's transaction id, `''` when it sends none. `unique (click_id, goal, txid)` — one conversion per goal per click unless the network distinguishes several with a txid, and a repeat postback updates rather than duplicates. Was `(click_id, txid)` before ADR-0027; every older row has goal `''` |
 | `status` | `approved` \| `pending` \| `rejected` (text + CHECK, not an enum), normalized from what the network sent by `lib/postback.ts`. A late `pending` never overwrites `approved` or `rejected` |
 | `payout` | numeric(14,4), 0 when not sent |
 | `currency` | ISO 4217 code, `USD` when not sent. No FX: reports sum per currency |
 | `created_at`, `updated_at` | `created_at` is when the first postback arrived — reports bucket by it, so a conversion stays on that day while a later status change moves it between approved, pending and rejected there |
 
-Written only by `record_postback()`. Read through `get_creative_conversions()`.
+Written only by `record_postback()`. Read through `get_creative_conversions()` and
+`get_creative_conversion_goals()`.
 
 #### `postback_keys`
 | Field | Notes |
@@ -169,7 +171,7 @@ only an HTTP status. A wrong key writes nothing.
 | `id` | bigint identity PK |
 | `user_id` | FK → auth user |
 | `received_at` | ts |
-| `params` | jsonb: the five parameters `/pb` reads, as received, each truncated to 128 characters, NUL removed. CHECK ≤ 4 KB. Nothing else from the request |
+| `params` | jsonb: the six parameters `/pb` reads, as received, each truncated to 128 characters (never inside a surrogate pair), NUL removed. CHECK ≤ 4 KB. Nothing else from the request |
 | `result` | `created`, `updated`, `unchanged` (a retry, or a late `pending` after a final status), or a rejection code (`unknown_click`, `expired_click`, `bad_click_id`, `unexpanded_macro`, …) |
 
 Read through `get_postback_log()`; purged after **7 days**. At most 3,600 rows per account
@@ -181,9 +183,10 @@ processed and only its log line is skipped.
 | Function | Caller | Does |
 | --- | --- | --- |
 | `record_click(click_id, creative_id, field, country, per_minute)` | service role (`/r`) | Inserts the click unless the creative already has `per_minute` clicks in the last minute. Returns whether it wrote |
-| `record_postback(key, click_id, status, payout, currency, txid, error, params)` | service role (`/pb`) | Resolves the key to its owner; updates the owner's conversion for `(click_id, txid)` if there is one (no window; `unchanged` when nothing would change), else inserts if the click is the owner's and under 30 days old; logs the hit. Returns the result code |
+| `record_postback(key, click_id, status, payout, currency, txid, error, params, goal = '')` | service role (`/pb`) | Resolves the key to its owner; updates the owner's conversion for `(click_id, goal, txid)` if there is one (no window; `unchanged` when nothing would change), else inserts if the click is the owner's and under 30 days old; logs the hit. Returns the result code. `goal` is last and defaulted, so a caller passing the eight earlier arguments still resolves (ADR-0027) |
 | `purge_tracking_data(click_days, log_days)` | service role (daily cron) | Retention for clicks and the log. Floors of 31 and 1 days, whatever is passed — a click must outlive the attribution window |
 | `get_creative_conversions(creative_id, days)` | authenticated | Clicks and approved/pending/rejected counts plus approved revenue per currency, per (UTC day, exit), for **one creative the caller owns** — the ownership check is inside |
+| `get_creative_conversion_goals(creative_id, days)` | authenticated | The same window, bucketing and ownership check, per goal: approved/pending/rejected counts and approved revenue per currency. No clicks — a click has no goal (ADR-0027) |
 | `ensure_postback_key()` / `rotate_postback_key()` / `has_postback_key()` / `get_postback_log(limit)` | authenticated | The caller's own key and log, scoped to `auth.uid()` |
 
 ### `stripe_events` (webhook idempotency)

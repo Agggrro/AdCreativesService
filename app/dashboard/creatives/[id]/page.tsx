@@ -64,6 +64,7 @@ export default async function CreativePage({
     { data: creative },
     { data: overview, error: overviewError },
     { data: conversions, error: conversionsError },
+    { data: goals, error: goalsError },
     { data: hasPostbackKey },
   ] = await Promise.all([
     supabase
@@ -75,6 +76,11 @@ export default async function CreativePage({
     // Owner-checked inside the function: a foreign id reads as no rows, and
     // the creative lookup above has already 404'd it by then anyway.
     supabase.rpc("get_creative_conversions", {
+      p_creative_id: id,
+      p_days: REPORT_DAYS,
+    }),
+    // The same window per goal (ADR-0027), owner-checked the same way.
+    supabase.rpc("get_creative_conversion_goals", {
       p_creative_id: id,
       p_days: REPORT_DAYS,
     }),
@@ -274,11 +280,15 @@ export default async function CreativePage({
 
       {/* Last on the page: a report read after the tag is copied, and the one
           section here with tables long enough to push the tag out of view. */}
+      {/* One reading, so one availability: a report whose goal split failed
+          to load would otherwise show totals the missing table cannot
+          explain, with nothing saying anything is missing. */}
       <ConversionReport
         dict={dict}
         locale={locale}
         rows={conversions ?? []}
-        available={!conversionsError}
+        goals={goals ?? []}
+        available={!conversionsError && !goalsError}
         exits={exits}
         exitsMissingMacro={exitsMissingMacro}
         editHref={`/dashboard/creatives/${creative.id}/edit`}

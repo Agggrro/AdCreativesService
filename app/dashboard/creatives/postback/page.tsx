@@ -4,7 +4,12 @@ import { getSiteUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
 import type { Dict } from "@/lib/i18n/dictionaries";
 import { asJsonObject } from "@/lib/json";
-import { isPostbackSuccess, POSTBACK_PARAMS, STATUS_ALIASES } from "@/lib/postback";
+import {
+  GOAL_MAX_LENGTH,
+  isPostbackSuccess,
+  POSTBACK_PARAMS,
+  STATUS_ALIASES,
+} from "@/lib/postback";
 import { CopyButton } from "@/components/CopyButton";
 import { ConfirmAction } from "@/components/ui/ConfirmAction";
 import { MacroText } from "@/components/ui/MacroText";
@@ -60,6 +65,24 @@ function resultText(dict: Dict, result: string): string {
 /** Machine time, same in both locales: the log is read against a network's own. */
 function utcTime(iso: string): string {
   return new Date(iso).toISOString().slice(0, 19).replace("T", " ");
+}
+
+/**
+ * How one logged parameter wraps. A click id broken across two lines cannot be
+ * compared against the network's log by eye, so machine values stay on one
+ * line. The free-form txid (up to 128 characters) breaks anywhere. A goal
+ * (ADR-0027) wraps at its spaces and never inside a word — it is matched by eye
+ * against the network's report too, and an eighth column that refused to wrap
+ * pushed the log past its frame at every desktop width. A goal too long to be
+ * one breaks anywhere like txid: logged at up to 128 characters, it would
+ * otherwise widen the whole log for the week it stays in it.
+ */
+function logWrap(name: (typeof POSTBACK_PARAMS)[number], value: unknown): string {
+  if (name === "txid") return "break-all";
+  if (name === "goal") {
+    return typeof value === "string" && value.length > GOAL_MAX_LENGTH ? "break-all" : "";
+  }
+  return "whitespace-nowrap";
 }
 
 export default async function PostbackPage({
@@ -220,7 +243,10 @@ export default async function PostbackPage({
             <table className="w-full border-collapse">
               <TableHead>
                 <th className={HEAD_TIGHT}>{t.time}</th>
-                <th className={`${HEAD_TIGHT} min-w-80`}>{t.result}</th>
+                {/* 288px: a landed postback's reason stays one line, a long one
+                    wraps under its word — and eight columns still fit the
+                    1,072px the content is at its narrowest desktop width. */}
+                <th className={`${HEAD_TIGHT} min-w-72`}>{t.result}</th>
                 {POSTBACK_PARAMS.map((name) => (
                   <th
                     key={name}
@@ -262,12 +288,9 @@ export default async function PostbackPage({
                         return (
                           <td
                             key={name}
-                            // A click id broken across two lines cannot be
-                            // compared against the network's log by eye; only
-                            // the free-form txid (up to 128 characters) wraps.
-                            className={`${CELL_TIGHT} data-instr ${
-                              name === "txid" ? "break-all" : "whitespace-nowrap"
-                            } ${name === "payout" ? "text-right" : ""} ${
+                            className={`${CELL_TIGHT} data-instr ${logWrap(name, value)} ${
+                              name === "payout" ? "text-right" : ""
+                            } ${
                               typeof value === "string" ? "" : "text-fg-muted"
                             }`}
                           >

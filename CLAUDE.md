@@ -107,6 +107,8 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
   against a running dev server. It pins the fixture corpus and the dry-run guarantee;
   a false positive on a conformant tag is as much a defect as a missed violation.
 - After any Supabase migration, query, or RLS change → **`supabase-rls-auditor`** subagent.
+- After changing the postback parser (`lib/postback.ts`, the trust boundary for what a
+  partner network sends `/pb`) → `npm run test:postback`. See [ADR-0027](docs/decisions/0027-conversion-goals.md).
 - After any Stripe/subscription/webhook change → **`billing-integrity-reviewer`** subagent.
 - After changing **either** copy of the entitlement predicate — `private.is_entitled` in
   `supabase/schema.sql` or `lib/serving/entitlement.ts` — change the other in the same

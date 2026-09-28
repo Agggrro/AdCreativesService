@@ -15,13 +15,30 @@ import type { ConversionStatus } from "@/types/database.types";
  *
  *   /pb?key=<key>&click_id=<the sub-id our {click_id} went into>
  *      &status=<status>&payout=<payout>&currency=<ISO code>&txid=<transaction id>
+ *      &goal=<goal id or name>
  */
 
 /** A postback key as ensure_postback_key() mints it: 32 lower-case hex. */
 export const POSTBACK_KEY_RE = /^[0-9a-f]{32}$/;
 
 /** The parameters `/pb` reads. Anything else in the request is ignored. */
-export const POSTBACK_PARAMS = ["click_id", "status", "payout", "currency", "txid"] as const;
+export const POSTBACK_PARAMS = [
+  "click_id",
+  "status",
+  "payout",
+  "currency",
+  "txid",
+  "goal",
+] as const;
+
+/**
+ * Longest goal accepted — `conversions_goal_length` in supabase/schema.sql,
+ * which record_postback() also checks (ADR-0027); change the three together. A
+ * goal is a label a report prints as a row, not free text: a network's goal id
+ * or name, `reg`, `deposit`, `2`. Measured in UTF-16 units, which is never
+ * fewer than Postgres's characters, so nothing that passes here fails there.
+ */
+export const GOAL_MAX_LENGTH = 64;
 
 /**
  * What a network may send as a status, and what it means here.
@@ -79,7 +96,8 @@ export type PostbackParseError =
   | "bad_status"
   | "bad_payout"
   | "bad_currency"
-  | "bad_txid";
+  | "bad_txid"
+  | "bad_goal";
 
 export interface PostbackInput {
   clickId: string | null;
@@ -87,6 +105,8 @@ export interface PostbackInput {
   payout: number | null;
   currency: string | null;
   txid: string;
+  /** '' when the network sends none — a conversion with no goal (ADR-0027). */
+  goal: string;
   error: PostbackParseError | null;
   /** The raw parameters as received, truncated — what the owner's log shows. */
   params: Record<string, string>;
@@ -115,6 +135,17 @@ function withoutNul(value: string | null): string | null {
   return value === null ? null : value.replace(/\u0000/g, "");
 }
 
+/**
+ * Cut to `max` UTF-16 units without splitting a surrogate pair. `slice` alone
+ * can end on the first half of an emoji, and a lone half is not valid JSON to
+ * PostgREST: it refuses the whole record_postback() call, the route answers
+ * 503, and the network retries that postback forever — the NUL failure again.
+ */
+function truncate(value: string, max: number): string {
+  const cut = value.slice(0, max);
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
+
 /** Parse one postback. Never throws: a malformed input is an `error`, logged for the owner. */
 export function parsePostback(readRaw: (name: string) => string | null): PostbackInput {
   const read = (name: string) => withoutNul(readRaw(name));
@@ -122,7 +153,7 @@ export function parsePostback(readRaw: (name: string) => string | null): Postbac
   const params: Record<string, string> = {};
   for (const name of POSTBACK_PARAMS) {
     const value = read(name);
-    if (value !== null) params[name] = value.slice(0, LOG_VALUE_MAX);
+    if (value !== null) params[name] = truncate(value, LOG_VALUE_MAX);
   }
 
   const fail = (error: PostbackParseError): PostbackInput => ({
@@ -131,6 +162,7 @@ export function parsePostback(readRaw: (name: string) => string | null): Postbac
     payout: null,
     currency: null,
     txid: "",
+    goal: "",
     error,
     params,
   });
@@ -152,6 +184,7 @@ export function parsePostback(readRaw: (name: string) => string | null): Postbac
   const rawPayout = optional("payout");
   const rawCurrency = optional("currency");
   const rawTxid = optional("txid");
+  const rawGoal = optional("goal");
   if (unexpanded) return fail("unexpanded_macro");
 
   // No status at all is approved: a network that sends none fires only on the
@@ -187,6 +220,13 @@ export function parsePostback(readRaw: (name: string) => string | null): Postbac
   const txid = rawTxid ?? "";
   if (txid.length > 128) return fail("bad_txid");
 
-  return { clickId, status, payout, currency, txid, error: null, params };
+  // Kept as sent, case included: it is the network's own label, and the owner
+  // matches it by eye against that network's report. Part of a conversion's
+  // identity — (click, goal, txid) — so one click can carry a registration
+  // and a deposit, and each one's status updates find their own row.
+  const goal = rawGoal ?? "";
+  if (goal.length > GOAL_MAX_LENGTH) return fail("bad_goal");
+
+  return { clickId, status, payout, currency, txid, goal, error: null, params };
 }
 
