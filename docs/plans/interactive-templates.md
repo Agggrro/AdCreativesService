@@ -16,7 +16,12 @@ VAST endpoint we already built:
    moves left–right or up–down, chosen per creative (`direction`; absent means
    horizontal, so creatives saved before the option existed are unchanged). The CTA
    sits at the bottom centre, or at the right edge, vertically centred, when the
-   divider moves up–down.
+   divider moves up–down. Until the viewer first grabs the divider, a ring pulses
+   round its knob and a dark glass pill beside it carries `hintText` (default "PULL",
+   so saved creatives show it too) with an arrow pointing the way to drag — on
+   whichever side of the knob has room, clear of the CTA and the close control; under
+   `prefers-reduced-motion` both only pulse in opacity, and nothing travels. It fades
+   at the first grab (`tpl:hint` records where it went and when it left).
 3. **Quick Setup Quiz** — one to three A/B questions with image options → honest
    "see results" CTA (no fabricated match data). Since
    [ADR-0011](../decisions/0011-conditional-grouped-config-schemas.md) the exit is

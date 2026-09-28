@@ -15,7 +15,7 @@ export interface RuntimeManifest {
 }
 
 export const RUNTIME_MANIFEST: RuntimeManifest = {
-  "generatedAt": "2026-09-28T11:02:43.198Z",
+  "generatedAt": "2026-09-28T13:25:44.598Z",
   "assets": {
     "age-gate/vpaid.js": {
       "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/age-gate/vpaid.29339a78.js",
@@ -42,8 +42,8 @@ export const RUNTIME_MANIFEST: RuntimeManifest = {
       "sha256": "a77fdffff6ef75abfbfc91b9bb2e3fa763f7b6f24abb74031cbbd90a19b35bea"
     },
     "slider/vpaid.js": {
-      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/slider/vpaid.5b25769e.js",
-      "sha256": "5b25769e2b24de4b343d48065f79416a7be9eed68967782fdcd4e2dffe782eb3"
+      "url": "https://gr2mdnykh85uvpdw.public.blob.vercel-storage.com/runtime/slider/vpaid.357f295b.js",
+      "sha256": "357f295b0153f544f28657d1bbbcc5d7ec5fefb3d057ce71053cc9ecb9d77788"
     }
   }
 };

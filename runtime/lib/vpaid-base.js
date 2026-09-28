@@ -692,6 +692,10 @@ CreoSmithVpaid.prototype._mountCloseControl = function () {
   // value would cross setTimeout's ~24.8-day int32 overflow and fire
   // immediately — the opposite of a "mandatory" delay.
   var delaySeconds = Math.min(Math.max(Number(this._params.closeDelaySeconds) || 5, 1), 30);
+  // The box below — SIZE square, 10px in from the top-right corner — is copied
+  // into the slider's hint placement (templates/slider/vpaid.js, placeHint),
+  // which keeps its pill off this control while onStart runs, before it exists.
+  // Move or resize it and change that copy too.
   var SIZE = 26,
     R = 11,
     C = 2 * Math.PI * R;

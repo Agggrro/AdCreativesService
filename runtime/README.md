@@ -26,10 +26,14 @@ document.
   unit into an iframe of its own and builds the slot in the host page
   (`fluid-player/src/modules/vpaid.js` `loadVpaid`, `adsupport.js`
   `switchPlayerToVpaidMode`). So anything a template binds to a window — a drag's
-  `mouseup`, a `resize` fallback, the `ResizeObserver` constructor — belongs to
-  `slot.ownerDocument.defaultView`, not to `window`: bound to the unit's own window, a
-  drag in Fluid never ends. The harness loads the unit into the slot's own document and
-  cannot show this.
+  `mouseup`, a `resize` fallback, the `ResizeObserver` constructor, a `matchMedia`
+  query — belongs to `slot.ownerDocument.defaultView`, not to `window`: bound to the
+  unit's own window, a drag in Fluid never ends. The harness loads the unit into the
+  slot's own document and cannot show this.
+  The slot also sits under the host page's styles there, and inherits what CSS
+  inherits — `direction` among it: on a right-to-left page a flex row runs right to
+  left. A row whose order carries meaning (the slider's two chevrons, its hint's
+  arrow leading the word) pins `direction:ltr`.
 - `build.mjs` concatenates each render module with the shared base, then
   minifies the result with `terser` (mangle + compress, comments stripped —
   deliberately no control-flow-flattening/self-defending obfuscation, which

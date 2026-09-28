@@ -55,6 +55,10 @@ insert into public.templates (
   -- without it, and needs no migration: the unit reads an absent value as
   -- horizontal, and the edit form starts a select missing from `config_json` at
   -- its default. Keep both true, or those creatives change under their owners.
+  -- `hintText` is the opposite case, on purpose: an absent value — a creative
+  -- saved before the field, or one whose field was cleared, which the form drops —
+  -- shows the default "PULL", so every saved slider gains the hint with the unit.
+  -- The hint is what tells a viewer the divider moves at all.
   (
     '00000000-0000-4000-8000-000000000003',
     'Before / After Slider',
@@ -69,6 +73,7 @@ insert into public.templates (
        {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true},
        {"name":"direction","label":"Divider movement","type":"select","required":true,"default":"horizontal","options":[{"value":"horizontal","label":"Horizontal — left and right"},{"value":"vertical","label":"Vertical — up and down"}],"help":"Horizontal puts the after image to the left of the divider; vertical puts it above."},
        {"name":"startPercent","label":"Start position (%)","type":"range","min":0,"max":100,"default":50,"help":"Where the divider starts: from the left edge, or from the top edge when it moves vertically."},
+       {"name":"hintText","label":"Handle hint","type":"text","default":"PULL","help":"Shown beside the handle, with an arrow pointing the way to drag, until the viewer first grabs it: PULL, Потяни, or your own word."},
        {"name":"ctaText","label":"Button text","type":"text","default":"See more"}
      ]}'::jsonb,
     'standard',
