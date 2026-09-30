@@ -16,12 +16,18 @@ VAST endpoint we already built:
    moves left–right or up–down, chosen per creative (`direction`; absent means
    horizontal, so creatives saved before the option existed are unchanged). The CTA
    sits at the bottom centre, or at the right edge, vertically centred, when the
-   divider moves up–down. Until the viewer first grabs the divider, a ring pulses
-   round its knob and a dark glass pill beside it carries `hintText` (default "PULL",
-   so saved creatives show it too) with an arrow pointing the way to drag — on
-   whichever side of the knob has room, clear of the CTA and the close control; under
-   `prefers-reduced-motion` both only pulse in opacity, and nothing travels. It fades
-   at the first grab (`tpl:hint` records where it went and when it left).
+   divider moves up–down. Until the viewer first grabs the divider, the knob says it
+   can be grabbed, as `hintStyle` chooses: `label` (the default, so saved creatives
+   show it too) makes the knob a 30px white capsule holding `hintText` (default
+   "PULL") between two nudging chevrons, which shrinks back into the round knob at the
+   first grab — nothing laid over the picture beyond the handle itself; `arrows` keeps
+   the round knob, its chevrons nudging and a ring pulsing; `off` shows nothing. The
+   capsule stays inside the slot, left of the CTA and clear of the close control, a
+   long word ending in an ellipsis. `hintSwing` (`off` unless chosen) also swings the
+   divider by itself every few seconds for about half a minute, showing a sliver of
+   the after image. Under `prefers-reduced-motion` nothing travels and the swing does
+   not run. `tpl:hint` records the style, the swing and the knob's size at mount, and
+   when and why the hint went.
 3. **Quick Setup Quiz** — one to three A/B questions with image options → honest
    "see results" CTA (no fabricated match data). Since
    [ADR-0011](../decisions/0011-conditional-grouped-config-schemas.md) the exit is

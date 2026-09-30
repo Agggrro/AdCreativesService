@@ -20,6 +20,10 @@ document.
   does not end by itself (animations, observers, audio) it stops in an
   `api.onStop(fn)` cleanup, which the base runs on every terminal path — and after
   which `api.clickThrough()` does nothing ([ADR-0024](../docs/decisions/0024-pick-message-template.md)).
+  An animation that runs until the viewer acts sticks to `transform` and `opacity`;
+  one that moves layout or repaints on every frame (`top`/`left`, `clip-path` — the
+  slider's swing) runs a bounded number of times, because Chrome's heavy-ad
+  intervention meters a unit's main-thread time and an ad can sit on screen untouched.
 - `templates/<name>/vpaid.js` — one render module per template, defining `var
   TEMPLATE = { name, duration, onStart }`.
   **The slot is not always in the document the unit runs in.** Fluid Player loads the
@@ -32,8 +36,8 @@ document.
   slot's own document and cannot show this.
   The slot also sits under the host page's styles there, and inherits what CSS
   inherits — `direction` among it: on a right-to-left page a flex row runs right to
-  left. A row whose order carries meaning (the slider's two chevrons, its hint's
-  arrow leading the word) pins `direction:ltr`.
+  left. A row whose order carries meaning (the slider knob's two chevrons, or the
+  word between them in its capsule) pins `direction:ltr`.
 - `build.mjs` concatenates each render module with the shared base, then
   minifies the result with `terser` (mangle + compress, comments stripped —
   deliberately no control-flow-flattening/self-defending obfuscation, which

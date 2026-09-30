@@ -2,8 +2,8 @@
  * Dress/Undress (Before/After) Slider — VPAID render module.
  * Two same-framed images; a draggable divider reveals the "after" image over the
  * "before". A CTA fires the click-through. Config (AdParameters):
- * imageBeforeUrl, imageAfterUrl, direction, startPercent, hintText, ctaText,
- * clickThroughUrl.
+ * imageBeforeUrl, imageAfterUrl, direction, startPercent, hintStyle, hintText,
+ * hintSwing, ctaText, clickThroughUrl.
  *
  * `direction` is "horizontal" — the divider moves left and right, "after" to its
  * left — or "vertical" — it moves up and down, "after" above it. Anything else is
@@ -13,13 +13,20 @@
  * The CTA sits at the bottom centre; in vertical mode, where the divider sweeps
  * the whole height, it sits at the right edge instead, centred in the height.
  *
- * Until the viewer first grabs the divider, the unit says it can be grabbed: a
- * ring pulses round the knob, and beside it a pill carries `hintText` (default
- * "PULL") with an arrow that keeps nudging the way to drag — toward whichever
- * side of the slot has the room, flipped and nudged clear of the edges, the CTA
- * and the close control. Everything drawn over the advertiser's picture carries
- * its own contrast (a dark glass pill, a white knob on a dark shadow, a haloed
- * line), because that picture can be anything.
+ * Until the viewer first grabs the divider, the unit says it can be grabbed, in
+ * the way `hintStyle` names:
+ * - "label" (the default, absent included): the knob is a white capsule holding
+ *   `hintText` (default "PULL") between the two ways to drag, its chevrons
+ *   nudging outward. Nothing is laid over the picture beyond the handle itself,
+ *   and at the first grab the capsule shrinks back into the round knob.
+ * - "arrows": the round knob alone, its chevrons nudging, a ring pulsing round it.
+ * - "off": nothing.
+ * `hintSwing` "on" adds, to any of them, the divider swinging by itself — out,
+ * back past its start, to rest — every few seconds for about half a minute,
+ * showing a sliver of "after".
+ * Everything drawn over the advertiser's picture carries its own contrast (a
+ * white knob on a dark shadow, a haloed line), because that picture can be
+ * anything.
  */
 var TEMPLATE = {
   name: "slider",
@@ -38,20 +45,29 @@ var TEMPLATE = {
     // 44px across: the floor for anything a finger has to find
     // (docs/design-system.md §8). The knob this replaced was 34.
     var KNOB = 44;
-    var KNOB_GAP = 8; // clear space kept between the knob or the hint and the CTA, px
+    // The capsule is shorter than the round knob — it carries a word across the
+    // picture and should cover as little of it as a word allows. It is no
+    // smaller a target for that: the whole slot is the drag surface.
+    var CAP_H = 30;
+    var KNOB_GAP = 8; // clear space kept between the knob and the CTA, px
     var CTA_EDGE = 14; // the CTA's offset from the slot edge it sits against, px
-    var HINT_GAP = 10; // between the knob's rim and the hint, px
-    var EDGE = 8; // the least room the hint leaves to any edge of the slot, px
+    var EDGE = 8; // the least room the capsule leaves to any edge of the slot, px
+    var SWING = 12; // the swing's first peak, % of the axis
+    var SWINGS = 10; // how many before the divider rests
+    var TURN = { right: 0, down: 90, left: 180, up: -90 };
     var FONT = "system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
+    var hintStyle =
+      params.hintStyle === "arrows" || params.hintStyle === "off" ? params.hintStyle : "label";
     var hintText = (typeof params.hintText === "string" && params.hintText.trim()) || "PULL";
-    // Under reduced motion nothing travels: the ring and the arrow still pulse,
-    // in opacity alone, and the hint appears where it stands.
+    // Under reduced motion nothing travels: the chevrons rest, the ring pulses in
+    // opacity alone, and the swing — nothing but movement — does not run at all.
     var still = false;
     try {
       still = !!(win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches);
     } catch (e) {
       /* no matchMedia: animate */
     }
+    var swing = params.hintSwing === "on" && !still;
 
     // The axis is reported with the size, because every later `position`
     // record means something different on each: 80% from the left edge, or
@@ -60,6 +76,8 @@ var TEMPLATE = {
       w: slot.clientWidth,
       h: slot.clientHeight,
       direction: vertical ? "vertical" : "horizontal",
+      hint: hintStyle,
+      swing: swing ? "on" : "off",
       motion: still ? "reduced" : "full",
     });
 
@@ -82,6 +100,9 @@ var TEMPLATE = {
         }
       }
       anims = [];
+    }
+    function clamp(v, lo, hi) {
+      return Math.max(lo, Math.min(hi, v));
     }
 
     /**
@@ -106,6 +127,29 @@ var TEMPLATE = {
       p.setAttribute("stroke-linejoin", "round");
       svg.appendChild(p);
       return svg;
+    }
+    /**
+     * A chevron turned to point `dir`. The turn is held by a wrapper, so the
+     * chevron inside can be nudged along its own axis: one motion, all four ways.
+     */
+    function pointer(dir, size) {
+      var turn = document.createElement("span");
+      turn.style.cssText = "display:block;flex:none;transform:rotate(" + TURN[dir] + "deg);";
+      var head = chevron(size, 2, "#1d1f23");
+      turn.appendChild(head);
+      return { el: turn, head: head };
+    }
+    function nudge(head, px) {
+      if (still) return;
+      animate(
+        head,
+        [
+          { transform: "translateX(0)" },
+          { transform: "translateX(" + px + "px)" },
+          { transform: "translateX(0)" },
+        ],
+        { duration: 1400, iterations: Infinity, easing: "ease-in-out" },
+      );
     }
 
     function layer(url, name) {
@@ -135,41 +179,61 @@ var TEMPLATE = {
       (vertical
         ? "left:0;right:0;height:2px;transform:translateY(-50%);cursor:ns-resize;"
         : "top:0;bottom:0;width:2px;transform:translateX(-50%);cursor:ew-resize;");
-    // The knob: a white disc on a soft dark shadow, and two chevrons pointing the
-    // two ways it travels. Centred with margins, which leaves `transform` free
-    // for the press feedback below.
+    // The knob: a white disc on a soft dark shadow, or while the "label" hint is
+    // up, a capsule. Centred with margins, which leaves `transform` free for the
+    // press feedback below; radii in pixels, since 50% of a capsule is an
+    // ellipse. Left to right whatever the page says: in a player that builds the
+    // slot in the host page, the slot inherits that page's direction, and on a
+    // right-to-left one its rows would run the other way — the two chevrons
+    // pointing at each other.
     var knob = document.createElement("div");
     knob.style.cssText =
       "position:absolute;top:50%;left:50%;box-sizing:border-box;" +
-      "width:" + KNOB + "px;height:" + KNOB + "px;" +
-      "margin:-" + KNOB / 2 + "px 0 0 -" + KNOB / 2 + "px;border-radius:50%;" +
+      "width:" + KNOB + "px;height:" + KNOB + "px;padding:0;" +
+      "margin:-" + KNOB / 2 + "px 0 0 -" + KNOB / 2 + "px;border-radius:" + KNOB / 2 + "px;" +
       "background:#fff;border:1px solid rgba(0,0,0,.08);" +
       "box-shadow:0 6px 18px rgba(0,0,0,.32),0 1px 3px rgba(0,0,0,.28);" +
-      "display:flex;align-items:center;justify-content:center;";
-    // Pulses outward until the first grab — the one signal a still picture of a
-    // line cannot give. A dark hairline keeps it visible over white.
-    var ring = document.createElement("div");
-    ring.style.cssText =
-      "position:absolute;inset:-1px;border-radius:50%;border:2px solid #fff;" +
-      "box-shadow:0 0 0 1px rgba(0,0,0,.14);pointer-events:none;opacity:0;";
-    knob.appendChild(ring);
-    // Left to right whatever the page says: in a player that builds the slot in
-    // the host page, the slot inherits that page's direction, and on a
-    // right-to-left one this row would run the other way — the two chevrons
-    // pointing at each other.
-    var grip = document.createElement("div");
-    grip.style.cssText =
       "display:flex;align-items:center;justify-content:center;direction:ltr;" +
-      (vertical ? "flex-direction:column;" : "");
-    var back = chevron(14, 2, "#1d1f23");
-    var ahead = chevron(14, 2, "#1d1f23");
-    back.style.transform = "rotate(" + (vertical ? -90 : 180) + "deg)";
-    ahead.style.transform = vertical ? "rotate(90deg)" : "";
-    grip.appendChild(back);
-    grip.appendChild(ahead);
-    knob.appendChild(grip);
+      "color:#1d1f23;font:700 12px/14px " + FONT + ";letter-spacing:.12em;" +
+      "text-transform:uppercase;white-space:nowrap;";
+    // What the knob holds — the round grip, or the capsule's word and chevrons —
+    // in one box, so swapping one for the other leaves the ring where it is.
+    // min-width:0 down the chain, or an over-long word never gives way to its
+    // ellipsis.
+    var body = document.createElement("span");
+    body.style.cssText = "display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;";
+    knob.appendChild(body);
+    // "arrows" only: a ring pulsing outward until the first grab. A dark hairline
+    // keeps it visible over white.
+    var ring = null;
+    if (hintStyle === "arrows") {
+      ring = document.createElement("div");
+      ring.style.cssText =
+        "position:absolute;inset:-1px;border-radius:50%;border:2px solid #fff;" +
+        "box-shadow:0 0 0 1px rgba(0,0,0,.14);pointer-events:none;opacity:0;";
+      knob.appendChild(ring);
+    }
     handle.appendChild(knob);
     slot.appendChild(handle);
+
+    function emptyBody() {
+      while (body.firstChild) body.removeChild(body.firstChild);
+    }
+    /** The round knob's two chevrons, pointing the two ways it travels. */
+    function showGrip(nudging) {
+      emptyBody();
+      var grip = document.createElement("span");
+      grip.style.cssText =
+        "display:flex;align-items:center;justify-content:center;" +
+        (vertical ? "flex-direction:column;" : "");
+      var dirs = vertical ? ["up", "down"] : ["left", "right"];
+      for (var i = 0; i < dirs.length; i++) {
+        var p = pointer(dirs[i], 14);
+        grip.appendChild(p.el);
+        if (nudging) nudge(p.head, 3);
+      }
+      body.appendChild(grip);
+    }
 
     // CTA. Above the handle, so a divider crossing it never covers the click.
     // At the bottom centre it would sit in the vertical divider's path for the
@@ -214,64 +278,121 @@ var TEMPLATE = {
     });
     slot.appendChild(btn);
 
-    // The hint: dark glass under white type. 70% of near-black over the picture
-    // keeps white text at 7.3:1 even on a pure white one (62% read as a washed-out
-    // grey there, at 5.4:1), before the blur the browser adds behind it where it
-    // has backdrop-filter. It never takes a pointer: the whole slot is the drag
-    // surface anyway. Left to right like the knob's grip, so the arrow leads
-    // on the side it is put on, whatever the host page's direction.
-    var hint = document.createElement("div");
-    hint.setAttribute("aria-hidden", "true");
-    hint.style.cssText =
-      "position:absolute;z-index:3;left:0;top:0;display:flex;align-items:center;gap:7px;" +
-      "direction:ltr;" +
-      "box-sizing:border-box;max-width:calc(100% - " + 2 * EDGE + "px);padding:8px 12px;" +
-      "border-radius:999px;background:rgba(14,14,18,.7);" +
-      "-webkit-backdrop-filter:blur(10px) saturate(1.4);backdrop-filter:blur(10px) saturate(1.4);" +
-      "border:1px solid rgba(255,255,255,.22);box-shadow:0 6px 20px rgba(0,0,0,.35);" +
-      "color:#fff;font:700 12px/14px " + FONT + ";letter-spacing:.12em;" +
-      "text-transform:uppercase;white-space:nowrap;pointer-events:none;visibility:hidden;";
-    var label = document.createElement("span");
-    label.textContent = hintText;
-    // min-width:0, or a flex item never shrinks below its text and the ellipsis
-    // for an over-long hint never shows.
-    label.style.cssText = "min-width:0;overflow:hidden;text-overflow:ellipsis;";
-    // The arrow: a double chevron in a fixed square, turned to face the way to
-    // drag. Turning, not redrawing, keeps the pill the same size whichever way it
-    // points, so it can be measured once and placed on either side.
-    var arrow = document.createElement("span");
-    arrow.style.cssText = "position:relative;display:block;flex:none;width:14px;height:14px;";
-    var bob = document.createElement("span");
-    bob.style.cssText = "position:absolute;inset:0;";
-    var heads = [chevron(12, 2.2, "#fff"), chevron(12, 2.2, "#fff")];
-    heads[0].style.cssText += "position:absolute;left:-2px;top:1px;";
-    heads[1].style.cssText += "position:absolute;left:4px;top:1px;";
-    bob.appendChild(heads[0]);
-    bob.appendChild(heads[1]);
-    arrow.appendChild(bob);
-    hint.appendChild(label);
-    hint.appendChild(arrow);
-    slot.appendChild(hint);
+    // --- the hint --------------------------------------------------------------
+    var hintGone = false;
+    // The capsule's state while it is up: its width as the word sets it, that
+    // width capped to the slot, and how far an edge of the slot pushed it off
+    // the line, px (at a start by the edge, it hangs inside rather than half out).
+    var capsuleOn = false;
+    var capNatural = 0;
+    var capW = 0;
+    var capShift = 0;
+    // True until the first grab when the divider swings: the knob keeps clear of
+    // the CTA across the whole swing, not just where the divider starts.
+    var swinging = swing;
+    /** How far the swing can carry the knob either way, px: 0.76 of its first peak, rounded up. */
+    function swingReach(h) {
+      return swinging ? ((SWING * 0.8) / 100) * h : 0;
+    }
+
+    /**
+     * The "label" hint: the word between the two ways to drag, in the knob itself
+     * — nothing over the picture that the knob would not cover anyway. Vertical
+     * mode stacks its chevrons before the word; horizontal puts one either side.
+     */
+    function buildCapsule() {
+      emptyBody();
+      var word = document.createElement("span");
+      word.textContent = hintText;
+      word.style.cssText = "min-width:0;overflow:hidden;text-overflow:ellipsis;";
+      // An instruction for the eye, hidden from screen readers like the chevrons:
+      // the divider has no keyboard control for it to name.
+      word.setAttribute("aria-hidden", "true");
+      if (vertical) {
+        var stack = document.createElement("span");
+        stack.style.cssText = "display:flex;flex-direction:column;align-items:center;flex:none;";
+        var up = pointer("up", 10);
+        var down = pointer("down", 10);
+        down.el.style.marginTop = "-1px";
+        stack.appendChild(up.el);
+        stack.appendChild(down.el);
+        body.appendChild(stack);
+        body.appendChild(word);
+        nudge(up.head, 2);
+        nudge(down.head, 2);
+      } else {
+        var back = pointer("left", 11);
+        var ahead = pointer("right", 11);
+        body.appendChild(back.el);
+        body.appendChild(word);
+        body.appendChild(ahead.el);
+        nudge(back.head, 3);
+        nudge(ahead.head, 3);
+      }
+      knob.style.padding = "0 12px";
+      knob.style.height = CAP_H + "px";
+      knob.style.borderRadius = CAP_H / 2 + "px";
+      capsuleOn = true;
+      measureCapsule();
+    }
+    // Measured at max-content, then pinned in pixels, which is what lets the
+    // width animate when the capsule collapses. Not shrink-to-fit: that sizes
+    // the capsule to the box it sits in, the line — 2px wide in horizontal
+    // mode, which cut the word to "PU…". Each assignment an engine does not
+    // understand is ignored, so the last one it does is the one it keeps. One
+    // pixel over, because offsetWidth rounds and a word a fraction of a pixel
+    // wider than its box still ends in an ellipsis. A slot not yet laid out
+    // measures 0; the observer measures again once it has a size.
+    function measureCapsule() {
+      knob.style.width = "auto";
+      knob.style.width = "-webkit-max-content";
+      knob.style.width = "max-content";
+      capNatural = knob.offsetWidth ? knob.offsetWidth + 1 : 0;
+    }
 
     // The vertical divider still crosses the CTA at mid-height, and a knob that
     // met the button there would sink behind it — a white rim showing past the
-    // CTA's edge. The two only meet when a long label reaches toward the centre
-    // column; then the knob steps aside to the left of the button, and back once
-    // the line has passed. Worked out in pixels, because that is how the CTA is
-    // anchored, on every move and on every resize: a player can resize the slot
-    // under a divider left parked there. With no room beside the CTA, the knob
-    // stays centred behind it.
+    // CTA's edge. The two only meet when a long label, or the capsule's width,
+    // reaches toward the centre column; then the knob steps aside to the left of
+    // the button, and back once the line has passed. Worked out in pixels,
+    // because that is how the CTA is anchored, on every move and on every
+    // resize: a player can resize the slot under a divider left parked there.
+    // With no room beside the CTA, the knob stays centred behind it.
     function knobLeft() {
       var w = slot.clientWidth;
       var h = slot.clientHeight;
+      var kw = capsuleOn ? capW : KNOB;
+      var kh = capsuleOn ? CAP_H : KNOB;
       var y = (pct / 100) * h;
-      var reach = KNOB / 2 + KNOB_GAP;
+      if (capsuleOn) y = clamp(y, kh / 2 + EDGE, h - kh / 2 - EDGE);
+      var hx = kw / 2 + KNOB_GAP;
+      var hy = kh / 2 + KNOB_GAP + swingReach(h);
       var ctaLeft = w - CTA_EDGE - btn.offsetWidth;
       var ctaHalf = btn.offsetHeight / 2;
-      var meets =
-        w / 2 + reach > ctaLeft && y + reach > h / 2 - ctaHalf && y - reach < h / 2 + ctaHalf;
-      var aside = ctaLeft - reach;
-      return meets && aside >= KNOB / 2 ? aside + "px" : "50%";
+      var meets = w / 2 + hx > ctaLeft && y + hy > h / 2 - ctaHalf && y - hy < h / 2 + ctaHalf;
+      var aside = ctaLeft - hx;
+      return meets && aside >= kw / 2 ? aside + "px" : "50%";
+    }
+    /**
+     * The widest the capsule may be, the rest of a long word giving way to an
+     * ellipsis. The slot, less its margins — and in vertical mode, where the
+     * capsule rides the centre column across the full width, less what it would
+     * run into at its height (the swing's included): at the CTA's height, the
+     * room left of the button, which the knob then steps into; near the top,
+     * whatever keeps it clear of the close control while it stays centred.
+     */
+    function capsuleRoom(w, h) {
+      var room = w - 2 * EDGE;
+      if (!vertical) return room;
+      var y = clamp((pct / 100) * h, CAP_H / 2 + EDGE, h - CAP_H / 2 - EDGE);
+      var reach = CAP_H / 2 + KNOB_GAP + swingReach(h);
+      var ctaHalf = btn.offsetHeight / 2;
+      if (y + reach > h / 2 - ctaHalf && y - reach < h / 2 + ctaHalf) {
+        room = Math.min(room, w - CTA_EDGE - btn.offsetWidth - KNOB_GAP - EDGE);
+      }
+      // The base's close control is 26px, 10px in from the top-right corner.
+      if (y - reach < 36) room = Math.min(room, w - 2 * (36 + KNOB_GAP));
+      return room;
     }
     // Horizontal mode has the mirror case on a short slot: the knob rides the
     // middle of the height, and there that puts its lower rim behind the bottom
@@ -284,8 +405,24 @@ var TEMPLATE = {
       return y < h / 2 && y >= KNOB / 2 ? y + "px" : "50%";
     }
     function placeKnob() {
+      var w = slot.clientWidth;
+      var h = slot.clientHeight;
+      if (capsuleOn) {
+        if (!capNatural) measureCapsule();
+        capW = Math.max(0, Math.min(capNatural, capsuleRoom(w, h)));
+        if (capW) knob.style.width = capW + "px";
+      }
       if (vertical) knob.style.left = knobLeft();
       else knob.style.top = knobTop();
+      if (!capsuleOn || !w || !h) return;
+      // On the line, unless that would put part of the capsule off the slot.
+      var at = (pct / 100) * (vertical ? h : w);
+      var half = (vertical ? CAP_H : capW) / 2;
+      var shift = clamp(at, half + EDGE, (vertical ? h : w) - half - EDGE) - at;
+      capShift = shift;
+      knob.style.margin = vertical
+        ? -CAP_H / 2 + shift + "px 0 0 " + -capW / 2 + "px"
+        : -CAP_H / 2 + "px 0 0 " + (-capW / 2 + shift) + "px";
     }
 
     var pct = 50;
@@ -299,241 +436,138 @@ var TEMPLATE = {
       // would force a second layout on every pointer move.
       var left = vertical ? knobLeft() : "";
       // inset(top right bottom left): trim "after" on the far side of the divider.
-      var rest = 100 - pct + "%";
-      var clip = vertical ? "inset(0 0 " + rest + " 0)" : "inset(0 " + rest + " 0 0)";
+      var clip = clipAt(pct);
       after.style.setProperty("-webkit-clip-path", clip);
       after.style.setProperty("clip-path", clip);
       handle.style[vertical ? "top" : "left"] = pct + "%";
       if (vertical) knob.style.left = left;
     }
+    function clipAt(p) {
+      var rest = 100 - p + "%";
+      return vertical ? "inset(0 0 " + rest + " 0)" : "inset(0 " + rest + " 0 0)";
+    }
+
+    if (hintStyle === "label") buildCapsule();
+    else showGrip(hintStyle === "arrows");
+
     // parseFloat, not `Number(x) || 50`, which turned a configured 0 into 50.
     // A start at the edge is a real setting: the whole "before", with the drag
     // revealing every bit of "after".
     var start = parseFloat(params.startPercent);
     setPct(isFinite(start) ? start : 50);
-    if (!vertical) placeKnob();
+    placeKnob();
 
-    // --- the hint's place ----------------------------------------------------
-    var hintDir = null;
-    var hintGone = false;
-    function hits(a, b) {
-      return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
-    }
-    function clamp(v, lo, hi) {
-      return Math.max(lo, Math.min(hi, v));
+    // --- the hint's motion -----------------------------------------------------
+    if (ring) {
+      var pulse = animate(
+        ring,
+        still
+          ? [{ opacity: 0.7 }, { opacity: 0.15 }, { opacity: 0.7 }]
+          : [
+              { transform: "scale(1)", opacity: 0.8 },
+              { transform: "scale(1.7)", opacity: 0 },
+            ],
+        { duration: still ? 2000 : 1600, iterations: Infinity, easing: "cubic-bezier(.22,.61,.36,1)" },
+      );
+      // Without Web Animations the ring still marks the knob, just unmoving.
+      if (!pulse) ring.style.opacity = ".6";
     }
     /**
-     * Beside the knob, on the side the viewer should drag toward: the far side of
-     * where the divider stands — and at exactly half, the way that reveals
-     * "after" (down, or right). The pill is only ever as wide as the room on that
-     * side, an over-long hint ending in an ellipsis rather than off the slot. It
-     * steps off the CTA and the close control sideways where there is room and
-     * along the axis where there is not (below the close control, above a bottom
-     * CTA); a side it still cannot fit gives way to the other one. Only the start
-     * position matters, since the hint goes at the first grab; it is placed again
-     * on a resize, which can change the room.
+     * The swing: a pause, then out toward the side with more room, back past the
+     * start and to rest — one damped sine, 12% of the axis at its first peak,
+     * every 3.4s. Sampled into Web Animations on the line and on the "after"
+     * picture's clip, both on the same timing, so the two keep in step with no
+     * script per frame; the knob rides the line. The capsule rides it too, and
+     * never past the slot's margin: each way, the swing goes only as far as the
+     * capsule has room — none toward an edge it already hangs against, less for
+     * a word as wide as the slot.
      */
-    function placeHint() {
-      if (hintGone) return;
-      var w = slot.clientWidth;
-      var h = slot.clientHeight;
-      if (!w || !h) return;
-      var kl = knob.style.left;
-      var kt = knob.style.top;
-      var kx = vertical ? (/px$/.test(kl) ? parseFloat(kl) : w / 2) : (pct / 100) * w;
-      var ky = vertical ? (pct / 100) * h : /px$/.test(kt) ? parseFloat(kt) : h / 2;
-      var reach = KNOB / 2 + HINT_GAP;
-      var bw = btn.offsetWidth;
-      var bh = btn.offsetHeight;
-      var cta = vertical
-        ? [w - CTA_EDGE - bw, h / 2 - bh / 2, w - CTA_EDGE, h / 2 + bh / 2]
-        : [w / 2 - bw / 2, h - CTA_EDGE - bh, w / 2 + bw / 2, h - CTA_EDGE];
-      // The base's close control: 26px, 10px in from the top-right corner. It is
-      // not mounted until onStart returns, so it cannot be measured here; the
-      // base's _mountCloseControl carries a note to keep the two in step.
-      var close = [w - 36, 10, w - 10, 36];
-      var obstacles = [cta, close];
-      function boxFor(dir) {
-        var room =
-          dir === "right" ? w - EDGE - (kx + reach) : dir === "left" ? kx - reach - EDGE : w - 2 * EDGE;
-        hint.style.maxWidth = Math.max(0, Math.floor(room)) + "px";
-        var hw = hint.offsetWidth;
-        var hh = hint.offsetHeight;
-        var x = dir === "right" ? kx + reach : dir === "left" ? kx - reach - hw : kx - hw / 2;
-        var y = dir === "down" ? ky + reach : dir === "up" ? ky - reach - hh : ky - hh / 2;
-        if (dir === "up" || dir === "down") x = clamp(x, EDGE, w - EDGE - hw);
-        else y = clamp(y, EDGE, h - EDGE - hh);
-        // Until nothing is in the way — a step off one obstacle can land on the
-        // other. Both sit at the right edge, so in vertical mode the pill passes
-        // them on their left if it fits there whole; failing that, it steps along
-        // the axis past them; and only when neither works is the word cut to the
-        // room on their left — a short hint should never lose letters to a wide
-        // CTA it could simply have stepped past.
-        for (var pass = 0; pass < 3; pass++) {
-          var moved = false;
-          for (var i = 0; i < obstacles.length; i++) {
-            var o = obstacles[i];
-            if (!hits([x, y, x + hw, y + hh], o)) continue;
-            moved = true;
-            if (vertical) {
-              var beside = o[0] - KNOB_GAP - EDGE;
-              var stepY = dir === "down" ? o[3] + KNOB_GAP : o[1] - KNOB_GAP - hh;
-              if (hw <= beside) {
-                x = clamp(kx - hw / 2, EDGE, o[0] - KNOB_GAP - hw);
-              } else if (stepY >= EDGE && stepY + hh <= h - EDGE) {
-                y = stepY;
-              } else if (beside >= 56) {
-                hint.style.maxWidth = Math.floor(beside) + "px";
-                hw = hint.offsetWidth;
-                hh = hint.offsetHeight;
-                x = clamp(kx - hw / 2, EDGE, o[0] - KNOB_GAP - hw);
-              } else {
-                y = stepY;
-              }
-            } else {
-              y = o === close ? o[3] + KNOB_GAP : o[1] - KNOB_GAP - hh;
-            }
-          }
-          if (!moved) break;
-        }
-        return [x, y, x + hw, y + hh];
+    function startSwing() {
+      var from = pct;
+      var sign = from > 50 ? -1 : 1;
+      var fwd = SWING;
+      var back = SWING;
+      var L = vertical ? slot.clientHeight : slot.clientWidth;
+      if (capsuleOn && L) {
+        var half = (vertical ? CAP_H : capW) / 2;
+        var c = (from / 100) * L + capShift;
+        var up = ((L - EDGE - half - c) / L) * 100;
+        var down = ((c - half - EDGE) / L) * 100;
+        sign = up >= down ? 1 : -1;
+        fwd = Math.max(0, sign > 0 ? up : down);
+        back = Math.max(0, sign > 0 ? down : up);
       }
-      function clear(b) {
-        return (
-          b[2] - b[0] >= 56 &&
-          b[0] >= EDGE - 0.5 &&
-          b[1] >= EDGE - 0.5 &&
-          b[2] <= w - EDGE + 0.5 &&
-          b[3] <= h - EDGE + 0.5 &&
-          !hits(b, cta) &&
-          !hits(b, close)
-        );
+      var REST = 0.4;
+      var SPAN = 1.8;
+      var PERIOD = 3.4;
+      var STEPS = 16;
+      var line = [];
+      var clip = [];
+      function key(offset, p) {
+        p = clamp(p, 0, 100);
+        var k = { offset: offset };
+        k[vertical ? "top" : "left"] = p + "%";
+        line.push(k);
+        clip.push({ offset: offset, clipPath: clipAt(p) });
       }
-      var prefer = vertical ? (pct <= 50 ? "down" : "up") : pct <= 50 ? "right" : "left";
-      var other = { down: "up", up: "down", right: "left", left: "right" }[prefer];
-      var dir = prefer;
-      var b = boxFor(prefer);
-      if (!clear(b)) {
-        var alt = boxFor(other);
-        if (clear(alt)) {
-          dir = other;
-          b = alt;
-        } else {
-          b = boxFor(prefer);
-        }
+      key(0, from);
+      for (var i = 0; i <= STEPS; i++) {
+        var u = i / STEPS;
+        var o = clamp(SWING * Math.sin(u * 2 * Math.PI) * (1 - u), -back, fwd);
+        key((REST + u * SPAN) / PERIOD, from + sign * o);
       }
-      var hw = b[2] - b[0];
-      var hh = b[3] - b[1];
-      hint.style.left = Math.round(b[0]) + "px";
-      hint.style.top = Math.round(b[1]) + "px";
-      if (dir !== hintDir) {
-        hintDir = dir;
-        arrow.style.transform =
-          "rotate(" + { right: 0, down: 90, left: 180, up: -90 }[dir] + "deg)";
-        // The arrow leads: before the word when it points left, after it otherwise.
-        arrow.style.order = dir === "left" ? "-1" : "0";
-        api.debug("hint", {
-          dir: dir,
-          x: Math.round(b[0]),
-          y: Math.round(b[1]),
-          w: Math.round(hw),
-          h: Math.round(hh),
-        });
-      }
+      key(1, from);
+      // Ten swings, about half a minute, and then the divider rests — the hint in
+      // the knob keeps saying the rest. Moving the line and re-clipping "after"
+      // are main-thread work on every frame, and an ad left on screen untouched
+      // would otherwise spend it for as long as it stayed up, against Chrome's
+      // heavy-ad allowance of a minute of main-thread time in all.
+      var timing = { duration: PERIOD * 1000, iterations: SWINGS };
+      animate(handle, line, timing);
+      animate(after, clip, timing);
     }
-    placeHint();
+    if (swing) startSwing();
 
-    // --- the hint's motion ---------------------------------------------------
-    hint.style.visibility = "visible";
-    // A beat after the ad appears, so it reads as a hint rather than decoration.
-    animate(
-      hint,
-      still
-        ? [{ opacity: 0 }, { opacity: 1 }]
-        : [
-            { opacity: 0, transform: "scale(.92)" },
-            { opacity: 1, transform: "none" },
-          ],
-      { duration: 380, delay: 450, easing: "cubic-bezier(.22,1,.36,1)", fill: "backwards" },
-    );
-    // The two heads light in turn, leading the eye the way to drag, and the
-    // arrow nudges that way — in its own turned frame, so one motion serves all
-    // four directions.
-    for (var hi = 0; hi < heads.length; hi++) {
-      animate(heads[hi], [{ opacity: 0.35 }, { opacity: 1 }, { opacity: 0.35 }], {
-        duration: 1200,
-        delay: hi * 180,
-        iterations: Infinity,
-        easing: "ease-in-out",
-      });
-    }
-    if (!still) {
-      animate(
-        bob,
-        [
-          { transform: "translateX(-1px)" },
-          { transform: "translateX(3px)" },
-          { transform: "translateX(-1px)" },
-        ],
-        { duration: 1200, iterations: Infinity, easing: "ease-in-out" },
-      );
-    }
-    var pulse = animate(
-      ring,
-      still
-        ? [{ opacity: 0.7 }, { opacity: 0.15 }, { opacity: 0.7 }]
-        : [
-            { transform: "scale(1)", opacity: 0.8 },
-            { transform: "scale(1.7)", opacity: 0 },
-          ],
-      { duration: still ? 2000 : 1600, iterations: Infinity, easing: "cubic-bezier(.22,.61,.36,1)" },
-    );
-    // Without Web Animations the ring still marks the knob, just unmoving.
-    if (!pulse) ring.style.opacity = ".6";
+    api.debug("hint", {
+      style: hintStyle,
+      swing: swing ? "on" : "off",
+      w: Math.round(knob.offsetWidth),
+      h: Math.round(knob.offsetHeight),
+    });
 
-    /** The hint and the ring go at the first grab, faded, or at once when the ad ends. */
+    /**
+     * The hint goes at the first grab — or when the ad ends, or the slot leaves
+     * the page. The swing stops where the viewer takes over, the chevrons come to
+     * rest, and the capsule shrinks back into the round knob.
+     */
     function hideHint(reason) {
       if (hintGone) return;
       hintGone = true;
-      // The fade starts where the entrance has got to. A grab can beat it — for
-      // the first half-second the hint is not on screen yet — and cancelled
-      // first, the entrance would hand the fade a hint at full strength that the
-      // viewer had never seen. An opacity that cannot be read (a slot taken out
-      // of the page has no computed style) is nothing to fade.
-      var from = 0;
-      if (reason) {
-        try {
-          var seen = parseFloat(win.getComputedStyle(hint).opacity);
-          if (seen >= 0) from = seen;
-        } catch (e) {
-          /* nothing to fade */
-        }
-      }
+      swinging = false;
       cancelAnims();
-      ring.style.display = "none";
-      function drop() {
-        if (hint.parentNode) hint.parentNode.removeChild(hint);
+      if (ring) ring.style.display = "none";
+      if (capsuleOn) {
+        capsuleOn = false;
+        showGrip(false);
+        knob.style.padding = "0";
+        knob.style.width = KNOB + "px";
+        knob.style.height = KNOB + "px";
+        knob.style.margin = "-" + KNOB / 2 + "px 0 0 -" + KNOB / 2 + "px";
+        knob.style.borderRadius = KNOB / 2 + "px";
       }
-      var fade =
-        from > 0.02
-          ? animate(hint, [{ opacity: from }, { opacity: 0 }], {
-              duration: 180,
-              easing: "ease-out",
-              fill: "forwards",
-            })
-          : null;
-      if (fade) fade.onfinish = drop;
-      else drop();
-      if (reason) api.debug("hint", { hidden: reason });
+      // "off" with no swing showed nothing, and has nothing to report going.
+      if (reason && (hintStyle !== "off" || swing)) api.debug("hint", { hidden: reason });
     }
 
-    // The knob's first place, and the hint's beside it, are committed before the
-    // knob is given a transition: with one already set, a start inside the CTA
-    // band would slide the knob there from the centre as the ad appears. A call,
-    // not a bare property read, so minification cannot drop it (the base's close
-    // ring does the same).
+    // The knob's first place is committed before the knob is given a transition:
+    // with one already set, a start inside the CTA band would slide the knob
+    // there from the centre as the ad appears. A call, not a bare property read,
+    // so minification cannot drop it (the base's close ring does the same).
     knob.getBoundingClientRect();
-    knob.style.transition = "transform .15s ease-out" + (vertical ? ",left .15s ease-out" : "");
+    knob.style.transition =
+      "transform .15s ease-out,width .2s ease-out,height .2s ease-out," +
+      "margin .2s ease-out,border-radius .2s ease-out" +
+      (vertical ? ",left .15s ease-out" : "");
 
     function relayout() {
       // A host can take the slot out of its page without ending the ad — a
@@ -546,7 +580,6 @@ var TEMPLATE = {
         return;
       }
       placeKnob();
-      placeHint();
     }
     // From the slot's own window as well: an observer belongs to the document
     // of the realm that made it, not to its target's.
@@ -614,10 +647,6 @@ var TEMPLATE = {
       // A knob still held when the ad ends goes back to rest with it.
       knob.style.transform = "";
       hideHint(null);
-      // Also after a grab: cancelling a fade still under way would bring the
-      // hint back to full opacity on a slot a host leaves up.
-      cancelAnims();
-      if (hint.parentNode) hint.parentNode.removeChild(hint);
       win.removeEventListener("mouseup", endDrag);
       win.removeEventListener("resize", relayout);
       if (observer) observer.disconnect();

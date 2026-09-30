@@ -693,8 +693,8 @@ CreoSmithVpaid.prototype._mountCloseControl = function () {
   // immediately — the opposite of a "mandatory" delay.
   var delaySeconds = Math.min(Math.max(Number(this._params.closeDelaySeconds) || 5, 1), 30);
   // The box below — SIZE square, 10px in from the top-right corner — is copied
-  // into the slider's hint placement (templates/slider/vpaid.js, placeHint),
-  // which keeps its pill off this control while onStart runs, before it exists.
+  // into the slider's capsule sizing (templates/slider/vpaid.js, capsuleRoom),
+  // which keeps its hint off this control while onStart runs, before it exists.
   // Move or resize it and change that copy too.
   var SIZE = 26,
     R = 11,

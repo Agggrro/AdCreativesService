@@ -55,10 +55,12 @@ insert into public.templates (
   -- without it, and needs no migration: the unit reads an absent value as
   -- horizontal, and the edit form starts a select missing from `config_json` at
   -- its default. Keep both true, or those creatives change under their owners.
-  -- `hintText` is the opposite case, on purpose: an absent value — a creative
-  -- saved before the field, or one whose field was cleared, which the form drops —
-  -- shows the default "PULL", so every saved slider gains the hint with the unit.
-  -- The hint is what tells a viewer the divider moves at all.
+  -- The hint is the opposite case, on purpose: an absent `hintStyle` is the
+  -- default "label" and an absent `hintText` — a creative saved before the field,
+  -- or one whose field was cleared, which the form drops — is "PULL", so every
+  -- saved slider gains the hint with the unit. The hint is what tells a viewer
+  -- the divider moves at all. An absent `hintSwing` is "off": the swing moves the
+  -- advertiser's picture, and stays something they choose.
   (
     '00000000-0000-4000-8000-000000000003',
     'Before / After Slider',
@@ -73,7 +75,9 @@ insert into public.templates (
        {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true},
        {"name":"direction","label":"Divider movement","type":"select","required":true,"default":"horizontal","options":[{"value":"horizontal","label":"Horizontal — left and right"},{"value":"vertical","label":"Vertical — up and down"}],"help":"Horizontal puts the after image to the left of the divider; vertical puts it above."},
        {"name":"startPercent","label":"Start position (%)","type":"range","min":0,"max":100,"default":50,"help":"Where the divider starts: from the left edge, or from the top edge when it moves vertically."},
-       {"name":"hintText","label":"Handle hint","type":"text","default":"PULL","help":"Shown beside the handle, with an arrow pointing the way to drag, until the viewer first grabs it: PULL, Потяни, or your own word."},
+       {"name":"hintStyle","label":"Handle hint","type":"select","required":true,"default":"label","options":[{"value":"label","label":"Word in the handle"},{"value":"arrows","label":"Arrows only"},{"value":"off","label":"None"}],"help":"What tells the viewer the divider moves, until they first grab it. The word turns the handle into a small capsule, which shrinks back to the round handle at the first grab."},
+       {"name":"hintText","label":"Hint word","type":"text","default":"PULL","help":"Inside the handle: PULL, Потяни, or your own word. Keep it short.","showWhen":[{"field":"hintStyle","equals":["label"]}]},
+       {"name":"hintSwing","label":"Swing the divider","type":"select","required":true,"default":"off","options":[{"value":"off","label":"Off"},{"value":"on","label":"On — it swings by itself for a while"}],"help":"For about half a minute, until the viewer takes it, the divider rocks out and back on its own every few seconds, showing a sliver of the after image. It stays still for viewers whose device asks for reduced motion."},
        {"name":"ctaText","label":"Button text","type":"text","default":"See more"}
      ]}'::jsonb,
     'standard',
