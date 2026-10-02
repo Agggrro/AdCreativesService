@@ -19,7 +19,8 @@
 | `GET /r` (click redirect) | A viewer's browser leaving an ad, from a link anyone holding the tag could have fetched | Public by necessity. The destination is read from the creative's own config by field name, never from the request, **and only a genuine signature minted by `/v` gets a redirect** — forged, missing or week-old links are 404, so no account can use the ad domain as a redirect to what it configured. See "Click redirect and postbacks" below |
 | `GET\|POST /pb` (postback) | A partner network's server | Authenticated only by the account's postback key in the URL; a wrong key writes nothing. See "Click redirect and postbacks" below |
 | UI language cookie (`creosmith_locale`) | Anyone with a browser — it is user-writable and carries no authority | Treated as untrusted input: validated against the `ru`/`en` allow-list on read and falls back to the default; it only selects a copy dictionary, never gates data, and never reaches the serving path |
-| Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage (no app server in the path) | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
+| Browser → R2 media upload (`requestMediaUpload`, then a PUT to R2) | Signed-in dashboard users, uploading straight to Cloudflare R2 with a presigned URL (no app server in the byte path) | The server action is the gate: it checks the session, the MIME allow-list (`Object.hasOwn`, so no prototype names) and the 25 MB cap, mints the key under the caller's own prefix, and signs **type and size** into a 5-minute URL — R2 answers any other body `403`. The browser never names the key. The bucket is deliberately public-read, at `media.smithcdn.net`. See [ADR-0028](decisions/0028-creative-media-on-r2.md) |
+| Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage — only on a deployment without the R2 variables | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
 | `POST /api/tools/vast/inspect`, `GET /api/tools/vast/hop` | The open internet, and **an arbitrary third-party host the caller names** | Public, unauthenticated, no rate limit. This is the only outbound-fetch boundary in the product — see "Outbound fetches to untrusted URLs" below |
 
 ## Secrets
@@ -29,8 +30,10 @@
   read (`/api/vast`) and its Storage fallback for a unit not yet in the manifest
   (`lib/runtime-bytes.ts`); the beacon, click and postback writes; the Stripe webhook
   write path; serving-snapshot publishing and its health check (`lib/serving/publish.ts`,
-  `lib/serving/health.ts`, `/api/cron/health`, `scripts/snapshot-backfill.mjs`); and,
-  on loopback only, `/dev/harness`'s read of draft templates (below). A new use is a
+  `lib/serving/health.ts`, `/api/cron/health`, `scripts/snapshot-backfill.mjs`); the
+  one-off media move to R2, which reads every creative and rewrites the config of each
+  one it moves (`scripts/media-migrate-r2.mjs`, [ADR-0028](decisions/0028-creative-media-on-r2.md));
+  and, on loopback only, `/dev/harness`'s read of draft templates (below). A new use is a
   change to this list.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — server-only.
 - `PREVIEW_TOKEN_SECRET` — server-only. Signs the short-TTL live-preview tokens
@@ -46,7 +49,16 @@
   store. On Vercel the SDK authenticates with OIDC instead (`BLOB_STORE_ID` +
   `VERCEL_OIDC_TOKEN`, both injected and rotated by the platform, neither secret), so
   this static token is needed only for code running **outside** Vercel — which today
-  means `npm run snapshot:backfill`.
+  means `npm run snapshot:backfill` and `npm run media:migrate`.
+- `R2_SECRET_ACCESS_KEY` — **server-only**. With `R2_ACCESS_KEY_ID`, the S3 credential
+  of a Cloudflare token with object read and write on the `creative-media` R2 bucket and
+  nothing else in the account ([ADR-0028](decisions/0028-creative-media-on-r2.md)).
+  Leaked, it can overwrite or delete any advertiser's media — which is all public
+  already, so it reads nothing new. Used only by `lib/r2.ts`: signing uploads
+  (`requestMediaUpload`), `deleteCreative`, and `npm run media:migrate`. The remedy
+  for a leak is to roll the token in the Cloudflare dashboard. The access key id is
+  not a secret — every presigned upload URL carries it in `X-Amz-Credential` — and
+  neither are `R2_ACCOUNT_ID`, `R2_BUCKET` and `NEXT_PUBLIC_MEDIA_URL`.
 - Public/anon Supabase key is fine client-side **because RLS is enforced** — RLS is
   therefore load-bearing for the dashboard and must be correct (audit with the
   `supabase-rls-auditor` subagent).
@@ -341,7 +353,10 @@ is not in the file, so the kill-switch still bites — a lapsed subscription yie
 empty VAST, no `<AdParameters>`, and the retained URL returns an anonymous
 template. ADR-0003 already refuses to claim the code is unrecoverable. The residual
 exposure is bandwidth (hotlinking), the same one ADR-0010 accepted for the public
-`creative-media` bucket.
+`creative-media` bucket — and, since [ADR-0028](decisions/0028-creative-media-on-r2.md),
+for the media host `media.smithcdn.net`, where R2 makes delivery free of charge, so
+hotlinking costs nothing there either; Cloudflare can rate-limit the host if abuse is
+ever observed.
 
 **The SIMID document is still one hop indirect**, reached through our own route
 with an HMAC-signed, 120s-TTL token (`lib/vast/interactive-token.ts`). The token
@@ -393,6 +408,13 @@ exception to "RLS protects the dashboard path" — reads are meant to be public 
 viewer's ad player fetches the URL with no session), so `public = true` bypassing
 RLS for GETs is correct here, not a gap. The same class of exception as
 `templates_select_published`. Writes stay RLS-gated to the uploader's own path.
+
+The R2 bucket that took over new uploads ([ADR-0028](decisions/0028-creative-media-on-r2.md))
+has no RLS at all, so its prefix rule lives in code, in two places that must stay
+strict: `requestMediaUpload` mints every key itself (the browser never names one), and
+`deleteCreative` deletes only keys that `parseOwnMediaUrl()` accepts — exactly
+`{uuid}/{uuid}.{ext}`, nothing a URL parser could normalize — under the caller's own
+`{userId}/` prefix. A looser parse there is a cross-tenant delete.
 
 ## Developer-only surfaces (`isDevOnlyEnabled()`)
 

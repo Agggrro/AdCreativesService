@@ -238,12 +238,22 @@ EXECUTE is granted to `service_role` only and which returns an explicit TABLE
 
 ## Storage buckets
 
-Two Supabase Storage buckets, deliberately different trust models:
+Two Supabase Storage buckets with deliberately different trust models, and one R2
+bucket that took over the advertiser media:
 
 | Bucket | Access | Holds | Notes |
 | --- | --- | --- | --- |
 | `creatives` | **Private** — fallback only | Runtime SIMID/VPAID units (code) | No longer the primary home: the runtime lives in a public, content-addressed Vercel Blob store ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)), and this bucket is read only by `lib/runtime-bytes.ts` for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
-| `creative-media` | **Public-read** | Advertiser-uploaded images/gifs/video for `"image"`-typed config fields | Public because the URL is baked into `<AdParameters>` and must keep resolving for the creative's lifetime. Created declaratively in `supabase/schema.sql`. Uploads go straight from the browser, RLS-gated to the uploader's own `{auth.uid()}/...` path prefix. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
+| R2 `creative-media` (Cloudflare) | **Public-read**, served at `media.smithcdn.net` | Advertiser-uploaded images/gifs/video for `"image"`-typed config fields — every upload since [ADR-0028](decisions/0028-creative-media-on-r2.md) | Public because the URL is baked into `<AdParameters>` and must keep resolving for the creative's lifetime. Not in `schema.sql`: there is no RLS in R2. The browser uploads with a presigned PUT that signs type and size; deletes go through `deleteCreative` with the server's bucket-scoped key, guarded in `lib/r2.ts` by the owner's `{userId}/` prefix and the exact key shape (`MEDIA_KEY_RE`). Cached for a day at the edge and in browsers, so a deleted creative's files stop being served within a day |
+| Supabase `creative-media` | **Public-read** | The same media, uploaded before ADR-0028 or on a deployment without the R2 variables | Created declaratively in `supabase/schema.sql`. Uploads go straight from the browser, RLS-gated to the uploader's own `{auth.uid()}/...` path prefix ([ADR-0010](decisions/0010-advertiser-media-uploads.md)). `npm run media:migrate` copies what a creative references to R2 and repoints its config; the objects stay here as the rollback |
+
+A media URL in `config_json` is ours when `parseOwnMediaUrl()` (`lib/creative-media.ts`)
+recognizes either store's prefix *and* the key is exactly `{uuid}/{uuid}.{ext}` — the
+shape `buildMediaObjectPath()` mints. `deleteCreative` removes each of its own keys from
+**both** stores (a migrated file's Supabase original shares the key), except a key another
+of the user's creatives still references. Replacing a file in the configurator does not
+delete the old object: until the form is saved the live tag still points at it, so a
+replaced file stays behind as an orphan.
 
 ## Serving snapshots (outside Postgres)
 
@@ -281,7 +291,7 @@ was missed or delayed.
 | `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
 | `creative_clicks`, `conversions`, `postback_keys`, `postback_log` | **no direct client access** (RLS on, zero policies, table and identity-sequence privileges revoked from `anon`/`authenticated`); clicks written by `record_click()` and conversions + log by `record_postback()`, both service role only; the owner reads through `get_creative_conversions()`, `ensure_postback_key()`, `has_postback_key()` and `get_postback_log()`, each scoped to `auth.uid()` ([ADR-0023](decisions/0023-conversion-postbacks.md)) |
 | `stripe_events` | **no direct client access**; written only by the webhook (service role) |
-| `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent |
+| `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent. Since [ADR-0028](decisions/0028-creative-media-on-r2.md) new uploads go to R2, which has no RLS: there the same prefix rule is enforced in code (`requestMediaUpload` mints the key; `deleteCreative` deletes only keys under the caller's prefix) |
 
 RLS protects the **dashboard** path. It is intentionally not relied upon for the
 public VAST path, which uses a narrowly scoped service-role read.

@@ -24,7 +24,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0007](0007-design-system-instrument.md) | "Instrument" design system: single light theme, Sienna accent, cold semantics | Superseded by 0022 |
 | [0008](0008-catalog-first-information-architecture.md) | Catalog-first information architecture: three sections, public catalog, honest metrics | Accepted |
 | [0009](0009-mandatory-close-control.md) | Mandatory close control, no fixed watch duration | Accepted |
-| [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted |
+| [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted (storage location and replace-delete amended by 0028) |
 | [0011](0011-conditional-grouped-config-schemas.md) | Conditional, grouped config schemas — and per-path click-through | Accepted |
 | [0012](0012-viewability-measurement.md) | Viewability measurement — OMID pass-through for SIMID, a custom module for VPAID | Accepted |
 | [0013](0013-public-free-tools-section.md) | A public free-tools section, and a nav for signed-out visitors | Accepted |
@@ -42,6 +42,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0025](0025-media-fit-by-height.md) | Advertiser media fit by height, with a blurred fill | Accepted |
 | [0026](0026-vast-cors-credentialed-requests.md) | VAST responses answer credentialed requests, as VAST 4.2 requires | Accepted |
 | [0027](0027-conversion-goals.md) | Conversion goals: a goal on the postback, one conversion per goal per click | Accepted |
+| [0028](0028-creative-media-on-r2.md) | Creative media on Cloudflare R2, served from the ad domain | Accepted |
 
 ## Template
 

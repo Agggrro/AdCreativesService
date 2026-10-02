@@ -22,6 +22,7 @@ we push after a case is built and verified locally).
 - **DB + Auth:** Supabase (PostgreSQL, RLS)
 - **Billing:** Stripe (webhooks are the source of truth)
 - **Hosting:** Vercel
+- **Advertiser media:** Cloudflare R2 behind `media.smithcdn.net` ([ADR-0028](docs/decisions/0028-creative-media-on-r2.md))
 
 ## Non-negotiable AdTech rules
 
@@ -109,6 +110,9 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
 - After any Supabase migration, query, or RLS change → **`supabase-rls-auditor`** subagent.
 - After changing the postback parser (`lib/postback.ts`, the trust boundary for what a
   partner network sends `/pb`) → `npm run test:postback`. See [ADR-0027](docs/decisions/0027-conversion-goals.md).
+- After changing media URL parsing or the R2 layer (`lib/creative-media.ts`, `lib/r2.ts` —
+  in R2, which has no RLS, they are the guard against a cross-tenant delete) →
+  `npm run test:media`. See [ADR-0028](docs/decisions/0028-creative-media-on-r2.md).
 - After any Stripe/subscription/webhook change → **`billing-integrity-reviewer`** subagent.
 - After changing **either** copy of the entitlement predicate — `private.is_entitled` in
   `supabase/schema.sql` or `lib/serving/entitlement.ts` — change the other in the same

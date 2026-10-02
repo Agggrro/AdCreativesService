@@ -18,9 +18,11 @@
     "check:entitlement": "node --env-file-if-exists=.env.local scripts/check-entitlement.mjs",
     "snapshot:backfill": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/snapshot-backfill.mjs",
     "check:snapshots": "node --env-file-if-exists=.env.local --import ./scripts/register-app-imports.mjs scripts/check-snapshots.mjs",
+    "media:migrate": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/media-migrate-r2.mjs",
     "test:entitlement": "node --test lib/serving/entitlement.test.ts",
     "test:cors": "node --import ./scripts/register-app-imports.mjs --test lib/vast/cors.test.ts",
-    "test:postback": "node --import ./scripts/register-app-imports.mjs --test lib/postback.test.ts"
+    "test:postback": "node --import ./scripts/register-app-imports.mjs --test lib/postback.test.ts",
+    "test:media": "node --import ./scripts/register-app-imports.mjs --test lib/creative-media.test.ts lib/r2.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
@@ -29,6 +31,7 @@
     "@vercel/blob": "^2.8.0",
     "@vercel/functions": "^3.9.3",
     "@vercel/speed-insights": "^2.0.0",
+    "aws4fetch": "1.0.20",
     "fast-xml-parser": "^5.10.1",
     "fluid-player": "^3.59.0",
     "lucide-react": "^1.22.0",

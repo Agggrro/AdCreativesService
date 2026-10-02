@@ -6,9 +6,10 @@ import { parseConfigSchema, buildConfigFromValues } from "@/lib/config-schema";
 import type { CreativeError } from "@/lib/creative-errors";
 import {
   CREATIVE_MEDIA_BUCKET,
-  isOwnMediaUrl,
-  mediaObjectPath,
+  ownMediaRefs,
+  type MediaRef,
 } from "@/lib/creative-media";
+import { deleteObjects, r2 } from "@/lib/r2";
 import { UUID_RE } from "@/lib/uuid";
 import {
   publishCreativeSnapshot,
@@ -197,37 +198,63 @@ export async function updateCreative(formData: FormData): Promise<void> {
 }
 
 /**
- * Every `creative-media` object referenced anywhere in a creative's config.
+ * Remove a deleted creative's media, best-effort, from both stores (ADR-0028).
+ * Runs after the row is gone; a failure is logged, never surfaced.
  *
- * `config_json` has no fixed shape (ADR-0011: templates author their own
- * schema, and the quiz nests per-path exits), so this recurses rather than
- * reading known field names — a media URL can sit at any depth.
+ * A file another of the user's creatives still references is kept. A buyer can
+ * paste one of their uploads into a second creative — the field shows it as
+ * theirs — and deleting it would break that creative's live tag. If the other
+ * creatives cannot be read, nothing is deleted: an orphan is recoverable by
+ * hand, a broken tag on a live campaign is not.
+ *
+ * Every remaining key goes to both stores. A migrated file keeps its Supabase
+ * original under the same key (`npm run media:migrate` leaves it as the
+ * rollback), and a copy that a half-finished migration left in R2 is no less
+ * public. A key that is not there is no error in either store.
  */
-function ownedMediaPaths(config: unknown, userId: string): string[] {
-  const paths = new Set<string>();
+async function removeMedia(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  userId: string,
+  creativeId: string,
+  refs: MediaRef[],
+): Promise<void> {
+  const { data: others, error } = await supabase.from("creatives").select("config_json");
+  if (error || !others) {
+    console.error("deleteCreative kept its media: could not read the other creatives", {
+      creativeId,
+      error,
+    });
+    return;
+  }
+  const stillUsed = new Set(
+    others.flatMap((row) => ownMediaRefs(row.config_json, userId).map((ref) => ref.key)),
+  );
+  const keys = [...new Set(refs.map((ref) => ref.key))].filter((key) => !stillUsed.has(key));
+  if (keys.length === 0) return;
 
-  const walk = (value: unknown) => {
-    if (typeof value === "string") {
-      if (!isOwnMediaUrl(value)) return;
-      const path = mediaObjectPath(value);
-      // Only ever remove objects under the caller's own prefix. Without this a
-      // hand-edited config pointing at someone else's public URL would delete
-      // their file — the bucket's delete policy is keyed on the path prefix,
-      // and this keeps us from ever asking it to do the wrong thing.
-      if (path && path.startsWith(`${userId}/`)) paths.add(path);
-      return;
-    }
-    if (Array.isArray(value)) {
-      value.forEach(walk);
-      return;
-    }
-    if (value && typeof value === "object") {
-      Object.values(value as Record<string, unknown>).forEach(walk);
-    }
-  };
+  const { error: storageError } = await supabase.storage
+    .from(CREATIVE_MEDIA_BUCKET)
+    .remove(keys);
+  if (storageError) {
+    console.error("deleteCreative left orphaned media", { creativeId, store: "supabase", keys, storageError });
+  }
 
-  walk(config);
-  return [...paths];
+  // With the server's bucket-scoped key, never the user's session — R2 has no
+  // RLS. `deleteObjects` refuses anything outside the user's prefix itself.
+  const store = r2();
+  if (store) {
+    const failed = await deleteObjects(store, userId, keys);
+    if (failed.length > 0) {
+      console.error("deleteCreative left orphaned media", { creativeId, store: "r2", keys: failed });
+    }
+  } else if (refs.some((ref) => ref.store === "r2")) {
+    console.error("deleteCreative left orphaned media", {
+      creativeId,
+      store: "r2",
+      keys,
+      reason: "R2 is not configured",
+    });
+  }
 }
 
 /**
@@ -241,11 +268,12 @@ function ownedMediaPaths(config: unknown, userId: string): string[] {
  * the funnel; offering that instead is a product decision, not one this action
  * can make on its own.
  *
- * Storage is cleaned up **before** the row is deleted, because `config_json` is
- * the only record of which objects belonged to this creative. Delete the row
- * first and those files are unattributable forever — and the bucket is
+ * The media are collected **before** the row is deleted, because `config_json`
+ * is the only record of which objects belonged to this creative. Lose the row
+ * first and those files are unattributable forever — and both stores are
  * public-read, so they would stay fetchable at a URL that has been published in
- * every VAST tag ever served. ADR-0010 deferred delete-time cleanup explicitly
+ * every VAST tag ever served. The objects themselves are removed after the row,
+ * for the reason given at that step. ADR-0010 deferred delete-time cleanup explicitly
  * "because there is no `deleteCreative` action yet"; this is that action, so the
  * deferral no longer applies.
  */
@@ -278,7 +306,7 @@ export async function deleteCreative(formData: FormData): Promise<void> {
     redirect("/dashboard/creatives?error=delete_failed");
   }
 
-  const mediaPaths = ownedMediaPaths(existing.config_json, user.id);
+  const media = ownMediaRefs(existing.config_json, user.id);
 
   // Snapshot before row — the opposite order to the media cleanup below, and
   // for the opposite reason. An orphaned media file merely occupies space; an
@@ -317,14 +345,7 @@ export async function deleteCreative(formData: FormData): Promise<void> {
   // Best-effort, and deliberately after the row is gone: a storage failure must
   // not resurrect a creative the user has already been told is deleted. The
   // orphan is recoverable by hand; a half-deleted creative is not.
-  if (mediaPaths.length > 0) {
-    const { error: storageError } = await supabase.storage
-      .from(CREATIVE_MEDIA_BUCKET)
-      .remove(mediaPaths);
-    if (storageError) {
-      console.error("deleteCreative left orphaned media", { creativeId, mediaPaths, storageError });
-    }
-  }
+  if (media.length > 0) await removeMedia(supabase, user.id, creativeId, media);
 
   redirect("/dashboard/creatives");
 }

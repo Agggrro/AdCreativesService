@@ -111,6 +111,13 @@ no cookie is ever set on that host. The postback endpoint `/pb` is registered on
 every host like the rest but handed out only on the app domain, so the ad domain's
 catch-all keeps answering it 404.
 
+The ad domain's DNS is hosted on Cloudflare since
+[ADR-0028](decisions/0028-creative-media-on-r2.md). Its apex records point at Vercel
+**DNS-only**, not proxied: Vercel issues the certificate and must see the viewer's own
+IP (geo for `/r`, rate limits). The one proxied hostname is `media.smithcdn.net`, the R2
+bucket's custom domain for advertiser media — a separate host, so none of the routing
+above applies to it.
+
 Request flow:
 
 1. Parse + validate `creative_id` (and optional `format` override, macros).
@@ -418,16 +425,25 @@ discovering that externally hosted media routinely breaks via hotlink protection
 (a host redirecting a cross-origin request to a URL that 404s). See
 [ADR-0010](decisions/0010-advertiser-media-uploads.md).
 
-- **Bucket:** `creative-media`, public-read (unlike `creatives`), created in
-  `supabase/schema.sql`. Public because the URL is baked into `<AdParameters>` and
-  must keep resolving for the creative's lifetime — a short-TTL signed URL is the
-  wrong shape for this, unlike the runtime JS bucket above.
-- **Upload path:** straight from the browser to Storage
-  (`lib/supabase/client.ts`'s anon-key client, the user's own session), **not**
+- **Store:** the Cloudflare R2 bucket `creative-media`, public-read and served by
+  Cloudflare's CDN at `media.smithcdn.net` — under the ad domain, and free of egress
+  charges at any volume ([ADR-0028](decisions/0028-creative-media-on-r2.md)). Public
+  because the URL is baked into `<AdParameters>` and must keep resolving for the
+  creative's lifetime — a short-TTL signed URL is the wrong shape for this, unlike the
+  runtime JS bucket above. Media uploaded before ADR-0028 sit in the Supabase Storage
+  bucket of the same name until `npm run media:migrate` moves them; both stores count
+  as ours (`parseOwnMediaUrl()`).
+- **Upload path:** straight from the browser to R2 with a presigned PUT, **not**
   proxied through a Vercel serverless function — those cap request bodies around
-  ~4.5MB, which video/gif files can exceed. RLS on `storage.objects` gates writes
-  to the uploader's own `{auth.uid()}/...` path prefix, mirroring the
-  `creatives_*_own` policy pattern.
+  ~4.5MB, which video/gif files can exceed. The server action `requestMediaUpload`
+  checks the session, type and size, mints the key under the uploader's own
+  `{userId}/` prefix, and signs type and size into the URL. A deployment without the
+  R2 variables uploads to the Supabase bucket instead, RLS-gated to the same prefix.
+- **Delete path:** `deleteCreative` removes a creative's objects from both stores — R2
+  with the server's bucket-scoped key, Storage with the user's session — since a
+  migrated file keeps its Supabase original under the same key; a key another of the
+  user's creatives still references is kept. A replaced file is left behind, because
+  the live tag points at it until the form is saved.
 - **Downstream:** the resulting public URL is just a string written into the same
   `config_json`/`<AdParameters>` field a pasted URL would occupy — `lib/vast/builder.ts`
   and the runtime's media helpers (`adInteractMediaLayer` / `adInteractFitMedia` in
@@ -440,6 +456,7 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | Dashboard / auth pages | Node (Vercel) | Rich, low QPS |
 | `GET /api/vast` | Node + CDN cache (`s-maxage=60`) | Reads CDN snapshots, not Postgres, and mints asset URLs locally — no Supabase call on this path at all ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)). Node only for the `node:crypto` HMAC; edge needs those helpers ported to Web Crypto first, and is the natural next optimization. |
 | VPAID unit | Public Vercel Blob (CDN, 1y immutable) | Content-addressed URL straight in `<MediaFile>` — no function at all ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)) |
+| Advertiser media | Cloudflare R2 + Cloudflare CDN at `media.smithcdn.net` (1 day, Smart Tiered Cache) | The heaviest bytes on the ad path — two looping videos are ~7 MB an impression — so they live where egress is free at any volume and no Vercel or Supabase quota is spent on them ([ADR-0028](decisions/0028-creative-media-on-r2.md)) |
 | `GET /api/creative/unit/[token]` | Node | Fallback only, for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
 | Serving snapshots | Vercel Blob (private), 60s cache | Written by the creative writers and the Stripe webhook; read by `/api/vast`. Private because keys derive from `creative_id`, which is public in every tag URL. |
 | `GET /r` → `/api/click` | Node | The click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)): `node:crypto` for the link signature and the click id, and the service-role `record_click()` in `waitUntil` — the 302 never waits on Postgres. Excluded from the middleware matcher |

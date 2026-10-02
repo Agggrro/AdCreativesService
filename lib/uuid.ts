@@ -6,8 +6,11 @@
  * spam. The pattern had been copy-pasted verbatim into each route that needed
  * it; one definition is what keeps a third and fourth copy from drifting.
  */
-export const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A lower-case uuid, unanchored — the building block for larger patterns. */
+export const UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+export const UUID_RE = new RegExp(`^${UUID_PATTERN}$`, "i");
 
 export function isUuid(value: string): boolean {
   return UUID_RE.test(value);

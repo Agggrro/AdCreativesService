@@ -1,6 +1,10 @@
 # 0010. Advertiser media uploads via a public Storage bucket
 
-- Status: Accepted
+- Status: Accepted — the storage location is amended by
+  [ADR-0028](0028-creative-media-on-r2.md) (new uploads go to Cloudflare R2); the upload
+  model, the MIME allow-list and the 25 MB cap stand. ADR-0028 also corrects the claim
+  below that a same-field replace deletes the old object: that code could never run, and
+  a replaced file is now deliberately left in place
 - Date: 2026-08-06
 
 ## Context

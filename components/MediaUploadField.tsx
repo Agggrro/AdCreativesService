@@ -10,9 +10,12 @@ import {
   buildMediaObjectPath,
   isAllowedMediaMime,
   isOwnMediaUrl,
-  mediaObjectPath,
 } from "@/lib/creative-media";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import {
+  requestMediaUpload,
+  type MediaUploadTicket,
+} from "@/app/dashboard/creatives/media-actions";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { Segmented } from "@/components/ui/Segmented";
 import { buttonClass } from "@/components/ui/Button";
@@ -21,10 +24,46 @@ import { inputClass } from "@/components/ui/Field";
 type Mode = "upload" | "url";
 
 /**
- * The `type: "image"` field control: upload a file straight to the public
- * `creative-media` Storage bucket, or fall back to pasting an external URL
- * (ADR-0010). Either path lands in the same plain URL string the rest of the
- * configurator already treats as opaque — no downstream change needed.
+ * PUT the file to a presigned R2 URL (ADR-0028). The `Content-Type` sent must
+ * be the one that was signed; the browser adds the matching `Content-Length`
+ * itself, and R2 refuses the upload if either differs from the declaration.
+ */
+async function uploadToR2(
+  ticket: Extract<MediaUploadTicket, { store: "r2" }>,
+  file: File,
+): Promise<string | null> {
+  const res = await fetch(ticket.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  return res.ok ? ticket.publicUrl : null;
+}
+
+/**
+ * The pre-ADR-0028 path, for a deployment without the R2 variables: straight
+ * into the Storage bucket, under the user's own prefix (its RLS insert policy).
+ */
+async function uploadToSupabase(file: File): Promise<string | null> {
+  const supabase = createBrowserSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const path = user ? buildMediaObjectPath(user.id, file.type) : null;
+  if (!path) return null;
+  const { error } = await supabase.storage
+    .from(CREATIVE_MEDIA_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) return null;
+  return supabase.storage.from(CREATIVE_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+/**
+ * The `type: "image"` field control: upload a file to our media store — R2
+ * behind the ad domain since ADR-0028, the Storage bucket of ADR-0010 on a
+ * deployment without it — or fall back to pasting an external URL. Either path
+ * lands in the same plain URL string the rest of the configurator already
+ * treats as opaque — no downstream change needed.
  */
 export function MediaUploadField({
   field,
@@ -63,36 +102,26 @@ export function MediaUploadField({
 
     setUploading(true);
     try {
-      const supabase = createBrowserSupabase();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      const path = user ? buildMediaObjectPath(user.id, file.type) : null;
-      if (!path) {
-        setError(m.errUploadFailed);
+      const ticket = await requestMediaUpload(file.type, file.size);
+      if ("error" in ticket) {
+        setError(
+          ticket.error === "wrong_type"
+            ? m.errWrongType
+            : ticket.error === "too_large"
+              ? m.errTooLarge
+              : m.errUploadFailed,
+        );
         return;
       }
 
-      // The object a replacement upload is superseding, if there is one —
-      // removed only after the new upload succeeds.
-      const previousPath = isOwnMediaUrl(value) ? mediaObjectPath(value) : null;
-
-      const { error: uploadError } = await supabase.storage
-        .from(CREATIVE_MEDIA_BUCKET)
-        .upload(path, file, { contentType: file.type, upsert: false });
-      if (uploadError) {
+      const url =
+        ticket.store === "r2" ? await uploadToR2(ticket, file) : await uploadToSupabase(file);
+      if (!url) {
         setError(m.errUploadFailed);
         return;
       }
-
-      const { data } = supabase.storage.from(CREATIVE_MEDIA_BUCKET).getPublicUrl(path);
-      onChange(data.publicUrl);
+      onChange(url);
       setUploadedName(file.name);
-
-      if (previousPath) {
-        // Best-effort: a stale object left behind isn't worth failing the save over.
-        void supabase.storage.from(CREATIVE_MEDIA_BUCKET).remove([previousPath]);
-      }
     } catch {
       setError(m.errUploadFailed);
     } finally {
@@ -124,6 +153,8 @@ export function MediaUploadField({
           )}
           <button
             type="button"
+            // The superseded file is deliberately not deleted here: until the
+            // form is saved, the live tag still points at it (ADR-0028).
             onClick={() => {
               setError(null);
               setUploadedName(null);

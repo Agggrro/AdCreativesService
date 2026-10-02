@@ -130,7 +130,12 @@ Remaining before a true end-to-end demo (needs external setup / assets):
    interactive in these.
 2. **Creative hosting:** **Supabase Storage** (free tier, CDN-backed) with native
    signed URLs (`createSignedUrl`, short expiry). No paid CDN for MVP. See
-   [ADR-0004](decisions/0004-mvp-on-free-tiers.md).
+   [ADR-0004](decisions/0004-mvp-on-free-tiers.md). *Since amended:* the runtime units
+   moved to a public Vercel Blob store
+   ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)) and advertiser media to
+   Cloudflare R2 behind `media.smithcdn.net`
+   ([ADR-0028](decisions/0028-creative-media-on-r2.md)) — both still free tier, still no
+   paid CDN.
 3. **Billing:** recurring Stripe subscriptions with a **7-day trial** for new accounts
    that attach a card. Draft prices: **$2/week** & **$5/month** (single template),
    **$30/month** (Ultimate/all-access). See [billing.md](billing.md).
