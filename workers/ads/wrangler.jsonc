@@ -17,12 +17,19 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
-    // The ad domain. A route rather than a custom domain: on a route, a plain
-    // `fetch` of the incoming request goes to the zone's origin, which is how
-    // the forwarded paths reach the app while it is still on Vercel — and
-    // deleting the route is the rollback (ADR-0029 §4). Needs the apex records
-    // proxied; with them DNS-only, it is inert.
+    // The ad domain. A route rather than a custom domain: deleting it is the
+    // rollback (ADR-0029 §4) — the apex records still point at Vercel, which
+    // still serves everything — and on a route a plain `fetch` of the incoming
+    // request reaches that origin, which is how ACME challenges keep Vercel's
+    // certificate for the rollback valid. Needs the apex records proxied; with
+    // them DNS-only, it is inert.
     { "pattern": "smithcdn.net/*", "zone_name": "smithcdn.net" }
+  ],
+
+  "services": [
+    // The app (creosmith-web): the ad domain's pages and their assets, with the
+    // ad domain's Host kept (workers/ads/src/index.ts, forwardToApp).
+    { "binding": "WEB", "service": "creosmith-web" }
   ],
 
   "kv_namespaces": [

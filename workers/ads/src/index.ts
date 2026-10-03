@@ -13,7 +13,8 @@
  *   /c/u/runtime/…        a unit, forwarded to the media host (tags in flight)
  *   /robots.txt           Disallow: /
  *   /, /cdn…, /c/player,
- *   /_next/…              forwarded unchanged to the app
+ *   /_next/…              forwarded unchanged to the app, over a service binding
+ *   /.well-known/acme-…   forwarded to the zone's origin (Vercel, while it exists)
  *   anything else         404
  */
 import {
@@ -47,8 +48,8 @@ interface Fetcher {
 export interface Env {
   /** Serving snapshots (lib/serving/store-kv.ts). */
   SNAPSHOTS: KvBinding;
-  /** The Next app on Workers (creosmith-web). Until it exists, the zone's origin answers. */
-  WEB?: Fetcher;
+  /** The Next app on Workers (creosmith-web), over a service binding. */
+  WEB: Fetcher;
   /** Changes on every deploy; keys the tag cache, so a deploy never serves the previous build's tag. */
   CF_VERSION_METADATA: { id: string };
   /** Where the runtime units live — the media host (ADR-0029). */
@@ -156,9 +157,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
 
   // The one page the ad domain shows people, the validator's player frame, and
   // the assets both need: rendered by the app, which keeps every rule it hangs
-  // on the ad domain's Host (next.config.ts, middleware.ts). ACME challenges go
-  // the same way: while Vercel is the origin it renews the domain's certificate
-  // over HTTP-01, and a 404 here would let that certificate lapse.
+  // on the ad domain's Host (next.config.ts, middleware.ts).
   //
   // GET and HEAD only. A POST to `/` with a `Next-Action` header is a server
   // action, and the app's sign-in and sign-up actions need no session: answered
@@ -169,11 +168,19 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     path === "/cdn" ||
     path.startsWith("/cdn/") ||
     path === "/c/player" ||
-    path.startsWith("/_next/") ||
-    path.startsWith("/.well-known/acme-challenge/")
+    path.startsWith("/_next/")
   ) {
     if (method !== "GET" && method !== "HEAD") return notAllowed();
     return forwardToApp(request, env);
+  }
+
+  // ACME challenges go to the zone's origin, not the app: Vercel renews the
+  // certificate it holds for this domain over HTTP-01, and that certificate is
+  // what a rollback — deleting the route, so Cloudflare proxies to Vercel with
+  // strict TLS — would need. The app has no ACME responder. Goes when Vercel does.
+  if (path.startsWith("/.well-known/acme-challenge/")) {
+    if (method !== "GET" && method !== "HEAD") return notAllowed();
+    return fetch(request);
   }
 
   return notFound();
@@ -331,12 +338,12 @@ async function forwardUnit(request: Request, key: string, env: Env): Promise<Res
 }
 
 /**
- * Hand the request to the app, untouched — same path, same Host. On a route,
- * a plain `fetch` of the incoming request goes to the zone's origin (Vercel,
- * until the app moves); once the app is a Worker, the service binding is used.
+ * Hand the request to the app Worker, untouched — same path, same Host. A
+ * request over a service binding meets the app's static assets first, as one
+ * from the internet does, so `/_next/static/…` is served from them.
  */
 async function forwardToApp(request: Request, env: Env): Promise<Response> {
-  return env.WEB ? env.WEB.fetch(request) : fetch(request);
+  return env.WEB.fetch(request);
 }
 
 /**

@@ -49,7 +49,8 @@ A hand-written Worker (`workers/ads/`, bundled by wrangler) owns `smithcdn.net`:
 | `/c/s/:token` | the SIMID document |
 | `/c/u/runtime/….js` | forwards a runtime *script* to `media.smithcdn.net`, for tags already in flight — never the SIMID document, never an upload |
 | `/robots.txt`, `/cdn-robots.txt` | `Disallow: /` |
-| `/`, `/cdn`, `/cdn/*`, `/c/player`, `/_next/*`, ACME challenges | forwarded unchanged to the app, GET and HEAD only |
+| `/`, `/cdn`, `/cdn/*`, `/c/player`, `/_next/*` | forwarded unchanged to the app over a service binding, GET and HEAD only |
+| `/.well-known/acme-challenge/*` | the zone's origin — Vercel, whose certificate a rollback needs — until Vercel is decommissioned |
 | anything else | `404` |
 
 - **One implementation of the ad path, not two.** The handlers move out of
@@ -125,7 +126,9 @@ fails on `next/font/google` in 16.3.8. What changes in the app is only what was 
   bucket, queue or Durable Object to run for an incremental cache the app does not use.
 - The ad domain's pages (`/cdn`, `/c/player`) reach the app through a service binding from
   `creosmith-ads`, so they keep arriving with the ad domain's `Host` and keep the rules
-  `next.config.ts` and `middleware.ts` hang on it.
+  `next.config.ts` and `middleware.ts` hang on it. A request over the binding meets the
+  app's static assets before its script, as one from the internet does — checked with a
+  throwaway Worker before the switch — so `/_next/static/*` needs nothing of its own.
 
 ### 3. State
 

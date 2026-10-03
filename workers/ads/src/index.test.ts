@@ -130,6 +130,10 @@ const fetchMock = mock.method(globalThis, "fetch", async (input: Request | strin
       headers: { "Content-Type": "application/javascript", "Cache-Control": "public, max-age=31536000, immutable" },
     });
   }
+  // The zone's origin, which a plain fetch of the incoming request reaches on a route.
+  if (url.startsWith("https://smithcdn.net/.well-known/acme-challenge/")) {
+    return new Response(`${url.split("/").pop()}.key`, { headers: { "Content-Type": "text/plain" } });
+  }
   throw new Error(`unexpected fetch ${url}`);
 });
 
@@ -306,6 +310,17 @@ test("the app's pages are forwarded on GET only, and never with a cookie", async
     assert.equal((await call(path)).status, 404, path);
   }
   assert.equal(forwarded.length, 1);
+});
+
+test("ACME challenges go to the zone's origin, never to the app", async () => {
+  const challenge = await call("/.well-known/acme-challenge/token-1");
+  assert.equal(challenge.status, 200);
+  assert.equal(await challenge.text(), "token-1.key");
+  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.equal(forwarded.length, 0);
+
+  assert.equal((await call("/.well-known/acme-challenge/token-1", { method: "POST" })).status, 405);
+  assert.equal(fetchMock.mock.callCount(), 1);
 });
 
 test("a forged beacon is a 204 that writes nothing", async () => {
