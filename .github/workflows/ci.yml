@@ -98,6 +98,53 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: 4e9bc9b3bf84f2a176586ef8dad3b43c
         run: npx wrangler deploy -c workers/ads/wrangler.jsonc
 
+  # The app (ADR-0029 §2), through OpenNext. Built here and only here: the
+  # build copies any `.env*` file it finds into the Worker — on this runner
+  # there is none — and it needs symlinks Windows refuses without Developer
+  # Mode. NEXT_PUBLIC_* are inlined at build, from the repository's Actions
+  # variables; secrets are the Worker's own (`wrangler secret put`).
+  deploy-web:
+    name: build and deploy the app Worker
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-web
+      cancel-in-progress: false
+    env:
+      NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+      NEXT_PUBLIC_CDN_URL: ${{ vars.NEXT_PUBLIC_CDN_URL }}
+      NEXT_PUBLIC_MEDIA_URL: ${{ vars.NEXT_PUBLIC_MEDIA_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN: ${{ vars.NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # A guard, not a formality: a build without these inlines `undefined`
+      # into every Supabase client and drops the ad domain's routing rules.
+      - name: build-time variables are present
+        run: |
+          for v in NEXT_PUBLIC_SITE_URL NEXT_PUBLIC_CDN_URL NEXT_PUBLIC_MEDIA_URL NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY; do
+            if [ -z "${!v}" ]; then echo "::error::$v is not set in the repository's Actions variables"; exit 1; fi
+          done
+
+      - run: npx opennextjs-cloudflare build
+
+      - name: opennextjs-cloudflare deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 4e9bc9b3bf84f2a176586ef8dad3b43c
+        run: npx opennextjs-cloudflare deploy
+
   drift:
     name: nightly drift checks
     if: github.event_name == 'schedule'

@@ -316,10 +316,15 @@ async function forwardUnit(request: Request, key: string, env: Env): Promise<Res
   const headers = new Headers();
   // No Content-Length or Content-Encoding: the runtime may have decompressed the
   // body on the way in, and a length copied from upstream would then be wrong.
-  for (const name of ["Content-Type", "Cache-Control", "ETag", "Last-Modified"]) {
+  for (const name of ["Cache-Control", "ETag", "Last-Modified"]) {
     const value = upstream.headers.get(name);
     if (value) headers.set(name, value);
   }
+  // Always a script, whatever type the object was stored with: anyone holding
+  // the bucket's key can add an object under `runtime/` (the lock stops
+  // overwrites, not additions), and one stored as HTML must not render as a
+  // page on the ad domain.
+  headers.set("Content-Type", "application/javascript; charset=utf-8");
   headers.set("Access-Control-Allow-Origin", "*");
   headers.set("X-Content-Type-Options", "nosniff");
   return new Response(request.method === "HEAD" ? null : upstream.body, { status: 200, headers });

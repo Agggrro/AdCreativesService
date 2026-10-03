@@ -57,3 +57,6 @@ certificates
 # Cloudflare Workers local state and local secrets (ADR-0029)
 .wrangler/
 .dev.vars*
+
+# OpenNext build output (ADR-0029) — may embed env; never commit it
+.open-next/

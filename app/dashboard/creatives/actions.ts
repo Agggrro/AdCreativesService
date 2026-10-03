@@ -342,6 +342,19 @@ export async function deleteCreative(formData: FormData): Promise<void> {
     redirect("/dashboard/creatives?error=delete_failed");
   }
 
+  // And once more now the row is gone. A publish that read the row before the
+  // delete — the reconciler, a save in another tab — can write its snapshot
+  // after the removal above, and a snapshot with no row behind it would serve
+  // until the owner's subscription lapsed: nothing that starts from the rows,
+  // the audit included, can see it. Best-effort, logged; the publisher's own
+  // re-check (lib/serving/publish.ts) closes the other half of that race.
+  await unpublishCreativeSnapshot(creativeId).catch((err: unknown) => {
+    console.error("[snapshot-stale] deleteCreative could not re-remove the snapshot", {
+      creativeId,
+      err: String(err),
+    });
+  });
+
   // Best-effort, and deliberately after the row is gone: a storage failure must
   // not resurrect a creative the user has already been told is deleted. The
   // orphan is recoverable by hand; a half-deleted creative is not.

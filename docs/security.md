@@ -31,13 +31,19 @@
   read (`/v`, in the ad Worker and the Next route alike) and its Storage fallback for a
   unit not yet in the manifest (`lib/runtime-bytes.ts`); the beacon, click and postback
   writes; the Stripe webhook
-  write path; serving-snapshot publishing and its health check (`lib/serving/publish.ts`,
-  `lib/serving/health.ts`, `/api/cron/health`, `scripts/snapshot-backfill.mjs`); the
+  write path; serving-snapshot publishing, its health check and its reconciler
+  (`lib/serving/publish.ts`, `lib/serving/health.ts`, `lib/serving/reconcile.ts`,
+  `/api/cron/health`, `/api/cron/reconcile`, `scripts/snapshot-backfill.mjs`); the
   one-off media move to R2, which reads every creative and rewrites the config of each
   one it moves (`scripts/media-migrate-r2.mjs`, [ADR-0028](decisions/0028-creative-media-on-r2.md));
   and, on loopback only, `/dev/harness`'s read of draft templates (below). A new use is a
   change to this list.
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — server-only.
+- `CRON_SECRET` — server-only. The bearer `/api/cron/health` and `/api/cron/reconcile`
+  demand (constant-time compare, `lib/cron-auth.ts`); both refuse to run without it. It
+  authorizes service-role jobs that read across every tenant, write the snapshot stores
+  and answer with tenant ids. The web Worker's cron sends it in-process, so it never
+  crosses the network there.
 - `PREVIEW_TOKEN_SECRET` — server-only. Signs the short-TTL live-preview tokens
   (`lib/vast/preview-token.ts`). Independent of the Supabase/Stripe secrets above —
   never derive one from another.
@@ -295,6 +301,21 @@ go through it rather than reimplement these guards.
   the hostname, so certificate validation is unaffected. A host that answers with
   one public and one private address is refused outright rather than having the
   public one picked.
+- **On a Cloudflare Worker, a pre-flight — and the window it leaves**
+  ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)). workerd's
+  `http.request` is a shim over `fetch` with no socket to pin, and it refuses a custom
+  `lookup` outright — the Node path would fail closed there, but never work. So on a
+  Worker the fetcher (chosen by runtime, `lib/runtime-env.ts`) refuses IP-literal
+  hosts, `localhost`, `*.localhost` and single-label names outright; resolves A and
+  AAAA through `node:dns` (DNS-over-HTTPS to 1.1.1.1), keeps only the answers that are
+  addresses — workerd lists a CNAME's target *name* among them — and requires at least
+  one, every one public; and only then fetches, with redirects, deadline and byte cap
+  enforced as on Node. What
+  that gives up is the rebinding guarantee above: `fetch` resolves the name again.
+  What is left behind the window is small — a Worker has no private network, no cloud
+  metadata endpoint and no loopback service, and Cloudflare does not route its
+  subrequests to private ranges — and it is accepted rather than hidden. Under
+  `next dev` the socket-level guard still applies.
 - **Per-hop caps.** 5 s deadline, 512 KB (streamed, aborted at the cap), 5 HTTP
   redirects, 5 wrapper hops. Every redirect target is fully re-validated — the
   scheme may have changed and the host certainly has.
@@ -456,8 +477,10 @@ Three routes exist for local creative work and **must not be reachable anywhere 
 (serves a unit off local disk), and the `/dev/harness` page.
 
 The gate is `lib/dev-only.ts`. `isDevOnlyEnabled()` answers *"is this a development
-build"* — `NODE_ENV !== "production"` and no `VERCEL` env var, which excludes preview
-deployments too (they run with `NODE_ENV=production` but are publicly reachable URLs).
+build"* — `NODE_ENV !== "production"`, no `VERCEL` env var, which excludes preview
+deployments too (they run with `NODE_ENV=production` but are publicly reachable URLs),
+and not inside a Cloudflare Worker (`navigator.userAgent === "Cloudflare-Workers"`,
+ADR-0029) — every Worker is a deployment, whatever its env says.
 
 **That question is not the same as "can anyone else reach this", and the difference is
 the one that bites.** `next dev` binds `0.0.0.0` by default and prints a LAN address on
@@ -541,38 +564,39 @@ the message before delivery — so a creative cannot leak its state to the page 
 - **Nothing is collected server-side**, and adding an endpoint that did would be a
   privacy decision in its own right — the records originate in a third-party context.
 
-## Web analytics and Speed Insights (Vercel)
+## Web analytics (Cloudflare)
 
-`@vercel/analytics` and `@vercel/speed-insights` are mounted together, once, in the root
-layout. They are the only third-party scripts our own pages load. Where they may run, and
-what they are allowed to see:
+Cloudflare Web Analytics ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md);
+Vercel Web Analytics and Speed Insights before it) is mounted once, in the root layout
+([`components/WebAnalytics.tsx`](../components/WebAnalytics.tsx)). It is the only
+third-party script our own pages load. Where it may run, and what it is allowed to see:
 
 - **App domain only.** The ad domain renders through that same root layout (`/cdn`, plus
-  the `/cdn/blocked` catch-all every other path there rewrites to), so both mounts sit
+  the `/cdn/blocked` catch-all every other path there rewrites to), so the mount sits
   behind one gate on the request host — the same comparison
   [`middleware.ts`](../middleware.ts) makes before it declines to set a cookie
   ([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)). The host that appears inside
-  strangers' VAST tags loads no script and reports nothing; its catch-all rewrite admits
-  the ad paths and nothing else, so it would swallow the beacons in any case.
-- **Never on the serving paths.** `/v`, `/t` and `/c/*` are API routes returning XML,
-  JavaScript and beacons — no HTML, no layout, no script. A creative running inside a
-  publisher's player cannot carry either of these onto their page.
-- **Cookie-less and first-party.** In production both scripts and both beacons are served
-  from our own origin; no request leaves for a third-party host. Not from the fixed
-  `/_vercel/insights/*` and `/_vercel/speed-insights/*` routes, though — those answer, but
-  what the browser actually loads is an opaque first-party path on the same origin, which
-  is how these SDKs get past content blockers. The host gate does not depend on which of
-  the two it picks: it removes the mount, so there is no request to route either way.
-- **The beacons carry the real path, not just the route pattern**, so a dashboard URL
-  reaches Vercel with a creative id in it. That is the party already terminating every
-  request to the app, not a new one — but it is why the mounts are gated by host rather
+  strangers' VAST tags, and that the validator runs their creatives on, loads no script
+  and reports nothing.
+- **Never on the serving paths.** `/v`, `/t` and `/c/*` return XML, JavaScript and
+  beacons — no HTML, no layout, no script. A creative running inside a publisher's player
+  cannot carry this onto their page.
+- **Cookie-less, and third-party.** The script loads from `static.cloudflareinsights.com`
+  and reports to `cloudflareinsights.com` — unlike Vercel's, which hid behind a
+  first-party path, so a content blocker may drop it and the counts read low. The site
+  token (`NEXT_PUBLIC_CF_WEB_ANALYTICS_TOKEN`) is public by design: it rides in every
+  page and can only report a view to this one site. Unset, nothing renders — so no local
+  or CI session lands in production numbers.
+- **The beacons carry the real path**, so a dashboard URL reaches Cloudflare with a
+  creative id in it. That is the party terminating every request to the app once it
+  runs on Workers, not a new one — but it is why the mount is gated by host rather
   than global.
-- **Page views and Web Vitals only.** No `track()` custom event is sent today. Adding one
-  is a decision about what leaves the browser, not a call-site detail.
-- **Speed Insights measures our pages, never a creative.** Vitals come from the app's own
-  documents; a VPAID unit runs in the player's cross-origin iframe, which this cannot see
-  and must not be extended to see. Creative-side measurement is the telemetry channel
-  above ([ADR-0019](decisions/0019-creative-telemetry-channel.md)) and viewability is
+- **Page views and Web Vitals only.** No custom event is sent. Adding one is a decision
+  about what leaves the browser, not a call-site detail.
+- **It measures our pages, never a creative.** Vitals come from the app's own documents;
+  a VPAID unit runs in the player's cross-origin iframe, which this cannot see and must
+  not be extended to see. Creative-side measurement is the telemetry channel above
+  ([ADR-0019](decisions/0019-creative-telemetry-channel.md)) and viewability is
   [ADR-0012](decisions/0012-viewability-measurement.md) — three separate mechanisms, on
   purpose.
 

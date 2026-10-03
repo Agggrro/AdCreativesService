@@ -48,8 +48,10 @@
   // Console output only. An invocation log per impression would be a bill that
   // grows with traffic for lines nobody reads; the `[serving-fallback]` and
   // `[click-redirect]` lines are what is worth searching.
+  // Query strings redacted too: a beacon's or a click link's carries its signature.
   "observability": {
     "enabled": true,
+    "redact_query_string": true,
     "logs": { "enabled": true, "invocation_logs": false }
   }
 }

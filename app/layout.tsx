@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Prata, Onest, IBM_Plex_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { getDict } from "@/lib/i18n/server";
 import { getCdnHost } from "@/lib/site";
 import { LocaleProvider } from "@/components/i18n/LocaleProvider";
+import { WebAnalytics } from "@/components/WebAnalytics";
 import "./globals.css";
 
 // Midnight runs on three faces (docs/design-system.md §4). All three carry
@@ -61,28 +60,23 @@ export default async function RootLayout({
 }>) {
   const { locale, dict } = await getDict();
 
-  // Vercel Web Analytics and Speed Insights — on the app domain only. The ad
-  // domain renders through this same layout (`/cdn`, plus the `/cdn/blocked`
-  // catch-all every other path there rewrites to), and must not pick either
-  // script up:
+  // Web analytics — Cloudflare's since ADR-0029, Vercel's before — on the app
+  // domain only. The ad domain renders through this same layout (`/cdn`, plus
+  // the `/cdn/blocked` catch-all every other path there rewrites to), and must
+  // not pick the script up:
   //
-  //  - that catch-all in next.config.ts admits the ad paths and nothing else, so
-  //    whichever path a beacon picks answers with HTML instead of recording. In
-  //    the browser these SDKs do not use the fixed `/_vercel/…` routes at all
-  //    but an opaque first-party path on the same origin, which the allow-list
-  //    has no reason to carry either;
-  //  - every crawler and port-scanner that finds the hostname inside a VAST tag
-  //    would otherwise spend page views and vitals samples out of the plan's
-  //    monthly budget, on a host that has no product surface to measure.
+  //  - the ad domain is a host strangers find inside VAST tags; every crawler
+  //    and port-scanner would count as a visitor to a host that has no product
+  //    surface to measure;
+  //  - a third-party script has no business on the origin the validator runs
+  //    strangers' creatives on (`/c/player`, ADR-0021).
   //
   // Reading the header costs nothing extra: getDict() already read the locale
   // cookie, so this render was dynamic before we got here. It is the same
   // host comparison middleware.ts makes, for the same domain split (ADR-0018).
   //
-  // Both are cookie-less, and neither reaches a publisher's page: `/v`, `/t` and
-  // the `/c/*` asset paths are API routes with no HTML at all, and the one HTML
-  // page under that prefix — `/c/player`, the validator's isolated player
-  // (ADR-0021) — renders on the ad domain, where this same check excludes both.
+  // The beacon is cookie-less and never reaches a publisher's page: `/v`, `/t`
+  // and the `/c/*` asset paths answer without HTML at all.
   const cdnHost = getCdnHost();
   const onAdDomain =
     cdnHost !== null && (await headers()).get("host") === cdnHost;
@@ -94,12 +88,7 @@ export default async function RootLayout({
     >
       <body className="flex min-h-full flex-col bg-ground text-fg">
         <LocaleProvider value={{ locale, dict }}>{children}</LocaleProvider>
-        {!onAdDomain && (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
-        )}
+        {!onAdDomain && <WebAnalytics />}
       </body>
     </html>
   );

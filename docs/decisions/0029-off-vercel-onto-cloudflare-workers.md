@@ -90,16 +90,39 @@ A hand-written Worker (`workers/ads/`, bundled by wrangler) owns `smithcdn.net`:
 The Next.js app runs on Workers through `@opennextjs/cloudflare`: dashboard, auth, server
 actions, the Stripe webhook, `/pb`, the free tools, the legacy ad paths, and the daily
 snapshot audit as a cron trigger. OpenNext rather than vinext: it runs the real Next
-(16.2) build instead of a re-implementation of its API, and this app leans on the parts a
+build instead of a re-implementation of its API, and this app leans on the parts a
 re-implementation gets wrong first — middleware, server actions, `next/og`, host-conditioned
-rewrites. What changes in the app is only what was Vercel's:
+rewrites. Its current adapter needs Next 16.3.8, which was also owed for twelve security
+advisories against 16.2.9; the production build moved to webpack, because Turbopack's
+fails on `next/font/google` in 16.3.8. What changes in the app is only what was Vercel's:
 
-- `waitUntil` → `after()`; the geo header → `cf-ipcountry`; `vercel.json` crons → a
-  `scheduled()` handler; `@vercel/analytics` and Speed Insights → Cloudflare Web Analytics.
-- The Stripe webhook verifies with `constructEventAsync`: the Workers build of `stripe`
-  checks signatures with SubtleCrypto, which has no synchronous path.
-- The validator's outbound fetch guard is rebuilt on `fetch`: its SSRF defence pinned DNS
-  through `node:dns`/`node:net`, which a Worker does not have.
+- `waitUntil` → `after()`; the geo header → `cf-ipcountry` (whichever header the running
+  platform owns — the other one is client-supplied there); `vercel.json` crons → a
+  `scheduled()` handler; `@vercel/analytics` and Speed Insights → Cloudflare Web Analytics
+  (page views and Core Web Vitals, cookie-less, behind the same ad-domain gate).
+- The Stripe client uses the fetch transport, and the webhook verifies with
+  `constructEventAsync` and SubtleCrypto: the Workers build of `stripe` has no synchronous
+  signature check, and the catch around it would have turned every event into a 400.
+- The validator's outbound fetch guard keeps its socket-level DNS pinning on Node; on a
+  Worker, whose `http.request` is a shim over `fetch` that refuses a custom `lookup`, it
+  resolves through DNS-over-HTTPS, requires every address answer public, refuses IP
+  literals and local names, then fetches — accepting a rebinding window docs/security.md
+  describes.
+- The developer-only gate refuses inside any Worker, the counterpart of its `VERCEL` check;
+  `getRequestOrigin` reads the request URL there, since Cloudflare passes a client's own
+  `X-Forwarded-*` through; Fluid Player loads on the client only, keeping three megabytes
+  of player code out of the server bundle; the Blob SDK is imported only where Blob is
+  configured; the sitemap is built per request, since nothing would revalidate it.
+- **A custom entry** (`workers/web/index.ts`) wraps OpenNext's Worker: it registers the KV
+  binding for the snapshot store, pins `__NEXT_PRIVATE_ORIGIN` to the app's origin — OpenNext
+  takes it from the isolate's first request, which could be one forwarded from the ad
+  domain — and runs the daily audit as the `scheduled()` handler.
+- **Built in CI, never on a workstation.** `opennextjs-cloudflare build` copies any `.env*`
+  file into the Worker, so a build next to `.env.local` would ship its secrets; the CI
+  runner has none, and NEXT_PUBLIC_* come from the repository's Actions variables.
+- The cache is OpenNext's read-only static-assets cache: `/icon`, `/opengraph-image` and
+  `/robots.txt` are the only prerendered routes and nothing revalidates, so there is no R2
+  bucket, queue or Durable Object to run for an incremental cache the app does not use.
 - The ad domain's pages (`/cdn`, `/c/player`) reach the app through a service binding from
   `creosmith-ads`, so they keep arriving with the ad domain's `Host` and keep the rules
   `next.config.ts` and `middleware.ts` hang on it.
@@ -115,8 +138,11 @@ rewrites. What changes in the app is only what was Vercel's:
   store and the Blob code goes. **The audit (`/api/cron/health`, `npm run check:snapshots`)
   checks every store**, for documents that are missing and for documents whose content no
   longer matches the rows — a cancellation that reached Blob but not KV would otherwise
-  serve on the ad domain while every check read the store that was right. A missing
-  document is still a miss. A *failed* read — new here — falls back to Postgres for the
+  serve on the ad domain while every check read the store that was right. **A failed
+  publish fails closed** — each store clears what it missed — and **the reconciler**
+  (`/api/cron/reconcile`, every ten minutes on the app's Worker) republishes from
+  Postgres whatever changed in the last four days and still drifts: the case where a
+  store could neither take a write nor clear it. A missing document is still a miss. A *failed* read — new here — falls back to Postgres for the
   entitlement too. Before, it read as "not entitled" and cached an empty ad for a minute.
 - **Runtime units: R2**, in the `creative-media` bucket under `runtime/`, public at
   `media.smithcdn.net/runtime/…`. A served tag points there directly. On Vercel `/c/u` was
@@ -157,8 +183,12 @@ rewrites. What changes in the app is only what was Vercel's:
   fetch of the tag. Security level stays "essentially off", Browser Integrity Check and
   Bot Fight Mode off; a rate limit here is a block rule, never a challenge.
 - **Then the app**, the same way: a route on `creosmith.com` to `creosmith-web`, rollback by
-  deleting it. The KV REST token leaves Vercel's environment with it. Vercel is
-  decommissioned after a quiet week, by the owner.
+  deleting it. The `SNAPSHOT_KV_*` variables **stay** in Vercel's environment until
+  Vercel is decommissioned: a rolled-back app without them would refuse every
+  snapshot write, every webhook included. And after the cutover only KV is written,
+  so a rollback also runs `npm run snapshot:backfill` to bring Blob current for the
+  legacy paths that read it there. Vercel is decommissioned after a quiet week, by
+  the owner.
 
 ### 5. Deploys
 

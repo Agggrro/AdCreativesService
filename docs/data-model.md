@@ -49,7 +49,7 @@ Source-of-truth mirror of Stripe state. See [billing.md](billing.md).
 | `user_id` | FK → auth user |
 | `plan_type` | `single` \| `all_access` |
 | `template_id` | FK → templates, **null for all-access** |
-| `status` | `active` \| `trialing` \| `past_due` \| `canceled` \| `incomplete` |
+| `status` | `active` \| `trialing` \| `past_due` \| `canceled` \| `incomplete`. **`canceled` is final**: the trigger `subscriptions_keep_canceled` skips any update that would move a row out of it — Stripe never revives a canceled subscription, so such a write is an older view landing late (see [billing.md](billing.md)) |
 | `stripe_subscription_id`, `stripe_customer_id` | |
 | `current_period_end` | ts; the effective expiry used by the gate |
 | `cancel_at_period_end` | bool |
@@ -190,13 +190,14 @@ processed and only its log line is skipped.
 | `ensure_postback_key()` / `rotate_postback_key()` / `has_postback_key()` / `get_postback_log(limit)` | authenticated | The caller's own key and log, scoped to `auth.uid()` |
 
 ### `stripe_events` (webhook idempotency)
-Ledger of processed Stripe event ids. Service-role only; no client access.
+Ledger of claimed and processed Stripe event ids. Service-role only; no client access.
 
 | Field | Notes |
 | --- | --- |
 | `id` | text PK — the Stripe event id |
 | `type` | event type |
-| `received_at` | ts |
+| `received_at` | ts — when the event was last claimed: first delivery, or a takeover of an abandoned claim |
+| `processed_at` | ts, nullable — when the handler finished; null while in flight or abandoned. Only a processed event is a duplicate (see [billing.md](billing.md), "Idempotent") |
 
 ## Relationships
 
@@ -267,8 +268,14 @@ lived in before, and a write counts only when both stores took it:
 
 | Key | Projection of | Republished by |
 | --- | --- | --- |
-| `serving/creative/<creative_id>.json` | `private.creative_serving`, minus the two computed columns | `createCreative` / `updateCreative`; removed by `deleteCreative` **before** the row |
-| `serving/entitlement/<user_id>.json` | that user's `subscriptions` rows, as facts (`status`, `plan_type`, `template_id`, `current_period_end`) | the Stripe webhook's `upsertSubscription` |
+| `serving/creative/<creative_id>.json` | `private.creative_serving`, minus the two computed columns | `createCreative` / `updateCreative`; removed by `deleteCreative` **before** the row, and once more after it; the reconciler |
+| `serving/entitlement/<user_id>.json` | that user's `subscriptions` rows, as facts (`status`, `plan_type`, `template_id`, `current_period_end`) | the Stripe webhook's `upsertSubscription`; the reconciler |
+
+The **reconciler** (`lib/serving/reconcile.ts`, `/api/cron/reconcile`, every ten minutes
+on the app's Worker) compares every snapshot whose row changed in the last four days with
+what a publish would write now, and republishes the ones that drifted — a store that could
+neither take a write nor clear it, a webhook whose retries ran out. A publish re-reads the
+row after writing and removes the snapshot if the creative was deleted meanwhile.
 
 Postgres remains the source of truth; these are a projection of it, and
 `npm run snapshot:backfill` rebuilds them from it idempotently. Note that a creative

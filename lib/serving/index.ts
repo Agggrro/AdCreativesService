@@ -7,24 +7,21 @@
 // The ad Worker (workers/ads) does not come through here: it builds its store
 // from its own KV binding and hands it to the handlers in lib/serving/http,
 // which keeps the Blob SDK out of its bundle.
-import { blobSnapshotStore } from "./store-blob";
 import { dualWriteStore, kvSnapshotStore } from "./store-kv";
-import { restNamespaceFromEnv, type SnapshotNamespace } from "./kv";
+import { restNamespaceFromEnv } from "./kv";
+import { registeredSnapshotNamespace } from "./registry";
 import { SnapshotReadError, type SnapshotStore } from "./store";
 
+export { registerSnapshotNamespace } from "./registry";
+
 /**
- * A KV binding registered by a Worker entry. Kept on a global symbol rather than
- * in a module variable: a Worker can hold more than one copy of this module (the
- * Next server bundle and the entry that wraps it are compiled separately), and
- * all of them must see the registration.
+ * The Blob store, loaded only when it is configured. A static import would put
+ * `@vercel/blob` — and the undici and jose it carries — into every runtime the
+ * app runs on, evaluated at startup, including a Worker that never touches it
+ * (ADR-0029). It goes entirely once the app has left Vercel.
  */
-const NAMESPACE_SLOT = Symbol.for("creosmith.serving.snapshot-namespace");
-
-type Slots = Record<symbol, SnapshotNamespace | undefined>;
-
-/** Called by a Worker entry, with its KV binding, before it serves. */
-export function registerSnapshotNamespace(namespace: SnapshotNamespace): void {
-  (globalThis as unknown as Slots)[NAMESPACE_SLOT] = namespace;
+async function blobStore(): Promise<SnapshotStore> {
+  return (await import("./store-blob")).blobSnapshotStore;
 }
 
 function blobConfigured(): boolean {
@@ -52,8 +49,12 @@ function kvOverRest(): SnapshotStore | null {
  * serving. Writes refuse, loudly; reads come from Blob if there is one, and are
  * otherwise "could not read" (the Postgres fallback).
  */
-function withoutKv(readBlob: boolean): SnapshotStore {
-  const refuse = async (): Promise<never> => {
+function withoutKv(blob: SnapshotStore | null): SnapshotStore {
+  // Refused, but not before the Blob copy is cleared: the legacy paths on the
+  // app domain still read it, and a write that failed must not leave it serving
+  // the previous state there either (store.ts, "fail closed").
+  const refuse = (clear?: () => Promise<void>) => async (): Promise<never> => {
+    await clear?.().catch(() => undefined);
     throw new Error(
       "Snapshot KV is not configured (no binding, no SNAPSHOT_KV_* variables): " +
         "refusing a write the ad domain would never see (ADR-0029).",
@@ -63,12 +64,12 @@ function withoutKv(readBlob: boolean): SnapshotStore {
     throw new SnapshotReadError("no snapshot store is configured");
   };
   return {
-    putCreative: refuse,
-    deleteCreative: refuse,
-    putEntitlement: refuse,
-    deleteEntitlement: refuse,
-    getCreative: readBlob ? (id) => blobSnapshotStore.getCreative(id) : unreadable,
-    getEntitlement: readBlob ? (id) => blobSnapshotStore.getEntitlement(id) : unreadable,
+    putCreative: (s) => refuse(blob ? () => blob.deleteCreative(s.creative_id) : undefined)(),
+    deleteCreative: (id) => refuse(blob ? () => blob.deleteCreative(id) : undefined)(),
+    putEntitlement: (s) => refuse(blob ? () => blob.deleteEntitlement(s.user_id) : undefined)(),
+    deleteEntitlement: (id) => refuse(blob ? () => blob.deleteEntitlement(id) : undefined)(),
+    getCreative: blob ? (id) => blob.getCreative(id) : unreadable,
+    getEntitlement: blob ? (id) => blob.getEntitlement(id) : unreadable,
   };
 }
 
@@ -88,13 +89,13 @@ function withoutKv(readBlob: boolean): SnapshotStore {
  *   4. No KV at all — writes refuse (`withoutKv`). The pre-ADR-0029 "Blob
  *      only" configuration is no longer a valid one to publish from.
  */
-function currentStore(): SnapshotStore {
-  const bound = (globalThis as unknown as Slots)[NAMESPACE_SLOT];
+async function currentStore(): Promise<SnapshotStore> {
+  const bound = registeredSnapshotNamespace();
   if (bound) return kvSnapshotStore(() => bound);
 
   const rest = kvOverRest();
-  const blob = blobConfigured();
-  if (rest) return blob ? dualWriteStore(blobSnapshotStore, rest) : rest;
+  const blob = blobConfigured() ? await blobStore() : null;
+  if (rest) return blob ? dualWriteStore(blob, rest) : rest;
   return withoutKv(blob);
 }
 
@@ -108,12 +109,12 @@ function currentStore(): SnapshotStore {
  * current in one and stale in the other is exactly the drift that would
  * otherwise go unseen.
  */
-export function auditableSnapshotStores(): { name: string; store: SnapshotStore }[] {
-  const bound = (globalThis as unknown as Slots)[NAMESPACE_SLOT];
+export async function auditableSnapshotStores(): Promise<{ name: string; store: SnapshotStore }[]> {
+  const bound = registeredSnapshotNamespace();
   if (bound) return [{ name: "kv", store: kvSnapshotStore(() => bound) }];
 
-  const stores = [{ name: "kv", store: kvOverRest() ?? withoutKv(false) }];
-  if (blobConfigured()) stores.push({ name: "blob", store: blobSnapshotStore });
+  const stores = [{ name: "kv", store: kvOverRest() ?? withoutKv(null) }];
+  if (blobConfigured()) stores.push({ name: "blob", store: await blobStore() });
   return stores;
 }
 
@@ -122,12 +123,12 @@ export function auditableSnapshotStores(): { name: string; store: SnapshotStore 
 // serving path's `.catch` turns a failed read into the Postgres fallback, and a
 // synchronous throw would skip it.
 export const snapshots: SnapshotStore = {
-  putCreative: async (snapshot) => currentStore().putCreative(snapshot),
-  deleteCreative: async (creativeId) => currentStore().deleteCreative(creativeId),
-  getCreative: async (creativeId) => currentStore().getCreative(creativeId),
-  putEntitlement: async (snapshot) => currentStore().putEntitlement(snapshot),
-  deleteEntitlement: async (userId) => currentStore().deleteEntitlement(userId),
-  getEntitlement: async (userId) => currentStore().getEntitlement(userId),
+  putCreative: async (snapshot) => (await currentStore()).putCreative(snapshot),
+  deleteCreative: async (creativeId) => (await currentStore()).deleteCreative(creativeId),
+  getCreative: async (creativeId) => (await currentStore()).getCreative(creativeId),
+  putEntitlement: async (snapshot) => (await currentStore()).putEntitlement(snapshot),
+  deleteEntitlement: async (userId) => (await currentStore()).deleteEntitlement(userId),
+  getEntitlement: async (userId) => (await currentStore()).getEntitlement(userId),
 };
 
 export type { SnapshotStore } from "./store";

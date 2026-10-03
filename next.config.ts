@@ -81,6 +81,16 @@ const FRAME_ANCESTORS = (() => {
 
 const nextConfig: NextConfig = {
   /**
+   * Loaded from node_modules at runtime rather than bundled. Bundled, webpack
+   * inlines stripe's Node build — Node's `http` agents created at module load,
+   * `os.release()` on every request — and a Cloudflare Worker would run that.
+   * External, OpenNext resolves the package with the `workerd` condition and
+   * ships stripe's own Worker build (fetch and SubtleCrypto); on Node nothing
+   * changes (ADR-0029).
+   */
+  serverExternalPackages: ["stripe"],
+
+  /**
    * `app/icon.tsx` generates the tab icon and Next links it as `/icon`, which is
    * what a browser reading the markup uses. Nothing serves `/favicon.ico` any
    * more, though — the starter default that used to sit there was deleted — and
@@ -150,18 +160,27 @@ const nextConfig: NextConfig = {
       // A VPAID unit from our own host. Served tags name the unit's media-host
       // URL directly (ADR-0029); this path is for the configurator's previews,
       // which load the unit from the page's own origin so the unit's telemetry
-      // can reach it (ADR-0019), and for tags built before the move.
+      // can reach it (ADR-0019).
       //
-      // **Scripts under `runtime/` only.** The store behind the media host also
-      // holds every advertiser's uploads and the SIMID document, so `/c/u/:path*`
-      // would proxy the whole bucket through the app — 25 MB videos on our
-      // transfer, and HTML rendered on the origin that holds the session.
-      // Mirrors RUNTIME_SCRIPT_KEY_RE (lib/runtime-keys.ts), which next.config.ts
-      // cannot import.
-      afterFiles.push({
-        source: "/c/u/:path(runtime/(?:[a-z0-9_-]+/)*[a-z0-9_-]+\\.[0-9a-f]{8}\\.js)",
-        destination: `${assetOrigin}/:path`,
-      });
+      // **The units in the manifest, by exact path, and nothing else.** The
+      // store behind the media host also holds every advertiser's uploads and
+      // the SIMID document, so a pattern would proxy whatever matched it through
+      // the app — and an object added under `runtime/` by anyone holding the
+      // bucket's key (the lock stops overwrites, not additions) would be served
+      // on the origin that holds the session, under whatever type it was stored
+      // with. Only objects this build already names, all scripts, are reachable.
+      for (const asset of Object.values(RUNTIME_MANIFEST.assets)) {
+        let key: string;
+        try {
+          key = new URL(asset.url).pathname.replace(/^\/+/, "");
+        } catch {
+          continue;
+        }
+        // Mirrors RUNTIME_SCRIPT_KEY_RE (lib/runtime-keys.ts), which this file
+        // cannot import: scripts only — the SIMID document has its own route.
+        if (!/^runtime\/(?:[a-z0-9_-]+\/)*[a-z0-9_-]+\.[0-9a-f]{8}\.js$/.test(key)) continue;
+        afterFiles.push({ source: `/c/u/${key}`, destination: asset.url });
+      }
     }
 
     return { beforeFiles, afterFiles, fallback: [] };

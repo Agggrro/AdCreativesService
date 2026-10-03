@@ -1,3 +1,5 @@
+import { isWorkersRuntime } from "@/lib/runtime-env";
+
 /** Public base URL (no trailing slash). Used for VAST tags, auth redirects, etc. */
 export function getSiteUrl(): string {
   return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(
@@ -42,10 +44,15 @@ export function getCdnHost(): string | null {
  * page is https, and the resulting protocol mismatch breaks the player.
  *
  * Prefers the forwarded headers a proxy sets (Vercel) over `request.url`, whose
- * host can be the internal one behind a proxy.
+ * host can be the internal one behind a proxy. Not on a Cloudflare Worker
+ * (ADR-0029): there `request.url` is the URL the visitor asked for, and
+ * Cloudflare passes a client's own `X-Forwarded-*` headers through untouched,
+ * so reading them would let any caller choose the origin written into its
+ * response.
  */
 export function getRequestOrigin(request: Request): string {
   const url = new URL(request.url);
+  if (isWorkersRuntime()) return url.origin;
   const proto =
     request.headers.get("x-forwarded-proto")?.split(",")[0].trim() ??
     url.protocol.replace(/:$/, "");

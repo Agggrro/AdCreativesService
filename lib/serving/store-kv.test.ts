@@ -198,3 +198,77 @@ test("during the move: reads come from the old store, a write lands in both or f
   // The old store still took it — which is why the caller must report failure.
   assert.equal(oldNs.data.has(`serving/entitlement/${USER_ID}.json`), true);
 });
+
+test("a put that fails clears that store's previous document — fail closed", async () => {
+  const ns = memory();
+  const store = kvSnapshotStore(() => ns);
+  await store.putEntitlement(ENTITLEMENT);
+
+  // The write is refused, the clear is not: the stale subscription must not stay.
+  const put = mock.method(ns, "put", async () => {
+    throw new Error("429 too many writes");
+  });
+  try {
+    await assert.rejects(store.putEntitlement({ ...ENTITLEMENT, subscriptions: [] }), /429/);
+    assert.equal(ns.data.has(`serving/entitlement/${USER_ID}.json`), false);
+  } finally {
+    put.mock.restore();
+  }
+});
+
+test("a binding write is tried once more, a second later — KV's one write per key per second", async () => {
+  let calls = 0;
+  const flaky = {
+    get: async () => null,
+    put: async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("429");
+    },
+    delete: async () => {},
+  };
+  const started = Date.now();
+  await bindingNamespace(flaky, 60).put("k", "v");
+  assert.equal(calls, 2);
+  assert.ok(Date.now() - started >= 1000, "the retry waits out the per-key limit");
+
+  calls = 0;
+  const broken = { ...flaky, put: async () => { calls += 1; throw new Error("down"); } };
+  await assert.rejects(bindingNamespace(broken, 60).put("k", "v"), /down/);
+  assert.equal(calls, 2);
+});
+
+test("on a partial dual write only the store that missed it is cleared", async () => {
+  const oldNs = memory();
+  const newNs = memory();
+  const oldStore = kvSnapshotStore(() => oldNs);
+  const newStore = kvSnapshotStore(() => newNs);
+  await oldStore.putEntitlement(ENTITLEMENT);
+  await newStore.putEntitlement(ENTITLEMENT);
+
+  const updated = { ...ENTITLEMENT, published_at: "2026-10-04T00:00:00.000Z" };
+  const put = mock.method(oldNs, "put", async () => {
+    throw new Error("blob unavailable");
+  });
+  try {
+    await assert.rejects(dualWriteStore(oldStore, newStore).putEntitlement(updated));
+  } finally {
+    put.mock.restore();
+  }
+  // The store that took the write keeps the one document that is right.
+  assert.deepEqual(await newStore.getEntitlement(USER_ID), updated);
+  assert.equal(await oldStore.getEntitlement(USER_ID), null);
+});
+
+test("a write refused for KV's per-key rate limit is retried with jitter, more than once", async () => {
+  let calls = 0;
+  const limited = {
+    get: async () => null,
+    put: async () => {
+      calls += 1;
+      if (calls < 3) throw new Error("KV PUT failed: 429 Too Many Requests");
+    },
+    delete: async () => {},
+  };
+  await bindingNamespace(limited, 60).put("k", "v");
+  assert.equal(calls, 3, "two refusals for the rate limit, then success");
+});

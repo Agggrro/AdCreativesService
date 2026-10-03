@@ -172,6 +172,9 @@ alter table public.creatives add column if not exists name text;
 
 create index if not exists creatives_user_id_idx     on public.creatives (user_id);
 create index if not exists creatives_template_id_idx on public.creatives (template_id);
+-- The snapshot reconciler's window (lib/serving/reconcile.ts, every ten minutes):
+-- creatives changed in the last four days, newest first.
+create index if not exists creatives_updated_at_idx  on public.creatives (updated_at);
 
 drop trigger if exists creatives_set_updated_at on public.creatives;
 create trigger creatives_set_updated_at
@@ -232,6 +235,9 @@ comment on table public.subscriptions is 'Stripe subscription mirror. Source of 
 
 create index if not exists subscriptions_user_id_idx     on public.subscriptions (user_id);
 create index if not exists subscriptions_template_id_idx on public.subscriptions (template_id);
+-- The snapshot reconciler's window and the audit's sample, both by recency
+-- (lib/serving/reconcile.ts, lib/serving/health.ts).
+create index if not exists subscriptions_updated_at_idx  on public.subscriptions (updated_at);
 -- Fast entitlement lookup: only currently-serving subscriptions.
 create index if not exists subscriptions_active_lookup_idx
   on public.subscriptions (user_id, plan_type, template_id, current_period_end)
@@ -241,6 +247,35 @@ drop trigger if exists subscriptions_set_updated_at on public.subscriptions;
 create trigger subscriptions_set_updated_at
   before update on public.subscriptions
   for each row execute function public.set_updated_at();
+
+-- A canceled subscription stays canceled. Stripe never revives one — a
+-- resubscription is a new subscription with a new id — so a write that would
+-- move a row out of 'canceled' can only be an older view of it landing late:
+-- two webhook handlers for one subscription, the one that fetched it before the
+-- cancellation writing after the one that fetched it after. Without this, that
+-- write put a cancelled tag back on air until its period ended, and nothing
+-- would ever see it: the snapshot would faithfully match the row. Skipping the
+-- update (`return null`) leaves the row exactly as the cancellation wrote it.
+-- Fires before subscriptions_set_updated_at (triggers fire in name order), so a
+-- skipped update does not touch updated_at either.
+create or replace function public.subscriptions_keep_canceled()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if old.status = 'canceled' and new.status is distinct from 'canceled' then
+    return null;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.subscriptions_keep_canceled() from public, anon, authenticated;
+
+drop trigger if exists subscriptions_keep_canceled on public.subscriptions;
+create trigger subscriptions_keep_canceled
+  before update on public.subscriptions
+  for each row execute function public.subscriptions_keep_canceled();
 
 -- ---------------------------------------------------------------------------
 -- creative_event_counters  (aggregated analytics ingest — ADR-0016)
@@ -791,7 +826,20 @@ create table if not exists public.stripe_events (
   type        text not null,
   received_at timestamptz not null default now()
 );
-comment on table public.stripe_events is 'Processed Stripe event ids for webhook idempotency. Service-role only.';
+comment on table public.stripe_events is 'Claimed and processed Stripe event ids for webhook idempotency. Service-role only.';
+
+-- A claim is not a completion. Without this column an event whose handler
+-- died after claiming it — the rollback failing alongside, or the request cut
+-- off when Stripe gave up waiting — answered "Duplicate" to every retry, and a
+-- cancellation could be lost for good. Now only a processed event is a
+-- duplicate; a claim older than the webhook's timeout is taken over by the
+-- next delivery (app/api/stripe/webhook/route.ts). Nullable, so the deployed
+-- code that does not know it keeps working; rows from before it are treated
+-- as abandoned claims and reprocessed if Stripe ever redelivers them, which is
+-- safe because every handler re-fetches the subscription from Stripe.
+alter table public.stripe_events add column if not exists processed_at timestamptz;
+comment on column public.stripe_events.received_at is 'When the event was last claimed (first delivery, or a takeover of an abandoned claim).';
+comment on column public.stripe_events.processed_at is 'When the handler finished. Null: claimed and in flight, or abandoned.';
 
 -- ============================================================================
 -- Row Level Security

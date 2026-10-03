@@ -7,6 +7,7 @@ import {
   type SnapshotStore,
 } from "./store";
 import { SNAPSHOT_SCHEMA_VERSION } from "./types";
+import { putOrClear } from "./store-kv";
 import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
 
 /**
@@ -69,19 +70,25 @@ async function readSnapshot<T extends { schema_version: number }>(
 }
 
 async function writeSnapshot(key: string, snapshot: unknown): Promise<void> {
-  // No try/catch: writes fail hard, by contract. The caller must be able to
-  // refuse to report success when the publish did not land.
-  await put(key, JSON.stringify(snapshot), {
-    access: ACCESS,
-    contentType: "application/json",
-    // Republishing is the whole point of these objects, and Blob refuses to
-    // overwrite unless asked. `addRandomSuffix` is already false by default;
-    // stated explicitly because a random suffix would make the deterministic
-    // key unresolvable and break every read.
-    allowOverwrite: true,
-    addRandomSuffix: false,
-    cacheControlMaxAge: SNAPSHOT_CACHE_SECONDS,
-  });
+  // Writes fail hard, and fail closed: a put that did not land clears this
+  // store's document before the error goes up (`putOrClear`, store-kv.ts).
+  await putOrClear(
+    async () => {
+      await put(key, JSON.stringify(snapshot), {
+        access: ACCESS,
+        contentType: "application/json",
+        // Republishing is the whole point of these objects, and Blob refuses to
+        // overwrite unless asked. `addRandomSuffix` is already false by default;
+        // stated explicitly because a random suffix would make the deterministic
+        // key unresolvable and break every read.
+        allowOverwrite: true,
+        addRandomSuffix: false,
+        cacheControlMaxAge: SNAPSHOT_CACHE_SECONDS,
+      });
+    },
+    () => del(key),
+    key,
+  );
 }
 
 export const blobSnapshotStore: SnapshotStore = {

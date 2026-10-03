@@ -57,8 +57,10 @@ strings are for logs, not for a buyer to read.
 ## Entitlement rule (used by the VAST gate)
 
 A creative may serve its payload iff its owner has a subscription with
-`status in (active, trialing)` and `current_period_end > now()` that covers the
-creative's template:
+`status in (active, trialing)` and `current_period_end` either NULL ("no expiry") or
+after `now()`, that covers the creative's template. NULL is what the webhook writes when
+Stripe gives no period end, and such a row never lapses on the clock — only an event
+moving its status does that:
 
 ```
 covered = (plan_type = 'all_access')
@@ -83,8 +85,30 @@ over a matrix of statuses, periods and plan types, and is the gate that enforces
 
 ## Webhooks — `/api/stripe/webhook` (source of truth)
 
-- Verify the Stripe signature against the **raw** request body (Node runtime; do not
-  let a framework parse/replace the body before verification).
+- Verify the Stripe signature against the **raw** request body (do not let a
+  framework parse/replace the body before verification), with `constructEventAsync`
+  and SubtleCrypto — the one path that exists on both Node and a Cloudflare Worker
+  ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)). A failure is a
+  400, logged with the check's own message (never the payload or the header).
+- **The row is written from Stripe's current state, not the event's.** `created`,
+  `updated`, `checkout.session.completed` and `invoice.payment_failed` fetch the
+  subscription, write it, and fetch it again — writing once more if it moved meanwhile.
+  A retry redelivers the object as it was when the event was created, and two handlers
+  for one subscription can interleave, so the one that fetched first may write last.
+  `deleted` is written from its payload: canceled is final, so it is right in any order,
+  and a re-fetch can fail for good (a test clock's objects go with it).
+- **A canceled row stays canceled** — a database trigger
+  (`subscriptions_keep_canceled`, schema.sql) skips any update that would move it out.
+  Stripe never revives a canceled subscription; a write that tries can only be an older
+  view landing late, and it would put a cancelled tag back on air with the snapshot
+  faithfully matching the row.
+- **Every call is bounded** — Stripe 8 s and one retry; the database 10 s, and a timed-out
+  read is not retried (the client renames the timeout so postgrest-js stops at once, and
+  the webhook's own reads opt out of retries); KV over REST 4 s a try. The run's ceiling
+  is 60 s on Vercel and, on a Worker, Stripe's own 20 s — when Stripe stops waiting the
+  Worker run is cancelled. Both sit well inside the two-minute claim timeout below, so a
+  run cut off mid-way is taken over, never overlapped. Vercel Blob, written only while
+  the app is still on Vercel, has no bound of its own.
 - Handle at minimum:
   - `checkout.session.completed` → create/link subscription, set `stripe_customer_id`.
   - `customer.subscription.created|updated` → sync `status`, `current_period_end`,
@@ -99,19 +123,44 @@ over a matrix of statuses, periods and plan types, and is the gate that enforces
   kill-switch.
   - It writes **one** document, `entitlement/<user_id>`, regardless of how many
     creatives the user owns.
-  - A publish that fails **must not return 2xx**. The handler drops the now-stale
-    document (which forces the correct-but-slower database fallback) and then throws,
-    so the idempotency claim is rolled back and Stripe retries. Reporting success on a
-    failed publish would leave the CDN serving the *previous* entitlement — which is
-    exactly how a cancelled subscription keeps serving.
+  - A publish that fails **must not return 2xx**. Each store a publish missed clears
+    its own copy before the error goes up — **fail closed**: with no entitlement
+    document the serving path serves nothing for that user — and the handler throws,
+    so the idempotency claim is rolled back and Stripe retries. Reporting success on
+    a failed publish would leave a store serving the *previous* entitlement — which is
+    exactly how a cancelled subscription keeps serving. A store whose put succeeded is
+    left alone: it holds the one document that is right.
+  - KV takes one write per second per key, and the events of one checkout arrive
+    together: a write refused for that (429) is retried up to three times, a second
+    and a random fraction apart; any other failure once. A clear is logged as
+    `[snapshot-cleared]` — it means a subscriber's tags are dark until a publish lands.
+  - A publish that cannot read the rows at all clears every store before it fails —
+    the webhook's upsert has committed by then, so the copies are already stale. One
+    whose facts keep changing writes the latest once more before it gives up.
+  - When a store can neither take the write nor clear it (the same outage, the same
+    limit), it keeps the previous document — logged as `[snapshot-stale]` — until a
+    retry or **the reconciler** republishes it: `/api/cron/reconcile`, every ten minutes
+    on the app's Worker (daily while the app is on Vercel), compares every snapshot
+    changed in the last four days with Postgres and republishes what drifted. Postgres
+    is right in all of these cases — the row is written before the snapshot.
+  - The publish reads the subscriptions again after writing and republishes if they
+    changed meanwhile, so two publishes that cross cannot leave the older one standing.
   - The snapshot stores `current_period_end`, not a boolean verdict, so entitlement
     still lapses on time even if no webhook arrives at all.
 - **Kill-switch latency: ~60s response cache + up to 60s of snapshot propagation**
   (Workers KV's edge cache since ADR-0029, Blob's before), so ~2 minutes worst case
   (it was ~1 minute when the view was read live).
 - **Idempotent:** each event id is claimed in `public.stripe_events` before
-  processing; a duplicate returns 200 without reprocessing, and a handler failure
-  rolls back the claim so Stripe's retry can reprocess.
+  processing and marked `processed_at` after it. Only a *processed* event is a
+  duplicate (200, not reprocessed). A claim still in flight answers 409, so Stripe
+  retries; a claim older than two minutes — twice the run's ceiling — was abandoned
+  (the handler died, its rollback failed, or Stripe stopped waiting) and the next
+  delivery takes it over and processes the event. Each run's rollback and processed
+  mark match the claim instant it wrote, so a takeover and a straggler never touch
+  each other's claim. Before `processed_at` existed, any of those answered
+  "Duplicate" to every retry and a cancellation could be lost for good.
+  Reprocessing is safe because every subscription handler re-fetches the
+  subscription from Stripe. A handler failure still rolls the claim back at once.
 
 Implemented in [`app/api/stripe/webhook/route.ts`](../app/api/stripe/webhook/route.ts);
 plans/price config + status mapping in [`lib/stripe.ts`](../lib/stripe.ts); checkout

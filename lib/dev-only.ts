@@ -1,12 +1,15 @@
+import { isWorkersRuntime } from "@/lib/runtime-env";
+
 /**
  * The gate for every developer-only surface in the app — today the password-less
  * session route (`/api/dev/session`) and the creative harness (`/dev/harness`).
  *
- * Three independent conditions rather than one, and every one of them must hold.
+ * Independent conditions rather than one, and every one of them must hold.
  * `NODE_ENV` alone is a single point of failure, and it is not even sufficient:
  * a Vercel *preview* deployment runs with `NODE_ENV=production` but is still a
  * publicly reachable URL, so `VERCEL` excludes every deployment regardless of
- * which environment it claims to be. The third condition lives at each call
+ * which environment it claims to be, and the Workers check does the same for
+ * Cloudflare (ADR-0029). The last condition lives at each call
  * site — the route also refuses unless its own env vars are present — so
  * forgetting to set them fails closed rather than opening a surface.
  *
@@ -16,6 +19,10 @@
 export function isDevOnlyEnabled(): boolean {
   if (process.env.NODE_ENV === "production") return false;
   if (process.env.VERCEL) return false;
+  // Every Cloudflare Worker is a deployment too (ADR-0029) — the counterpart of
+  // the `VERCEL` check, read off the runtime itself rather than an env var
+  // someone could forget to set.
+  if (isWorkersRuntime()) return false;
   return true;
 }
 

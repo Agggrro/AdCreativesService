@@ -21,6 +21,8 @@ const eslintConfig = defineConfig([
     // Wrangler's local state and bundles (`wrangler dev`, ADR-0029) — generated,
     // gitignored, and thousands of lines of other people's code.
     "**/.wrangler/**",
+    // OpenNext's build output (ADR-0029): generated, gitignored, the whole app bundled.
+    ".open-next/**",
   ]),
   {
     // Hand-written ES5 creative units, not app code. Two default rules model

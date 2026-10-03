@@ -5,16 +5,17 @@ import { templateSlug } from "@/lib/template-demo";
 import type { Database } from "@/types/database.types";
 
 /**
- * Rebuilt at most hourly. The published-template list changes when someone
- * publishes a template, which is rare, and a crawler should not be running a
- * database query per fetch.
+ * Built per request. It was `revalidate = 3600` — rebuilt at most hourly — but
+ * on Cloudflare Workers (ADR-0029) there is no incremental cache to hold the
+ * hourly copy, so the declaration would quietly mean "the build's copy,
+ * forever". One anon read of the published templates per crawler fetch is the
+ * honest version of the same thing: the list changes rarely, crawlers fetch it
+ * rarely, and it can never go stale.
  *
- * This only holds because nothing below reads a cookie: `createServerSupabase`
- * awaits `cookies()`, and any use of that API opts the route into dynamic
- * rendering, which would silently make this declaration a no-op. A sitemap has
- * no session to read anyway — it is the same list for every visitor.
+ * Nothing below reads a cookie (`createServerSupabase` would, and is not used):
+ * a sitemap has no session to read — it is the same list for every visitor.
  */
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 /**
  * The public surface, for crawlers.

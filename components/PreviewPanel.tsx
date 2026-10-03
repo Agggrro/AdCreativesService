@@ -1,15 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { AlertCircle, Loader2, Play, RotateCcw } from "lucide-react";
 import type { PreviewMint, StatusTone } from "@/components/players/types";
 import { Notice } from "@/components/ui/Field";
 import { SandboxPlayer } from "@/components/players/SandboxPlayer";
 import { ImaPlayer } from "@/components/players/ImaPlayer";
-import { FluidPlayer } from "@/components/players/FluidPlayer";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { buttonClass } from "@/components/ui/Button";
 import { Segmented } from "@/components/ui/Segmented";
+
+// Fluid Player only ever runs in the browser, and it brings dash.js, hls.js and
+// three.js with it — three megabytes that, imported statically, sat in the
+// server bundle of every page that renders this panel, and in the Worker's
+// startup on Cloudflare (ADR-0029). Loaded on the client, when the tab is used.
+const FluidPlayer = dynamic(
+  () => import("@/components/players/FluidPlayer").then((m) => m.FluidPlayer),
+  { ssr: false },
+);
 
 type PlayerKey = "sandbox" | "ima" | "fluid";
 

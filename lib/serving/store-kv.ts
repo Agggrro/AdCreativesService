@@ -50,8 +50,13 @@ export function kvSnapshotStore(namespace: () => SnapshotNamespace): SnapshotSto
   }
 
   async function write(key: string, snapshot: unknown): Promise<void> {
-    // No try/catch: writes fail hard, by contract.
-    await namespace().put(key, JSON.stringify(snapshot));
+    // Writes fail hard, and fail closed (store.ts): a put that did not land
+    // clears this store's document before the error goes up.
+    await putOrClear(
+      () => namespace().put(key, JSON.stringify(snapshot)),
+      () => namespace().delete(key),
+      key,
+    );
   }
 
   return {
@@ -88,10 +93,50 @@ export function kvSnapshotStore(namespace: () => SnapshotNamespace): SnapshotSto
 }
 
 /**
+ * A put that failed leaves whatever the store held before — for an entitlement,
+ * possibly the subscription before its cancellation. So the store clears its
+ * own document before reporting the failure: a creative then falls back to
+ * Postgres, which is right; an entitlement then serves nothing, which is safe.
+ * The clear is this store's alone. Clearing a store whose put succeeded would
+ * only throw away the one document that was correct.
+ *
+ * If the clear fails too — the same outage, or the same one-write-per-second
+ * limit — the previous document stays, and only a later publish repairs it: a
+ * retried webhook, or the reconciler (`/api/cron/reconcile`). It is logged
+ * under a stable prefix so that case is never silent.
+ */
+export async function putOrClear(
+  put: () => Promise<void>,
+  clear: () => Promise<void>,
+  key: string,
+): Promise<void> {
+  try {
+    await put();
+  } catch (err) {
+    try {
+      await clear();
+      // Said out loud: a clear fails closed, and for an entitlement that means a
+      // subscriber's tags are dark until the next publish lands.
+      console.warn("[snapshot-cleared] a publish failed; this store's copy was removed", {
+        key,
+        err: String(err),
+      });
+    } catch (clearErr) {
+      console.error("[snapshot-stale] a failed publish could not be cleared", {
+        key,
+        err: String(clearErr),
+      });
+    }
+    throw err;
+  }
+}
+
+/**
  * Reads from `primary`, writes to both — the shape of the move between stores
  * (ADR-0029 §3). A write counts only when both stores took it: reporting success
  * with one of them stale would let the two serving paths disagree about whether
- * a tag may serve.
+ * a tag may serve. Each store fails closed on its own (`putOrClear`), so a
+ * partial failure clears only the store that missed the write.
  */
 export function dualWriteStore(primary: SnapshotStore, secondary: SnapshotStore): SnapshotStore {
   async function both(a: Promise<void>, b: Promise<void>): Promise<void> {

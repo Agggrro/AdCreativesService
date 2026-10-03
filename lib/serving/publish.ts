@@ -63,6 +63,19 @@ export async function publishCreativeSnapshot(
   };
 
   await snapshots.putCreative(snapshot);
+
+  // The row may have been deleted between the read above and the write: a
+  // delete removes the snapshot first and the row second, so this write can
+  // land after its removal and resurrect a creative with no row — one that
+  // serves until its owner's subscription lapses, invisible to everything that
+  // starts from the rows. Checked again, and undone if so; deleteCreative
+  // removes the snapshot a second time from its side.
+  const { data: still, error: recheckError } = await supabase.rpc("get_creative_serving", {
+    p_creative_id: creativeId,
+  });
+  if (!recheckError && (!still || still.length === 0)) {
+    await snapshots.deleteCreative(creativeId);
+  }
 }
 
 /**
@@ -76,6 +89,13 @@ export async function publishCreativeSnapshot(
  * Note what is *not* stored: no boolean verdict. The rows carry
  * `current_period_end`, and the serving path compares it against the clock, so
  * a subscription still lapses on time when no webhook arrives to say it did.
+ *
+ * Read, write, then read again: two publishes for one user can run at once — the
+ * events of one checkout arrive together, and the reconciler can overlap a
+ * webhook — and the one that read first can write last. Nothing would then
+ * correct it, since both reported success. So the facts are read again after
+ * the write, and a publish that is already out of date is redone. A store that
+ * refuses the write clears its copy and this throws (store.ts, "fail closed").
  */
 export async function publishEntitlementSnapshot(
   userId: string,
@@ -83,27 +103,59 @@ export async function publishEntitlementSnapshot(
 ): Promise<void> {
   const supabase = client ?? createServiceClient();
 
-  const { data, error } = await supabase
-    .from("subscriptions")
-    .select("plan_type, template_id, status, current_period_end")
-    .eq("user_id", userId);
-  if (error) throw new Error(`subscriptions read failed: ${error.message}`);
-
-  const subscriptions: EntitlementRecord[] = (data ?? []).map((s) => ({
-    plan_type: s.plan_type,
-    template_id: s.template_id,
-    status: s.status,
-    current_period_end: s.current_period_end,
-  }));
-
-  const snapshot: EntitlementSnapshot = {
-    schema_version: SNAPSHOT_SCHEMA_VERSION,
-    user_id: userId,
-    subscriptions,
-    published_at: new Date().toISOString(),
+  const readFacts = async (): Promise<EntitlementRecord[]> => {
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("plan_type, template_id, status, current_period_end")
+      .eq("user_id", userId)
+      .order("stripe_subscription_id")
+      .order("id")
+      // Not retried: this runs under a webhook's ceiling, and the failure path
+      // (clear every store) must get to run before that ceiling cuts it off.
+      .retry(false);
+    if (error) throw new Error(`subscriptions read failed: ${error.message}`);
+    return (data ?? []).map((s) => ({
+      plan_type: s.plan_type,
+      template_id: s.template_id,
+      status: s.status,
+      current_period_end: s.current_period_end,
+    }));
   };
+  const put = (subscriptions: EntitlementRecord[]) =>
+    snapshots.putEntitlement({
+      schema_version: SNAPSHOT_SCHEMA_VERSION,
+      user_id: userId,
+      subscriptions,
+      published_at: new Date().toISOString(),
+    } satisfies EntitlementSnapshot);
 
-  await snapshots.putEntitlement(snapshot);
+  let subscriptions: EntitlementRecord[];
+  try {
+    subscriptions = await readFacts();
+  } catch (err) {
+    // The caller has usually just changed the rows (a webhook's upsert has
+    // committed), so the stores' copies are already out of date — and no put
+    // will run to clear them on failure. Cleared here instead: fail closed.
+    await snapshots.deleteEntitlement(userId).catch((clearErr: unknown) => {
+      console.error("[snapshot-stale] an unpublishable entitlement could not be cleared", {
+        userId,
+        err: String(clearErr),
+      });
+    });
+    throw err;
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await put(subscriptions);
+    const now = await readFacts();
+    if (JSON.stringify(now) === JSON.stringify(subscriptions)) return;
+    subscriptions = now;
+  }
+  // Still moving after three rounds. The last put may have landed after a newer
+  // one another publisher already reported — so the latest facts go in once
+  // more before this gives up, rather than leaving a copy known to be stale.
+  await put(subscriptions);
+  throw new Error(`entitlement for ${userId} kept changing while it was published`);
 }
 
 /** Remove a creative's snapshot. See the ordering note in deleteCreative. */
@@ -111,11 +163,3 @@ export async function unpublishCreativeSnapshot(creativeId: string): Promise<voi
   await snapshots.deleteCreative(creativeId);
 }
 
-/**
- * Drop a user's entitlement document, which turns their tags off until the next
- * successful publish — fail closed, see `deleteEntitlement` in store.ts. A
- * fail-safe for a republish that would not land — never part of a normal flow.
- */
-export async function unpublishEntitlementSnapshot(userId: string): Promise<void> {
-  await snapshots.deleteEntitlement(userId);
-}

@@ -22,8 +22,11 @@ we push after a case is built and verified locally).
 - **DB + Auth:** Supabase (PostgreSQL, RLS)
 - **Billing:** Stripe (webhooks are the source of truth)
 - **Hosting:** Cloudflare Workers — `creosmith-ads` serves the ad domain
-  (`workers/ads`); the app is moving there from Vercel through OpenNext
-  ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md))
+  (`workers/ads`); the app is moving there from Vercel through OpenNext as
+  `creosmith-web` (`wrangler.jsonc`, `workers/web`)
+  ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)). **The app's
+  Worker is built and deployed by CI only** — `opennextjs-cloudflare build` copies any
+  `.env*` file into the bundle, so a build next to `.env.local` would ship its secrets.
 - **Serving snapshots:** Workers KV (`creosmith-snapshots`)
 - **Advertiser media:** Cloudflare R2 behind `media.smithcdn.net` ([ADR-0028](docs/decisions/0028-creative-media-on-r2.md))
 

@@ -25,9 +25,14 @@ import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
  *     user who never subscribed, while a failed read is "we do not know". Before
  *     ADR-0029 both came back as `null`, so one failed read served an empty ad
  *     that the CDN then kept for a minute.
- *   - **Writes fail hard.** `put*`/`delete*` throw, so the caller can refuse to
- *     report success. A writer that swallows a failed publish leaves the CDN
- *     serving stale entitlement, which is the one thing this design must not do.
+ *   - **Writes fail hard, and fail closed.** `put*`/`delete*` throw, so the
+ *     caller can refuse to report success. A writer that swallows a failed
+ *     publish leaves a store serving stale entitlement, which is the one thing
+ *     this design must not do — so a `put*` that fails also clears that store's
+ *     document before it throws (`putOrClear` in store-kv.ts): a creative then
+ *     falls back to Postgres, an entitlement serves nothing. Callers neither need
+ *     nor should clear other stores themselves; a store whose put succeeded
+ *     holds the one document that is right.
  */
 export interface SnapshotStore {
   putCreative(snapshot: CreativeSnapshot): Promise<void>;
@@ -39,10 +44,12 @@ export interface SnapshotStore {
    * Used as a fail-safe, not as part of normal operation. Dropping the document
    * **fails closed**: with no entitlement document the serving path treats the
    * user as unsubscribed, so their tags serve empty until the next successful
-   * publish — it does not read Postgres for them. The Stripe webhook reaches for
-   * this when a republish fails, so a finite number of retries cannot leave
-   * stale entitlement serving forever; the price is that a *new* subscription
-   * whose publish failed stays dark until a retry or a backfill lands it.
+   * publish — it does not read Postgres for them. A failed put clears its own
+   * store this way (`putOrClear`), and a publish that cannot even read the rows
+   * clears every store (lib/serving/publish.ts), so a finite number of retries
+   * cannot leave stale entitlement serving forever; the price is that a *new*
+   * subscription whose publish failed stays dark until a retry or the reconciler
+   * lands it.
    */
   deleteEntitlement(userId: string): Promise<void>;
   getEntitlement(userId: string): Promise<EntitlementSnapshot | null>;

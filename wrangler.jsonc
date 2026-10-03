@@ -1,0 +1,68 @@
+// creosmith-web — the Next.js app on Cloudflare Workers, through OpenNext
+// (ADR-0029 §2). The ad domain is a separate Worker: workers/ads/wrangler.jsonc.
+//
+// Built and deployed by CI only (.github/workflows/ci.yml): `opennextjs-cloudflare
+// build` copies any `.env*` file it finds into the Worker, so a build on a machine
+// holding `.env.local` would ship its secrets. NEXT_PUBLIC_* values are inlined at
+// build time and come from the repository's Actions variables.
+//
+// Secrets are set with `wrangler secret put` and never live in this file:
+//   SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+//   PREVIEW_TOKEN_SECRET, TRACK_TOKEN_SECRET (both equal to creosmith-ads'),
+//   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CRON_SECRET
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "creosmith-web",
+  // Wraps .open-next/worker.js: the KV binding, the canonical origin, the cron.
+  "main": "workers/web/index.ts",
+  "compatibility_date": "2026-09-15",
+  // global_fetch_strictly_public: a fetch to our own zone goes through the front
+  // door like any other, not straight to the zone's origin — which is Vercel
+  // until the cutover, and nothing after it.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    // Staging, before the app domain moves — for reading and self-signed test
+    // events only. A write made here (a dashboard save, a webhook) lands in KV
+    // alone, while the app still on Vercel reads Blob for the legacy paths.
+    { "pattern": "next.creosmith.com", "custom_domain": true }
+  ],
+
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [
+    // OpenNext's self-reference (https://opennext.js.org/cloudflare/caching).
+    { "binding": "WORKER_SELF_REFERENCE", "service": "creosmith-web" }
+  ],
+  "kv_namespaces": [
+    // creosmith-snapshots — the serving snapshots the app publishes (ADR-0015).
+    { "binding": "SNAPSHOTS", "id": "f95d56504dbf4f5b8281be99fd64d223" }
+  ],
+
+  // workers/web/index.ts dispatches on the schedule: 03:00 UTC is the daily audit
+  // and tracking-table housekeeping (/api/cron/health), as on Vercel; every ten
+  // minutes the reconciler republishes snapshots that drifted from Postgres
+  // (/api/cron/reconcile).
+  "triggers": { "crons": ["0 3 * * *", "*/10 * * * *"] },
+
+  // Configuration that is not secret. NEXT_PUBLIC_* are inlined at build; the
+  // site URL is here too because the entry reads it at runtime.
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://creosmith.com",
+    "STRIPE_PRICE_SINGLE_WEEKLY": "price_1TqJGLRuVae2qc3xuiPHh0uo",
+    "STRIPE_PRICE_SINGLE_MONTHLY": "price_1TqJGMRuVae2qc3xNsPJ6pWF",
+    "STRIPE_PRICE_ULTIMATE_MONTHLY": "price_1TqJGNRuVae2qc3xq5h4x3H2",
+    "R2_ACCOUNT_ID": "4e9bc9b3bf84f2a176586ef8dad3b43c",
+    "R2_BUCKET": "creative-media"
+  },
+
+  // Query strings out of every log line: they carry postback keys (`/pb?key=…`,
+  // a password by another name) and the validator's hop tokens, which encode a
+  // stranger's wrapper URL — and nothing submitted to the validator is stored.
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": true }
+  }
+}

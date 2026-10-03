@@ -7,7 +7,20 @@ export function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("Missing STRIPE_SECRET_KEY");
   // apiVersion omitted on purpose: use the version pinned by this SDK release.
-  return new Stripe(key);
+  //
+  // The fetch HTTP client rather than the SDK's default, Node's `http` module:
+  // fetch is the one transport every runtime the app runs on has — Vercel's
+  // Node, `next dev`, and a Cloudflare Worker (ADR-0029), where `http` is only a
+  // partial shim over fetch anyway.
+  //
+  // Bounded: 8 s a request and one retry, against the SDK's 80 s and two. The
+  // webhook's run has a ceiling of its own (route.ts maxDuration) that its event
+  // claim relies on, and a checkout should fail in seconds, not minutes.
+  return new Stripe(key, {
+    httpClient: Stripe.createFetchHttpClient(),
+    timeout: 8000,
+    maxNetworkRetries: 1,
+  });
 }
 
 /** 7-day free trial for new subscriptions (mvp-scope / docs/billing.md). */

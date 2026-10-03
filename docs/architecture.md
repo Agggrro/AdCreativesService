@@ -65,12 +65,12 @@ Dashboard analytics are read through the owner-scoped aggregate
 `public.get_creative_overview()` (see [data-model.md](data-model.md)); `creative_event_counters`
 itself stays unreadable from the client.
 
-Traffic and page performance on these surfaces are measured by **Vercel Web Analytics**
-and **Speed Insights** (`@vercel/analytics`, `@vercel/speed-insights`), mounted together
-in the root layout — distinct from the delivery counts above, which are our own, and from
+Traffic and page performance on these surfaces are measured by **Cloudflare Web
+Analytics** (page views and Core Web Vitals, cookie-less; `components/WebAnalytics.tsx`,
+Vercel's Analytics and Speed Insights until ADR-0029), mounted once in the root layout — distinct from the delivery counts above, which are our own, and from
 anything happening inside a creative. Both are deliberately gated off the ad domain, which
 renders through that same layout: see
-[security.md](security.md#web-analytics-and-speed-insights-vercel).
+[security.md](security.md#web-analytics-cloudflare).
 
 The UI is bilingual (RU/EN). Copy lives in [`lib/i18n/dictionaries.ts`](../lib/i18n/dictionaries.ts)
 with the English dictionary typed against the Russian one, so a missing translation is a

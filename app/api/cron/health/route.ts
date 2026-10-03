@@ -1,3 +1,4 @@
+import { hasCronBearer } from "@/lib/cron-auth";
 import { checkSnapshotHealth, describeSnapshotHealth } from "@/lib/serving/health";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -52,7 +53,7 @@ export async function GET(request: Request): Promise<Response> {
     return new Response("CRON_SECRET not configured", { status: 503 });
   }
 
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!hasCronBearer(request, secret)) {
     return unauthorized();
   }
 

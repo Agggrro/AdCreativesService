@@ -3,6 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import net from "node:net";
 import type { LookupAddress } from "node:dns";
+import { isWorkersRuntime } from "@/lib/runtime-env";
 
 /**
  * The only place in this codebase that issues an outbound request to a URL a
@@ -367,6 +368,144 @@ function requestOnce(url: URL, deadlineMs: number): Promise<RawResponse> {
   });
 }
 
+/* ---------- the same guards on a Cloudflare Worker (ADR-0029) ---------- */
+
+/**
+ * On a Worker the socket-level guard above cannot exist: workerd's
+ * `http.request` is a shim over `fetch` with no socket to pin, and refuses a
+ * custom `lookup` outright ("not implemented") — so the Node path would fail
+ * closed there, but it would also never work. The Worker path checks before it
+ * fetches instead:
+ *
+ *   - no IP literal, no `localhost`/`*.localhost`, no single-label name: a
+ *     Worker cannot fetch an IP host at all, and the others only ever mean "here";
+ *   - every A and AAAA answer must pass `isPublicAddress` — resolved through
+ *     `node:dns`, which on Workers is DNS-over-HTTPS to 1.1.1.1;
+ *   - then `fetch`, redirects by hand, the deadline and the byte cap on the stream.
+ *
+ * What it gives up is guard 3: `fetch` resolves the name again, so a rebinding
+ * answer between the check and the connection is not caught here. What is left
+ * behind that window is small — a Worker has no private network, no metadata
+ * endpoint and no loopback service to reach, and Cloudflare does not route its
+ * subrequests to private ranges — and it is written down in docs/security.md.
+ */
+async function assertResolvesPublic(url: URL, deadlineMs: number): Promise<void> {
+  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (net.isIP(host)) {
+    throw new TagFetchError("blocked", `${host} is an address, not a name; only hostnames are fetched.`);
+  }
+  if (host === "localhost" || host.endsWith(".localhost") || !host.includes(".")) {
+    throw new TagFetchError("blocked", `${host} is not a public hostname.`);
+  }
+
+  const lookup = async (resolve: (h: string) => Promise<string[]>): Promise<string[]> => {
+    try {
+      return await resolve(host);
+    } catch (cause) {
+      // No record of this type is an empty answer, not a failure.
+      const code = (cause as NodeJS.ErrnoException)?.code;
+      if (code === "ENODATA" || code === "ENOTFOUND") return [];
+      throw cause;
+    }
+  };
+
+  let addresses: string[];
+  try {
+    const answers = await Promise.race([
+      Promise.all([lookup(dns.promises.resolve4), lookup(dns.promises.resolve6)]),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new TagFetchError("timeout", `No answer within ${TIMEOUT_MS} ms.`)), deadlineMs),
+      ),
+    ]);
+    addresses = answers.flat();
+  } catch (cause) {
+    if (cause instanceof TagFetchError) throw cause;
+    throw new TagFetchError("dns", `${host} could not be resolved.`);
+  }
+
+  // workerd's resolver lists a CNAME's target *name* among the answers
+  // (`www.github.com` → A ["github.com.", "4.225.11.194"]). Names are not
+  // addresses: judged as one, every CNAME'd host — most ad servers and CDNs —
+  // would be refused. Only the addresses are judged, and there must be one.
+  addresses = addresses.filter((answer) => net.isIP(answer) !== 0);
+  if (addresses.length === 0) throw new TagFetchError("dns", `${host} did not resolve.`);
+  const offender = addresses.find((address) => !isPublicAddress(address));
+  if (offender) {
+    throw new TagFetchError("blocked", `${host} resolves to a non-public address (${offender}).`);
+  }
+}
+
+/** `requestOnce` for a Worker: one fetch, no redirect following, capped in time and size. */
+async function requestOnceViaFetch(url: URL, deadlineMs: number): Promise<RawResponse> {
+  const startedAt = Date.now();
+  await assertResolvesPublic(url, deadlineMs);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "GET",
+      redirect: "manual",
+      signal: AbortSignal.timeout(Math.max(1, deadlineMs - (Date.now() - startedAt))),
+      headers: {
+        "user-agent": "CreoSmith-VAST-Validator/1.0 (+https://creosmith.com/tools/vast-validator)",
+        accept: "application/xml, text/xml, */*",
+      },
+    });
+  } catch (cause) {
+    const name = (cause as Error)?.name;
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new TagFetchError("timeout", `No response within ${TIMEOUT_MS} ms.`);
+    }
+    throw new TagFetchError("network", (cause as Error)?.message ?? "fetch failed");
+  }
+
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  let truncated = false;
+  const reader = response.body?.getReader();
+  try {
+    while (reader) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_BYTES) {
+        // As on Node: stopping at the cap is a success, with as much of the
+        // document as we are willing to read.
+        chunks.push(value.subarray(0, value.byteLength - (bytes - MAX_BYTES)));
+        truncated = true;
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
+      chunks.push(value);
+    }
+  } catch (cause) {
+    const name = (cause as Error)?.name;
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new TagFetchError("timeout", `No response within ${TIMEOUT_MS} ms.`);
+    }
+    throw new TagFetchError("network", (cause as Error)?.message ?? "read failed");
+  }
+
+  const body = new Uint8Array(Math.min(bytes, MAX_BYTES));
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  const headers: http.IncomingHttpHeaders = {};
+  response.headers.forEach((value, key) => {
+    headers[key] = value;
+  });
+  return {
+    status: response.status,
+    headers,
+    body: new TextDecoder().decode(body),
+    bytes: Math.min(bytes, MAX_BYTES),
+    truncated,
+  };
+}
+
 /**
  * Fetch one VAST document, following redirects by hand so each `Location` is
  * re-validated before it is dialled.
@@ -374,6 +513,7 @@ function requestOnce(url: URL, deadlineMs: number): Promise<RawResponse> {
 export async function fetchTag(rawUrl: string): Promise<FetchedTag> {
   const startedAt = Date.now();
   const redirects: string[] = [];
+  const request = isWorkersRuntime() ? requestOnceViaFetch : requestOnce;
   let url = assertFetchableUrl(rawUrl);
 
   for (let attempt = 0; attempt <= MAX_REDIRECTS; attempt += 1) {
@@ -383,7 +523,7 @@ export async function fetchTag(rawUrl: string): Promise<FetchedTag> {
       throw new TagFetchError("timeout", `No response within ${TIMEOUT_MS} ms.`);
     }
 
-    const response = await requestOnce(url, remaining);
+    const response = await request(url, remaining);
     const location = response.headers.location;
 
     if (response.status >= 300 && response.status < 400 && location) {
