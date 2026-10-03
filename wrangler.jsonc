@@ -24,8 +24,13 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
-    // Staging, before the app domain moves — for reading and self-signed test
-    // events only. A write made here (a dashboard save, a webhook) lands in KV
+    // The app domain (ADR-0029 §4). Its records stay pointed at Vercel and are
+    // proxied, so this route is what sends the traffic here: until the records are
+    // proxied it does nothing, and rollback is turning the proxy off (or removing
+    // this route) — Vercel still serves everything behind it. www is not routed:
+    // a zone redirect rule sends it to the bare domain, as Vercel did.
+    { "pattern": "creosmith.com/*", "zone_name": "creosmith.com" },
+    // Staging, kept until the cutover is verified. A write made here lands in KV
     // alone, while the app still on Vercel reads Blob for the legacy paths.
     { "pattern": "next.creosmith.com", "custom_domain": true }
   ],
