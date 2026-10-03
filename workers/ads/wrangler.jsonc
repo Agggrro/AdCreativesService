@@ -22,10 +22,7 @@
     // the forwarded paths reach the app while it is still on Vercel — and
     // deleting the route is the rollback (ADR-0029 §4). Needs the apex records
     // proxied; with them DNS-only, it is inert.
-    { "pattern": "smithcdn.net/*", "zone_name": "smithcdn.net" },
-    // Staging: a hostname of its own, to check the Worker against the live tag.
-    // Removed once the ad domain is on the Worker.
-    { "pattern": "edge.smithcdn.net", "custom_domain": true }
+    { "pattern": "smithcdn.net/*", "zone_name": "smithcdn.net" }
   ],
 
   "kv_namespaces": [
