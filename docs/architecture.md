@@ -111,8 +111,7 @@ will — tags already pasted into a DSP point there.
 `/c/u/…` (runtime scripts only: a forward to the media host for tags built before units
 moved there) and `robots.txt`; it forwards `/`, `/cdn…`, `/c/player` and `/_next/…` to
 the app's Worker unchanged, over a service binding that keeps the ad domain's `Host`, GET
-and HEAD only; ACME challenges go to the zone's origin (Vercel, while it exists); and
-everything else is a 404. No cookie is ever set on that host —
+and HEAD only; and everything else is a 404. No cookie is ever set on that host —
 the Worker strips `Set-Cookie` from anything it forwards — and every answer carries
 HSTS. The postback endpoint `/pb` lives on the app domain only.
 
@@ -126,12 +125,12 @@ VAST document is therefore the same bytes whichever runtime built it —
 `npm run test:vast` pins them, signatures included.
 
 The ad domain's DNS is on Cloudflare since
-[ADR-0028](decisions/0028-creative-media-on-r2.md). The apex records are proxied and a
-Workers Route `smithcdn.net/*` sends every request to the Worker; the zone's origin is
-still Vercel until it is decommissioned (ADR-0029 §4), and **deleting the route is the
-rollback** — traffic falls straight through to Vercel, which still serves everything.
-The app domain is set up the same way: `creosmith.com`'s records are proxied, a route
-`creosmith.com/*` sends it to `creosmith-web`, and turning the proxy off is its rollback.
+[ADR-0028](decisions/0028-creative-media-on-r2.md). The apex record is proxied and points
+at no origin — `192.0.2.1`, a documentation address — and a Workers Route
+`smithcdn.net/*` sends every request to the Worker, so nothing but the Worker ever
+answers for the domain. The app domain is set up the same way: a route `creosmith.com/*`
+to `creosmith-web`, with `www` 308ing to the bare domain by a zone rule. Vercel, which
+served both before, was decommissioned on 2026-10-03 (ADR-0029 §4).
 `media.smithcdn.net` is the R2 bucket's custom domain: advertiser media and, since
 ADR-0029, the VPAID units — a separate host, so none of the routing above applies to it.
 
@@ -419,8 +418,8 @@ writes the committed `runtime/manifest.ts` that maps logical `runtime_keys` to
 at build time, so resolving a unit URL costs no network call. Runtime keys
 (`lib/runtime-keys.ts`) and advertiser media keys (`{uuid}/{uuid}.{ext}`) cannot match
 each other, so nothing that writes or deletes one can reach the other. Units moved there
-from a public Vercel Blob store in ADR-0029, superseded hashes included
-(`npm run runtime:migrate`).
+from a public Vercel Blob store in ADR-0029, superseded hashes included, by a one-off
+script that went with Vercel.
 
 The two formats then diverge, and not symmetrically:
 
@@ -498,7 +497,7 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | VPAID unit | R2 + Cloudflare CDN at `media.smithcdn.net` (1y immutable) | Content-addressed URL straight in `<MediaFile>` — nothing of ours in the path ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md), ADR-0029) |
 | Advertiser media | Cloudflare R2 + Cloudflare CDN at `media.smithcdn.net` (1 day, Smart Tiered Cache) | The heaviest bytes on the ad path — two looping videos are ~7 MB an impression — so they live where egress is free at any volume and no Vercel or Supabase quota is spent on them ([ADR-0028](decisions/0028-creative-media-on-r2.md)) |
 | `GET /api/creative/unit/[token]` | App Worker | Fallback only, for a logical key not yet in `runtime/manifest.ts`; app domain only. Removable once every template has been pushed |
-| Serving snapshots | Workers KV `creosmith-snapshots`, 60 s edge cache | Written by the creative writers and the Stripe webhook through the app Worker's binding, and by the Node scripts over the REST API — which also write the private Blob store a rollback to Vercel would read; read by both Workers through their bindings. KV has no public URL, which matters because keys derive from `creative_id`, public in every tag ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
+| Serving snapshots | Workers KV `creosmith-snapshots`, 60 s edge cache | Written by the creative writers and the Stripe webhook through the app Worker's binding, and by the Node scripts over the REST API; read by both Workers through their bindings. KV has no public URL, which matters because keys derive from `creative_id`, public in every tag ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
 | `GET /r` | Ad Worker (`/api/click`: Node, app domain) | The click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)): `node:crypto` for the link signature and the click id, and the service-role `record_click()` in `waitUntil` — the 302 never waits on Postgres. Excluded from the middleware matcher |
 | `GET\|POST /pb` → `/api/postback` | App Worker | S2S postbacks from partner networks. Awaits `record_postback()`, because the network needs to know whether it landed — a 5xx is what makes it retry. Excluded from the middleware matcher |
 | `POST /api/stripe/webhook` | App Worker | Needs the raw body for signature verification, checked through WebCrypto (`constructEventAsync`) |

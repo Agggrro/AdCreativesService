@@ -14,7 +14,7 @@
 | `/c/player` (browser) | Whoever pastes a tag into the validator — the creative it names is executed here | Runs `VpaidMode.INSECURE` on an **isolated origin** with no session, no storage and no API of ours; fails closed when none is configured (ADR-0021) |
 | `POST /api/stripe/webhook` | Stripe | Signature-verified; treat unsigned/invalid as hostile |
 | Creative runtime assets, via `/c/s/:token` on the ad Worker and `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 10-minute token that names one runtime path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
-| The ad domain (`creosmith-ads` Worker) | The open internet, on every path of `smithcdn.net` | Answers the ad paths through the same handlers as the app, 404s everything else, and **forwards only** `/`, `/cdn…`, `/c/player` and `/_next/…` to the app's Worker (over a service binding) and ACME challenges to the zone's origin, GET and HEAD only — so no dashboard, auth or API route, and no server action, is reachable on the ad domain. `Set-Cookie` is stripped from every response; the zone adds none after it, because Bot Fight Mode, Browser Integrity Check and challenges stay off on this zone. `/c/u/…` forwards only a content-addressed runtime **script** (`RUNTIME_SCRIPT_KEY_RE`) to the media host — never an advertiser's object, never the SIMID document, never an arbitrary path. The app's own `/c/u/` rewrite (`next.config.ts`) is held to the same pattern. See [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
+| The ad domain (`creosmith-ads` Worker) | The open internet, on every path of `smithcdn.net` | Answers the ad paths through the same handlers as the app, 404s everything else, and **forwards only** `/`, `/cdn…`, `/c/player` and `/_next/…` to the app's Worker (over a service binding), GET and HEAD only — so no dashboard, auth or API route, and no server action, is reachable on the ad domain. `Set-Cookie` is stripped from every response; the zone adds none after it, because Bot Fight Mode, Browser Integrity Check and challenges stay off on this zone. `/c/u/…` forwards only a content-addressed runtime **script** (`RUNTIME_SCRIPT_KEY_RE`) to the media host — never an advertiser's object, never the SIMID document, never an arbitrary path. The app's own `/c/u/` rewrite (`next.config.ts`) is held to the same pattern. See [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
 | The app domain (`creosmith-web` Worker) | The open internet, on every path of `creosmith.com` | Every route the app has, behind the Workers Route `creosmith.com/*`. The zone adds HSTS (`max-age=63072000`, as Vercel sent it), TLS 1.2 at least, Always Use HTTPS, and a 308 from `www` to the bare domain. **No challenge in front of it either:** Stripe and partner networks' servers call `/api/stripe/webhook` and `/pb`, not always with a browser's User-Agent, which Browser Integrity Check refuses — so it, Bot Fight Mode and the security level's challenges stay off, as nothing stood in front of the app on Vercel. Each of those routes authenticates its caller itself. See [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
 | Serving snapshots (Workers KV) | Read only through the two Workers' bindings, never by a player | **No public URL exists for KV**: a document is readable only through a binding or an API token. That property matters because keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. Until the app leaves Vercel it also writes the private Blob store it used before. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md), [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
@@ -54,23 +54,14 @@
   secret reuse), which the code still does when it is unset.
 - **Where these live.** Since ADR-0029 the signing secrets (`PREVIEW_TOKEN_SECRET`,
   `TRACK_TOKEN_SECRET`) and `SUPABASE_SERVICE_ROLE_KEY` are held twice: as secrets of
-  both Workers (`wrangler secret put`, read through `process.env`) and, until it is
-  decommissioned, in the Vercel project's environment. **The copies must be equal** — a
-  beacon or click link minted by one runtime is verified by another — so they change
-  together or not at all. Vercel stores them write-only, which is why the move rotated
-  both signing secrets once rather than copying them, and why the Stripe webhook got a
-  new endpoint with a new secret ([billing.md](billing.md)).
-- `BLOB_READ_WRITE_TOKEN` — server-only. Read/write access to the private Blob store
-  the snapshots lived in before ADR-0029, now written only by the Node scripts, which
-  keeps it current for a rollback to Vercel.
-  On Vercel the SDK authenticates with OIDC instead (`BLOB_STORE_ID` +
-  `VERCEL_OIDC_TOKEN`, both injected and rotated by the platform, neither secret), so
-  this static token is needed only for code running **outside** Vercel. Goes with the
-  Blob store.
+  each Worker (`wrangler secret put`, read through `process.env`). **The copies must be
+  equal** — a beacon or click link minted by one Worker is verified by the other — so
+  they change together or not at all. Vercel stored them write-only, which is why the
+  move rotated both signing secrets once rather than copying them, and why the Stripe
+  webhook got a new endpoint with a new secret ([billing.md](billing.md)).
 - `SNAPSHOT_KV_API_TOKEN` — server-only. A Cloudflare API token holding **Workers KV
   Storage: Edit on the account and nothing else**, for writing snapshots from outside
-  a Worker: the Node scripts, and the Vercel deployment a rollback would bring back —
-  it stays in Vercel's environment until Vercel is decommissioned. It can
+  a Worker: the Node scripts and `npm run dev`. It can
   read and rewrite every serving snapshot — which is to say, decide whether a tag
   serves — so it is as sensitive as the service-role key's write to the same rows.
   `lib/serving/kv.ts` sends it only to `api.cloudflare.com` and never logs it. Roll it
@@ -92,7 +83,7 @@
   objects there, which no tag names — the committed manifest decides what is served,
   and `runtime:push` checks each served unit's bytes against its hash.
   Used only by `lib/r2.ts`: signing uploads (`requestMediaUpload`), `deleteCreative`,
-  `npm run media:migrate`, and `npm run runtime:push` / `runtime:migrate`. The remedy
+  `npm run media:migrate`, and `npm run runtime:push`. The remedy
   for a leak is to roll the token in the Cloudflare dashboard. The access key id is
   not a secret — every presigned upload URL carries it in `X-Amz-Credential` — and
   neither are `R2_ACCOUNT_ID`, `R2_BUCKET` and `NEXT_PUBLIC_MEDIA_URL`.

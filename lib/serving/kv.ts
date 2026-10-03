@@ -3,9 +3,8 @@
  *
  * Two transports, one shape. Inside a Worker the namespace is a binding: a read
  * is served from the data centre's own cache and costs no network hop. Anywhere
- * else — the Node scripts, and the Vercel deployment for as long as the app still
- * runs there — it is the Cloudflare REST API. The store in `store-kv.ts` does not
- * know which one it holds.
+ * else — the Node scripts and `npm run dev` — it is the Cloudflare REST API. The
+ * store in `store-kv.ts` does not know which one it holds.
  */
 
 /** The three operations the snapshot store needs. */

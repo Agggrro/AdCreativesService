@@ -17,18 +17,17 @@
   "main": "workers/web/index.ts",
   "compatibility_date": "2026-09-15",
   // global_fetch_strictly_public: a fetch to our own zone goes through the front
-  // door like any other, not straight to the zone's origin — which is Vercel's
-  // address, kept only for a rollback, and nothing once Vercel is decommissioned.
+  // door like any other, not straight to the zone's origin — of which there is
+  // none: the records point at a documentation address (ADR-0029 §4).
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
-    // The app domain (ADR-0029 §4), since 2026-10-03. Its records still point at
-    // Vercel and are proxied, so this route is what sends the traffic here, and
-    // rollback is turning the proxy off (or removing this route) — Vercel still
-    // serves everything behind it until it is decommissioned. www is not routed:
-    // a zone redirect rule sends it to the bare domain, as Vercel did.
+    // The app domain (ADR-0029 §4), since 2026-10-03. The apex record is proxied
+    // and points at no origin (192.0.2.1, a documentation address), so this route
+    // is all that answers for it. www is not routed: a zone redirect rule sends
+    // it to the bare domain, as Vercel did.
     { "pattern": "creosmith.com/*", "zone_name": "creosmith.com" }
   ],
 

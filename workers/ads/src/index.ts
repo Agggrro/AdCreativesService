@@ -14,7 +14,6 @@
  *   /robots.txt           Disallow: /
  *   /, /cdn…, /c/player,
  *   /_next/…              forwarded unchanged to the app, over a service binding
- *   /.well-known/acme-…   forwarded to the zone's origin (Vercel, while it exists)
  *   anything else         404
  */
 import {
@@ -172,15 +171,6 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
   ) {
     if (method !== "GET" && method !== "HEAD") return notAllowed();
     return forwardToApp(request, env);
-  }
-
-  // ACME challenges go to the zone's origin, not the app: Vercel renews the
-  // certificate it holds for this domain over HTTP-01, and that certificate is
-  // what a rollback — deleting the route, so Cloudflare proxies to Vercel with
-  // strict TLS — would need. The app has no ACME responder. Goes when Vercel does.
-  if (path.startsWith("/.well-known/acme-challenge/")) {
-    if (method !== "GET" && method !== "HEAD") return notAllowed();
-    return fetch(request);
   }
 
   return notFound();

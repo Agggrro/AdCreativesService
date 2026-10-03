@@ -113,8 +113,9 @@ over a matrix of statuses, periods and plan types, and is the gate that enforces
   created for the Worker at the cutover (ADR-0029 §4), because Vercel keeps secrets
   write-only and the old one's could not be copied; its signing secret lives only in the
   Worker (`STRIPE_WEBHOOK_SECRET`). The Vercel-era endpoint `we_1TqK4CRuVae2qc3xdK2MFBKJ`,
-  same URL and events, is **disabled, not deleted**: its secret is the one Vercel holds,
-  so re-enabling it is part of a rollback. Both ran for the minutes of the switch — each
+  same URL and events, is **disabled**: its secret was the one Vercel held, and with
+  Vercel decommissioned nothing verifies it any more — never re-enable it, every
+  delivery would be a 400. Both ran for the minutes of the switch — each
   event is delivered to every endpoint under the same id, so the claim ledger let
   whichever arrived first handle it and the other answer `Duplicate`.
 - Handle at minimum:

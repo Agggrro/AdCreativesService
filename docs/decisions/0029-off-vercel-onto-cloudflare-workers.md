@@ -50,7 +50,6 @@ A hand-written Worker (`workers/ads/`, bundled by wrangler) owns `smithcdn.net`:
 | `/c/u/runtime/….js` | forwards a runtime *script* to `media.smithcdn.net`, for tags already in flight — never the SIMID document, never an upload |
 | `/robots.txt`, `/cdn-robots.txt` | `Disallow: /` |
 | `/`, `/cdn`, `/cdn/*`, `/c/player`, `/_next/*` | forwarded unchanged to the app over a service binding, GET and HEAD only |
-| `/.well-known/acme-challenge/*` | the zone's origin — Vercel, whose certificate a rollback needs — until Vercel is decommissioned |
 | anything else | `404` |
 
 - **One implementation of the ad path, not two.** The handlers move out of
@@ -112,8 +111,8 @@ fails on `next/font/google` in 16.3.8. What changes in the app is only what was 
 - The developer-only gate refuses inside any Worker, the counterpart of its `VERCEL` check;
   `getRequestOrigin` reads the request URL there, since Cloudflare passes a client's own
   `X-Forwarded-*` through; Fluid Player loads on the client only, keeping three megabytes
-  of player code out of the server bundle; the Blob SDK is imported only where Blob is
-  configured; the sitemap is built per request, since nothing would revalidate it.
+  of player code out of the server bundle; the sitemap is built per request, since nothing
+  would revalidate it.
 - **A custom entry** (`workers/web/index.ts`) wraps OpenNext's Worker: it registers the KV
   binding for the snapshot store, pins `__NEXT_PRIVATE_ORIGIN` to the app's origin — OpenNext
   takes it from the isolate's first request, which could be one forwarded from the ad
@@ -137,10 +136,10 @@ fails on `next/font/google` in 16.3.8. What changes in the app is only what was 
   cache gave, so the kill-switch budget (about two minutes) is unchanged. Node scripts
   write through the KV REST API. Until the app left Vercel it **wrote both stores and
   read Blob** — not KV, because over REST that is the Cloudflare API, whose rate limit
-  is shared by everything the account does, deploys included. Since the switch the app's
-  Worker reads and writes KV alone, through its binding; the Node scripts still write
-  both, which keeps Blob fit for a rollback, and the Blob code goes with Vercel. **The audit (`/api/cron/health`, `npm run check:snapshots`)
-  checks every store**, for documents that are missing and for documents whose content no
+  is shared by everything the account does, deploys included. Since the switch KV is the
+  only store: the Workers read and write it through their bindings, the Node scripts
+  over REST, and the Blob store and its code went with Vercel. **The audit
+  (`/api/cron/health`, `npm run check:snapshots`) checks every store**, for documents that are missing and for documents whose content no
   longer matches the rows — a cancellation that reached Blob but not KV would otherwise
   serve on the ad domain while every check read the store that was right. **A failed
   publish fails closed** — each store clears what it missed — and **the reconciler**
@@ -175,8 +174,9 @@ fails on `next/font/google` in 16.3.8. What changes in the app is only what was 
 - **The ad domain first, behind a route.** The apex records become proxied — the origin is
   still Vercel — and a Workers Route `smithcdn.net/*` sends every request to
   `creosmith-ads`. Until `creosmith-web` exists the forwarded paths go to that origin, which
-  is exactly what served them before. **Rollback is deleting the route**: traffic falls
-  straight through to Vercel, which still serves everything.
+  is exactly what served them before. **Rollback was deleting the route**: traffic fell
+  straight through to Vercel, which still served everything — until it was
+  decommissioned (below).
 - **The signing secrets rotate once, at that switch.** Vercel stores them write-only, so the
   Worker cannot be handed the values that are in production. A new `PREVIEW_TOKEN_SECRET`
   and a first, dedicated `TRACK_TOKEN_SECRET` go into both at the same moment. The cost:
@@ -203,19 +203,22 @@ fails on `next/font/google` in 16.3.8. What changes in the app is only what was 
   side was retried onto the right one — nothing is lost while both are enabled. The old
   endpoint was disabled, not deleted, once DNS had moved and a real Stripe-signed
   delivery had reached the Worker.
-- **Rolling the app back** is three steps: turn the proxy off on the apex records, so
-  traffic goes straight to Vercel (removing the route works too, but the next push puts
-  it back); re-enable the old Stripe endpoint, whose secret is the one Vercel holds; and
-  `npm run snapshot:backfill`, because the app now writes only KV and the Vercel
-  deployment reads Blob. The `SNAPSHOT_KV_*` variables **stay** in Vercel's environment
-  until it is decommissioned: a rolled-back app without them would refuse every snapshot
-  write, every webhook included. The proxy-off path leans on Vercel's own certificate,
-  which cannot renew while the route holds the domain — its HTTP-01 challenge reaches
-  the app, which has no responder — so it is good until that certificate expires,
-  2026-11-14. On the ad domain the Worker forwards ACME challenges to Vercel instead,
-  so its certificate keeps renewing for as long as Vercel is there.
-- **Vercel is decommissioned after a quiet week, by the owner.** Then the Blob store and
-  its code, the dual write, `vercel.json` and the ad Worker's ACME forward go.
+- **Rolling back, while it was possible**, was three steps: proxy off on the apex records
+  so traffic went straight to Vercel, re-enable the old Stripe endpoint (its secret was the
+  one Vercel held), and `npm run snapshot:backfill` to bring Blob current. It was never
+  needed.
+- **Vercel was decommissioned the same day**, at the owner's word, once the signed-in
+  surfaces had been checked on the Worker — the planned quiet week was skipped. Reversible
+  steps went first: every push's build skipped (`commandForIgnoringBuildStep: "exit 0"`),
+  the three custom domains removed from the project, the project paused — its
+  `*.vercel.app` URL answers 503. The apex records were repointed from Vercel's addresses
+  to `192.0.2.1`, a documentation address that routes nowhere, and `www` to a CNAME of
+  the bare domain: the Workers Routes answer everything, and a request a route ever
+  missed would get a Cloudflare error rather than whichever server holds Vercel's
+  addresses. The code went with it — the Blob store and the dual write, `@vercel/blob`,
+  `vercel.json`, the deploy-status and runtime-migration scripts, the ad Worker's ACME
+  forward, and the Vercel geo header. Deleting the project and its two Blob stores is
+  permanent and left to the owner.
 
 ### 5. Deploys
 

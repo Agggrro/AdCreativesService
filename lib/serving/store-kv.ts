@@ -130,30 +130,3 @@ export async function putOrClear(
     throw err;
   }
 }
-
-/**
- * Reads from `primary`, writes to both — the shape of the move between stores
- * (ADR-0029 §3). A write counts only when both stores took it: reporting success
- * with one of them stale would let the two serving paths disagree about whether
- * a tag may serve. Each store fails closed on its own (`putOrClear`), so a
- * partial failure clears only the store that missed the write.
- */
-export function dualWriteStore(primary: SnapshotStore, secondary: SnapshotStore): SnapshotStore {
-  async function both(a: Promise<void>, b: Promise<void>): Promise<void> {
-    // Settled rather than raced: the second write is not abandoned mid-flight
-    // because the first one failed.
-    const results = await Promise.allSettled([a, b]);
-    const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
-    if (failed) throw failed.reason;
-  }
-
-  return {
-    putCreative: (s) => both(primary.putCreative(s), secondary.putCreative(s)),
-    deleteCreative: (id) => both(primary.deleteCreative(id), secondary.deleteCreative(id)),
-    getCreative: (id) => primary.getCreative(id),
-    putEntitlement: (s) => both(primary.putEntitlement(s), secondary.putEntitlement(s)),
-    deleteEntitlement: (id) =>
-      both(primary.deleteEntitlement(id), secondary.deleteEntitlement(id)),
-    getEntitlement: (id) => primary.getEntitlement(id),
-  };
-}

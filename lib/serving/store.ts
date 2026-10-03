@@ -12,8 +12,8 @@ import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
  * A creative that saves successfully but never reaches the CDN is a worse
  * failure than a slower read, so the shipped implementation is Vercel Blob.
  *
- * Since ADR-0029 the store is Workers KV (`store-kv.ts`); the Blob store stays
- * only for the deployment the app is leaving, which writes both.
+ * Since ADR-0029 the store is Workers KV (`store-kv.ts`). Blob was written
+ * alongside it for the move off Vercel and went with Vercel.
  *
  * Contract, and it differs by direction on purpose:
  *

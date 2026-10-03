@@ -15,8 +15,8 @@ import type { CreativeSnapshot, EntitlementRecord, EntitlementSnapshot } from ".
  * check exists to make the silence audible.
  *
  * It looks for two kinds of drift, in **every** store this process writes
- * (ADR-0029: during the move the ad Worker serves from KV while the app reads
- * Blob, and the two can disagree):
+ * (ADR-0029 — one since Vercel Blob went; during the move it was two, and they
+ * could disagree):
  *
  *   - **missing** — no document, or one that cannot be read. For a creative the
  *     serving path falls back to Postgres; for an entitlement it does not serve

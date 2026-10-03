@@ -9,9 +9,9 @@ export function getStripe(): Stripe {
   // apiVersion omitted on purpose: use the version pinned by this SDK release.
   //
   // The fetch HTTP client rather than the SDK's default, Node's `http` module:
-  // fetch is the one transport every runtime the app runs on has — Vercel's
-  // Node, `next dev`, and a Cloudflare Worker (ADR-0029), where `http` is only a
-  // partial shim over fetch anyway.
+  // fetch is the one transport every runtime the app runs on has — `next dev`
+  // and the Cloudflare Worker (ADR-0029), where `http` is only a partial shim
+  // over fetch anyway.
   //
   // Bounded: 8 s a request and one retry, against the SDK's 80 s and two. The
   // webhook's run has a ceiling of its own (route.ts maxDuration) that its event

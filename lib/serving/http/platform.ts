@@ -34,13 +34,12 @@ export function normalizeCountry(raw: string | null | undefined): string | null 
 }
 
 /**
- * The country from the geo header of the platform actually running the app —
- * and only that one. Each platform overwrites its own header and passes any
- * other through untouched, so on Workers `x-vercel-ip-country` is whatever the
- * client typed, and on Vercel so is `cf-ipcountry`. Reading the wrong one would
- * let a click choose its own country in the report.
+ * The country from Cloudflare's geo header, which the edge overwrites on every
+ * request it proxies to the app's Worker. Only that one: another platform's
+ * geo header (`x-vercel-ip-country`, say) is passed through untouched — it is
+ * whatever the client typed, and reading it would let a click choose its own
+ * country in the report. Under `npm run dev` nothing sets it.
  */
 export function countryFromHeaders(request: Request): string | null {
-  const header = process.env.VERCEL ? "x-vercel-ip-country" : "cf-ipcountry";
-  return normalizeCountry(request.headers.get(header));
+  return normalizeCountry(request.headers.get("cf-ipcountry"));
 }

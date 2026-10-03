@@ -28,7 +28,7 @@
  *
  * Reuses the app's own modules via the resolution hooks in
  * scripts/app-imports-hook.mjs. Needs SUPABASE_SERVICE_ROLE_KEY, the R2
- * variables, NEXT_PUBLIC_MEDIA_URL and — to republish — BLOB_READ_WRITE_TOKEN.
+ * variables, NEXT_PUBLIC_MEDIA_URL and — to republish — the SNAPSHOT_KV_* variables.
  * None of them is logged.
  */
 import { createServiceClient } from "@/lib/supabase/service";
@@ -56,8 +56,11 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_
   console.error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.");
   process.exit(1);
 }
-if (apply && !process.env.BLOB_READ_WRITE_TOKEN) {
-  console.error("BLOB_READ_WRITE_TOKEN must be set to republish snapshots.");
+if (apply && !process.env.SNAPSHOT_KV_API_TOKEN) {
+  console.error(
+    "The SNAPSHOT_KV_* variables must be set to republish snapshots — KV is what\n" +
+      "the ad domain serves from (ADR-0029).",
+  );
   process.exit(1);
 }
 

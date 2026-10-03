@@ -2,8 +2,9 @@ import { hasCronBearer } from "@/lib/cron-auth";
 import { checkSnapshotHealth, describeSnapshotHealth } from "@/lib/serving/health";
 import { createServiceClient } from "@/lib/supabase/service";
 
-// Triggered by the Vercel cron in vercel.json. Node runtime for the service-role
-// read; never cached, since the whole point is the state right now.
+// Triggered daily at 03:00 UTC by the app Worker's cron, in-process
+// (workers/web/index.ts). Node runtime for the service-role read; never cached,
+// since the whole point is the state right now.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,10 @@ export const dynamic = "force-dynamic";
  * Daily audit that the CDN snapshots still agree with the database (ADR-0015).
  *
  * Reports by **failing**: a drift returns 503 and logs a line with a stable
- * prefix. Vercel's built-in alerts only fire on error and usage anomalies, so a
- * 200 with `{"healthy": false}` would be invisible — the status code is the only
- * signal the platform actually watches. `npm run check:snapshots` runs the same
- * check from a terminal when you want to look on purpose.
+ * prefix, and the Worker's scheduled handler turns that status into a failed
+ * run in its cron history. A 200 with `{"healthy": false}` would be invisible —
+ * the status code is the only signal anything watches. `npm run check:snapshots`
+ * runs the same check from a terminal when you want to look on purpose.
  */
 const LOG_PREFIX = "[snapshot-health]";
 
@@ -47,8 +48,8 @@ export async function GET(request: Request): Promise<Response> {
   if (!secret) {
     console.error(
       `${LOG_PREFIX} CRON_SECRET is not set — refusing to run. ` +
-        "Set it in the project's environment variables; Vercel sends it as a " +
-        "Bearer token on scheduled invocations.",
+        "Set it as a secret of the app Worker; its scheduled handler sends it as a " +
+        "Bearer token.",
     );
     return new Response("CRON_SECRET not configured", { status: 503 });
   }

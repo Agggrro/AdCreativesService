@@ -13,7 +13,6 @@
     "runtime:push": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/runtime-push.mjs",
     "db:schema": "node --env-file=.env.local scripts/db-apply.mjs supabase/schema.sql",
     "db:seed": "node --env-file=.env.local scripts/db-apply.mjs supabase/seed.sql",
-    "deploy:status": "node --env-file=.env.local scripts/deploy-status.mjs",
     "check:vast": "node scripts/check-vast-fixtures.mjs",
     "check:entitlement": "node --env-file-if-exists=.env.local scripts/check-entitlement.mjs",
     "snapshot:backfill": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/snapshot-backfill.mjs",
@@ -23,7 +22,6 @@
     "test:cors": "node --import ./scripts/register-app-imports.mjs --test lib/vast/cors.test.ts",
     "test:postback": "node --import ./scripts/register-app-imports.mjs --test lib/postback.test.ts",
     "test:media": "node --import ./scripts/register-app-imports.mjs --test lib/creative-media.test.ts lib/r2.test.ts",
-    "runtime:migrate": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/runtime-migrate-r2.mjs",
     "test:vast": "node --import ./scripts/register-app-imports.mjs --test lib/vast/golden.test.ts",
     "test:snapshots": "node --import ./scripts/register-app-imports.mjs --test lib/serving/store-kv.test.ts",
     "test:ads": "node --import ./scripts/register-app-imports.mjs --test workers/ads/src/index.test.ts"
@@ -31,7 +29,6 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
-    "@vercel/blob": "^2.8.0",
     "aws4fetch": "1.0.20",
     "fast-xml-parser": "^5.10.1",
     "fluid-player": "^3.59.0",

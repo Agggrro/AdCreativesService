@@ -9,8 +9,9 @@ import type { Database } from "@/types/database.types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 // Far inside CLAIM_TIMEOUT_MS below: a run that outlived the claim timeout
-// would share its event with the delivery that took the claim over. Vercel
-// honours it; on a Worker the run ends when Stripe stops waiting (20 s).
+// would share its event with the delivery that took the claim over. A Node host
+// honours it (Vercel did); on the Worker the run ends when Stripe stops waiting
+// (20 s), well inside it.
 export const maxDuration = 60;
 
 type DB = SupabaseClient<Database>;

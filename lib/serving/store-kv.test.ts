@@ -1,8 +1,8 @@
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { dualWriteStore, kvSnapshotStore } from "./store-kv.ts";
+import { kvSnapshotStore } from "./store-kv.ts";
 import { bindingNamespace, restNamespace, type SnapshotNamespace } from "./kv.ts";
-import { SnapshotReadError, type SnapshotStore } from "./store.ts";
+import { SnapshotReadError } from "./store.ts";
 import { SNAPSHOT_SCHEMA_VERSION, type CreativeSnapshot, type EntitlementSnapshot } from "./types.ts";
 
 /**
@@ -179,26 +179,6 @@ test("REST: one percent-encoded key per call, the token in a header, 404 as a mi
   assert.equal(seen[2].init.body, "v");
 });
 
-test("during the move: reads come from the old store, a write lands in both or fails", async () => {
-  const oldNs = memory();
-  const newNs = memory();
-  const store: SnapshotStore = dualWriteStore(
-    kvSnapshotStore(() => oldNs),
-    kvSnapshotStore(() => newNs),
-  );
-  await store.putCreative(CREATIVE);
-  assert.equal(oldNs.data.size, 1);
-  assert.equal(newNs.data.size, 1);
-
-  newNs.data.clear();
-  assert.deepEqual(await store.getCreative(CREATIVE_ID), CREATIVE);
-
-  newNs.broken = true;
-  await assert.rejects(store.putEntitlement(ENTITLEMENT));
-  // The old store still took it — which is why the caller must report failure.
-  assert.equal(oldNs.data.has(`serving/entitlement/${USER_ID}.json`), true);
-});
-
 test("a put that fails clears that store's previous document — fail closed", async () => {
   const ns = memory();
   const store = kvSnapshotStore(() => ns);
@@ -235,28 +215,6 @@ test("a binding write is tried once more, a second later — KV's one write per 
   const broken = { ...flaky, put: async () => { calls += 1; throw new Error("down"); } };
   await assert.rejects(bindingNamespace(broken, 60).put("k", "v"), /down/);
   assert.equal(calls, 2);
-});
-
-test("on a partial dual write only the store that missed it is cleared", async () => {
-  const oldNs = memory();
-  const newNs = memory();
-  const oldStore = kvSnapshotStore(() => oldNs);
-  const newStore = kvSnapshotStore(() => newNs);
-  await oldStore.putEntitlement(ENTITLEMENT);
-  await newStore.putEntitlement(ENTITLEMENT);
-
-  const updated = { ...ENTITLEMENT, published_at: "2026-10-04T00:00:00.000Z" };
-  const put = mock.method(oldNs, "put", async () => {
-    throw new Error("blob unavailable");
-  });
-  try {
-    await assert.rejects(dualWriteStore(oldStore, newStore).putEntitlement(updated));
-  } finally {
-    put.mock.restore();
-  }
-  // The store that took the write keeps the one document that is right.
-  assert.deepEqual(await newStore.getEntitlement(USER_ID), updated);
-  assert.equal(await oldStore.getEntitlement(USER_ID), null);
 });
 
 test("a write refused for KV's per-key rate limit is retried with jitter, more than once", async () => {

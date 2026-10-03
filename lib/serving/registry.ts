@@ -3,7 +3,7 @@ import type { SnapshotNamespace } from "./kv";
 /**
  * Where a Worker entry registers its KV binding for the snapshot store
  * (ADR-0029), kept in a module with no dependencies so an entry can import it
- * without pulling the store — and the Blob SDK behind it — into its bundle.
+ * without pulling the store into its bundle.
  *
  * The registration lives on a global symbol rather than in a module variable: a
  * Worker can hold more than one copy of the serving modules (the Next server

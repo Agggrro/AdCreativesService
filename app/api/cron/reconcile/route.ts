@@ -3,8 +3,7 @@ import { reconcileRecentSnapshots } from "@/lib/serving/reconcile";
 
 // Republishes recently changed snapshots that no longer match Postgres
 // (lib/serving/reconcile.ts, ADR-0029). Called by the web Worker's cron every
-// ten minutes, and by Vercel's daily cron while the app is still there. Never
-// cached: the point is the state right now.
+// ten minutes. Never cached: the point is the state right now.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

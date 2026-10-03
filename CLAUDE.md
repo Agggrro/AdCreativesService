@@ -24,8 +24,8 @@ we push after a case is built and verified locally).
 - **Hosting:** Cloudflare Workers, since 2026-10-03 — `creosmith-web` is the app on
   `creosmith.com`, through OpenNext (`wrangler.jsonc`, `workers/web`), and
   `creosmith-ads` the ad domain (`workers/ads`)
-  ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)). Vercel serves
-  nothing and stays only as the rollback target until it is decommissioned. **The app's
+  ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)). Vercel was
+  decommissioned the same day; nothing runs there. **The app's
   Worker is built and deployed by CI only** — `opennextjs-cloudflare build` copies any
   `.env*` file into the bundle, so a build next to `.env.local` would ship its secrets.
 - **Serving snapshots:** Workers KV (`creosmith-snapshots`)

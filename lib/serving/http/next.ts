@@ -8,9 +8,8 @@ import { countryFromHeaders, type ServingPlatform } from "./platform";
  * `/api/*` paths on the app domain (ADR-0029). The ad domain itself is served by
  * workers/ads, which builds its own platform from its bindings.
  *
- * `after()` rather than `@vercel/functions`' `waitUntil`: it is Next's own hook,
- * so it works on every host the app runs on — Vercel, a Worker through OpenNext,
- * and `next dev`, where the old import was a silent no-op.
+ * `after()` rather than a platform's `waitUntil`: it is Next's own hook, so it
+ * works wherever the app runs — the Worker through OpenNext, and `next dev`.
  */
 export const nextPlatform: ServingPlatform = {
   snapshots,

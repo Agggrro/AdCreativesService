@@ -46,8 +46,8 @@ export const config = {
   // only ever return null. That is a Supabase dependency on exactly the path
   // ADR-0015 and ADR-0017 set out to make Supabase-free.
   //
-  // "api/cron" is invoked by Vercel's scheduler with a bearer token, never a
-  // session cookie; the route does its own authorization.
+  // "api/cron" is invoked by the app Worker's scheduled handler with a bearer
+  // token, never a session cookie; the route does its own authorization.
   //
   // "api/dev" is the local-only developer surface. Excluded for both reasons
   // already given above. `/api/dev/session` writes the session cookie itself

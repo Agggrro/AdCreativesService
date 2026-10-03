@@ -17,12 +17,10 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
-    // The ad domain. A route rather than a custom domain: deleting it is the
-    // rollback (ADR-0029 §4) — the apex records still point at Vercel, which
-    // still serves everything — and on a route a plain `fetch` of the incoming
-    // request reaches that origin, which is how ACME challenges keep Vercel's
-    // certificate for the rollback valid. Needs the apex records proxied; with
-    // them DNS-only, it is inert.
+    // The ad domain (ADR-0029 §4). The apex record is proxied and points at no
+    // origin (192.0.2.1, a documentation address), so every request is this
+    // Worker's: without the route it would be a Cloudflare error page, not some
+    // other server answering for the domain.
     { "pattern": "smithcdn.net/*", "zone_name": "smithcdn.net" }
   ],
 

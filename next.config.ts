@@ -7,9 +7,11 @@ import { RUNTIME_MANIFEST } from "./runtime/manifest";
 /**
  * Routing for the split between the app domain and the ad domain (ADR-0018).
  *
- * Everything here runs in Vercel's routing layer, before any function: a rewrite
- * is a routing rule, not code waking up. That is what lets the ad domain serve
- * the creative unit without giving back the CDN win from ADR-0017.
+ * On Vercel everything here ran in the routing layer, before any function. Since
+ * ADR-0029 the ad domain's own paths are the ad Worker's (workers/ads), and these
+ * rules run inside the app's Worker through OpenNext: for the app domain, for the
+ * ad domain's pages the ad Worker forwards (`/`, `/cdn`, `/c/player`), and under
+ * `npm run dev`, where they are the whole ad domain.
  *
  * Order Next applies: headers → redirects → middleware → beforeFiles rewrites →
  * filesystem → afterFiles → dynamic routes. Middleware therefore sees the

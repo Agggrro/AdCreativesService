@@ -102,7 +102,7 @@ test("a preflight that requests no headers is allowed none", () => {
  * next.config.ts beside it does not merge: under `next dev` the config's value
  * wins over the handler's, so a leftover `*` would sit next to
  * `Access-Control-Allow-Credentials: true` — a pair browsers reject — while on
- * Vercel the handler wins, and local and production would disagree.
+ * Vercel the handler won, so local and production disagreed.
  */
 test("no next.config.ts header rule sets CORS on the tag", async () => {
   const require = createRequire(import.meta.url);

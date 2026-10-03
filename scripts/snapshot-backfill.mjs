@@ -22,9 +22,9 @@
  * Reuses the app's own publish functions rather than reimplementing them, via
  * the resolution hooks in scripts/app-imports-hook.mjs.
  *
- * Needs SUPABASE_SERVICE_ROLE_KEY (bypasses RLS to see every row), the
- * SNAPSHOT_KV_* variables (KV is what the ad domain serves from, ADR-0029) and,
- * while Vercel is kept for a rollback, BLOB_READ_WRITE_TOKEN. None is logged.
+ * Needs SUPABASE_SERVICE_ROLE_KEY (bypasses RLS to see every row) and the
+ * SNAPSHOT_KV_* variables (KV is what the ad domain serves from, ADR-0029).
+ * None is logged.
  */
 import { createServiceClient } from "@/lib/supabase/service";
 import {
@@ -47,14 +47,10 @@ if (!process.env.SNAPSHOT_KV_API_TOKEN) {
     "SNAPSHOT_KV_* is not set. KV is the store the ad domain serves from\n" +
       "(ADR-0029), and a backfill that cannot write it repairs nothing that serves.\n" +
       "Set CLOUDFLARE_ACCOUNT_ID, SNAPSHOT_KV_NAMESPACE_ID and SNAPSHOT_KV_API_TOKEN\n" +
-      "in .env.local — and BLOB_READ_WRITE_TOKEN while Vercel is kept for a rollback.",
+      "in .env.local.",
   );
   process.exit(1);
 }
-// Said out loud, so a run that skipped a store cannot pass for a full one.
-console.log(
-  `writing to: KV${process.env.BLOB_READ_WRITE_TOKEN ? " + Vercel Blob" : " only (no BLOB_READ_WRITE_TOKEN)"}`,
-);
 
 const arg = process.argv[2];
 const onlyCreativeId = arg && UUID_RE.test(arg) ? arg : null;

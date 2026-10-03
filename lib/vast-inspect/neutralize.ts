@@ -70,7 +70,7 @@ const NEUTRALIZED_ELEMENTS = [
 ] as const;
 
 export interface NeutralizeOptions {
-  /** Absolute origin of this deployment, e.g. https://example.vercel.app */
+  /** Absolute origin of this deployment, e.g. https://creosmith.com */
   origin: string;
 }
 

@@ -26,7 +26,8 @@
  * `Vary: Origin` goes on every response, the `*` ones included. The body is
  * shared but this header is not, and a shared cache that ignored the difference
  * would hand one publisher's `Access-Control-Allow-Origin` to the next —
- * breaking every site but the first. Vercel's CDN keys its cache on it.
+ * breaking every site but the first. Caches downstream of us key on it; the ad
+ * Worker's own stores the body without CORS headers at all (ADR-0029).
  */
 
 /**
