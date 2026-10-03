@@ -80,7 +80,7 @@ const ru = {
       "От первого шага до готового тега — ничего, кроме браузера.",
     step1Title: "Выберите шаблон",
     step1Body:
-      "Шесть механик: шоппинг, скретч, до/после, квиз, возрастной гейт и выбор с сообщением.",
+      "Семь механик: шоппинг, скретч, до/после, квиз, возрастной гейт, выбор с сообщением и дуэль.",
     step2Title: "Настройте под кампанию",
     step2Body:
       "Медиафайлы, ссылка перехода, тексты кнопок. Превью обновляется сразу.",
@@ -382,6 +382,11 @@ const ru = {
       pickMessage: "Сообщение",
       pickSound: "Звук",
       pickClick: "Переход по клику",
+      duelSideA: "Сторона A",
+      duelSideB: "Сторона B",
+      duelRound: "Раунд",
+      duelFinish: "Победитель",
+      duelClick: "Переход по клику",
       viewability: "Верификация просмотра (OMID)",
     },
     outcomes: {
@@ -643,7 +648,7 @@ const en: Dict = {
       "From the first step to a working tag — nothing but a browser.",
     step1Title: "Pick a template",
     step1Body:
-      "Six mechanics: shoppable, scratch, before/after, quiz, an age gate, and pick-and-message.",
+      "Seven mechanics: shoppable, scratch, before/after, quiz, an age gate, pick-and-message, and a duel.",
     step2Title: "Tune it to the campaign",
     step2Body:
       "Media, click-through, button copy. The preview updates as you type.",
@@ -931,6 +936,11 @@ const en: Dict = {
       pickMessage: "Message",
       pickSound: "Sound",
       pickClick: "Click-through",
+      duelSideA: "Side A",
+      duelSideB: "Side B",
+      duelRound: "Round",
+      duelFinish: "Winner",
+      duelClick: "Click-through",
       viewability: "Viewability verification (OMID)",
     },
     outcomes: {

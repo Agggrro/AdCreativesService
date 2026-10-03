@@ -273,7 +273,10 @@ auto-completes or auto-removes the creative on a timer; only the viewer's own cl
 click does.
 
 A consequence worth naming, now that a quiz can run three questions: **`complete` means
-"was on screen for the injected duration", not "finished the interaction".** A viewer
+"was on screen for the injected duration", not "finished the interaction".** Time the player
+holds the ad paused (`pauseAd` until `resumeAd`) does not count toward it: the timer that
+paces a video-less ad stands still while paused, as a video's playhead would
+([ADR-0030](decisions/0030-duel-template.md)). A viewer
 still on question two when the 30s quartile timer expires fires `complete` anyway. This
 was always true of every template; multi-step just makes the gap visible. Do not defer
 `complete` until the mechanic ends — that would make the metric incomparable across
@@ -285,7 +288,11 @@ decision.
 
 Pick & Message is the first template that makes a sound of its own — a chime when the
 viewer picks a picture ([ADR-0024](decisions/0024-pick-message-template.md)). Two rules
-bind it, and any template that follows:
+bind it, and any template that follows. Duel is the second: the winner clip plays
+with its own audio when the viewer's tap made the pick, and muted when the countdown made it
+([ADR-0030](decisions/0030-duel-template.md)).
+
+The rules:
 
 - **User-initiated only.** Audio starts inside the viewer's own tap on the creative or not
   at all — never on load, on a timer, or late: a file that has not begun within 800ms of

@@ -44,6 +44,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0027](0027-conversion-goals.md) | Conversion goals: a goal on the postback, one conversion per goal per click | Accepted |
 | [0028](0028-creative-media-on-r2.md) | Creative media on Cloudflare R2, served from the ad domain | Accepted |
 | [0029](0029-off-vercel-onto-cloudflare-workers.md) | Off Vercel: the ad path and the app on Cloudflare Workers | Accepted |
+| [0030](0030-duel-template.md) | Duel: one round of a two-way vote, and a winner clip with its own sound | Accepted |
 
 ## Template
 

@@ -10,7 +10,7 @@
  * ADR-0025), and the mandatory close control (ADR-0009).
  *
  * `api` given to onStart: { params, slot, videoSlot, clickThrough(url?), emit(e,a),
- * stop(), debug(name, data), volume(), onStop(fn) }
+ * stop(), debug(name, data), volume(), onStop(fn), onPause(fn), onResume(fn) }
  * Config arrives via VAST <AdParameters> (creativeData.AdParameters). ADR-0005.
  */
 
@@ -366,6 +366,10 @@ function CreoSmithVpaid(template) {
   // host leaves on screen, and the template's own cleanups have run.
   this._stopped = false;
   this._onStop = [];
+  this._onPause = [];
+  this._onResume = [];
+  // When pauseAd stopped the timer-driven clock; 0 while it runs.
+  this._pausedAt = 0;
   this._viewObserver = null;
   this._viewTimer = null;
   this._viewableFired = false;
@@ -472,6 +476,16 @@ CreoSmithVpaid.prototype._api = function () {
     onStop: function (fn) {
       if (typeof fn === "function") self._onStop.push(fn);
     },
+    // Run fn when the player pauses or resumes the ad (VPAID pauseAd/resumeAd) —
+    // for media a template plays itself, which the base cannot reach: a player
+    // that pauses the ad after a click-through must not leave a template's clip
+    // sounding behind the landing page.
+    onPause: function (fn) {
+      if (typeof fn === "function") self._onPause.push(fn);
+    },
+    onResume: function (fn) {
+      if (typeof fn === "function") self._onResume.push(fn);
+    },
   };
 };
 
@@ -529,6 +543,8 @@ CreoSmithVpaid.prototype._startTimer = function () {
   var self = this;
   this._startedAt = Date.now();
   this._timer = setInterval(function () {
+    // Paused (pauseAd): the clock stands still, as a video's would.
+    if (self._pausedAt) return;
     var pct =
       (Date.now() - self._startedAt) / 1000 / self._attributes.duration;
     self._attributes.remainingTime = Math.max(
@@ -812,7 +828,9 @@ CreoSmithVpaid.prototype._closeCreative = function () {
   // by then it may be the host's own content video.
   if (this._closed || this._stopped) return;
   this._closed = true;
-  if (this._videoSlot) {
+  // Only a slot the creative plays its base video in: otherwise it may be the
+  // host's own element (Fluid Player's is the publisher's video).
+  if (this._ownsVideo()) {
     try {
       this._videoSlot.pause();
     } catch (e) {
@@ -828,12 +846,47 @@ CreoSmithVpaid.prototype.resizeAd = function (width, height, viewMode) {
   this._attributes.viewMode = viewMode;
   this._emit("AdSizeChange");
 };
+/** A template's pause/resume hooks; one throwing cannot stop the rest, nor the event. */
+CreoSmithVpaid.prototype._runHooks = function (fns, at) {
+  if (this._stopped) return;
+  for (var i = 0; i < fns.length; i++) {
+    try {
+      fns[i]();
+    } catch (e) {
+      this._report("error", { at: at, message: String((e && e.message) || e) });
+    }
+  }
+};
+/**
+ * Whether the player's video slot is ours to drive — the same test startAd
+ * plays it by. A template without a base video never touches it: the slot can
+ * be the host's own element, and a play() on it at resumeAd would start
+ * whatever the player left there (or reject, into the publisher's console).
+ */
+CreoSmithVpaid.prototype._ownsVideo = function () {
+  return !!(this._params.videoUrl && this._videoSlot);
+};
 CreoSmithVpaid.prototype.pauseAd = function () {
-  if (this._videoSlot) this._videoSlot.pause();
+  // An ended ad neither pauses nor resumes: nothing of it may restart, and no
+  // event follows AdStopped.
+  if (this._stopped) return;
+  if (this._ownsVideo()) this._videoSlot.pause();
+  if (this._timer && !this._pausedAt) this._pausedAt = Date.now();
+  this._runHooks(this._onPause, "onPause");
   this._emit("AdPaused");
 };
 CreoSmithVpaid.prototype.resumeAd = function () {
-  if (this._videoSlot) this._videoSlot.play();
+  if (this._stopped) return;
+  if (this._ownsVideo()) {
+    var p = this._videoSlot.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+  if (this._pausedAt) {
+    // The paused stretch is not ad time: the quartiles resume where they stopped.
+    this._startedAt += Date.now() - this._pausedAt;
+    this._pausedAt = 0;
+  }
+  this._runHooks(this._onResume, "onResume");
   this._emit("AdPlaying");
 };
 CreoSmithVpaid.prototype.expandAd = function () {};
@@ -865,7 +918,16 @@ CreoSmithVpaid.prototype.getAdVolume = function () {
 };
 CreoSmithVpaid.prototype.setAdVolume = function (volume) {
   this._attributes.volume = volume;
-  if (this._videoSlot) this._videoSlot.volume = volume;
+  // The slot only when it is ours (_ownsVideo), and only a volume it accepts:
+  // a media element throws on anything outside 0–1, which would otherwise end
+  // this call before AdVolumeChange.
+  if (this._ownsVideo()) {
+    try {
+      this._videoSlot.volume = Math.min(Math.max(Number(volume) || 0, 0), 1);
+    } catch (e) {
+      /* the element keeps its volume */
+    }
+  }
   this._emit("AdVolumeChange");
 };
 CreoSmithVpaid.prototype.getAdCompanions = function () {

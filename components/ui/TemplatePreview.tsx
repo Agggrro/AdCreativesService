@@ -90,6 +90,20 @@ function Mechanic({ type }: { type: string }) {
         </div>
       );
 
+    case "duel":
+      // A countdown bar over two inset tiles, one taken — the stronger edge.
+      // Tiles with a gap rather than edge-to-edge halves, so nothing sits on a
+      // seam at 50% where the slider's divider and knob are.
+      return (
+        <div className="absolute inset-x-3 top-3 bottom-3 flex flex-col gap-2">
+          <div className="mx-auto h-2 w-[44%] shrink-0 bg-fg-disabled" />
+          <div className="flex min-h-0 flex-1 gap-2">
+            <div className="flex-1 rounded-ctl border-2 border-fg-muted bg-surface-2" />
+            <div className="flex-1 rounded-ctl border border-line bg-surface" />
+          </div>
+        </div>
+      );
+
     case "age_gate":
       return (
         <div className="absolute inset-0 flex items-center justify-center">

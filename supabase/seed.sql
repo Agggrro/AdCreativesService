@@ -219,6 +219,45 @@ insert into public.templates (
      ]}'::jsonb,
     'standard',
     true
+  ),
+  -- Duel (ADR-0030). One round of a two-way vote between two clips; the pick
+  -- plays its winner clip and a button drives the click. It was seeded as a draft
+  -- (is_published = false) until its unit was on the CDN and an app that knows
+  -- its key was deployed, and is published by this commit — runtime/README.md,
+  -- "Order matters when shipping a template change".
+  (
+    '00000000-0000-4000-8000-000000000007',
+    'Duel',
+    'Two clips side by side under a countdown; the viewer votes, the pick takes the screen with its winner clip, and a button drives the click.',
+    'duel',
+    'interactive',
+    array['vpaid'],
+    '{"vpaid":"duel/vpaid.js"}'::jsonb,
+    '{"groups":[
+       {"id":"duelSideA"},
+       {"id":"duelSideB"},
+       {"id":"duelRound"},
+       {"id":"duelFinish"},
+       {"id":"duelClick"}
+     ],"fields":[
+       {"name":"nameA","label":"Name","type":"text","required":true,"default":"Left","group":"duelSideA"},
+       {"name":"videoAUrl","label":"Vote clip","type":"image","required":true,"group":"duelSideA","help":"Plays on the left (top on a portrait slot) while the viewer decides. Vertical video works best; it is fitted by height. Keep the two vote clips under about 3.5 MB together (720p H.264): browsers unload an ad that downloads more than 4 MB before the viewer touches it."},
+       {"name":"winAUrl","label":"Winner clip","type":"image","group":"duelSideA","help":"Plays full-screen when this side is picked, and loads only then, so it does not count toward the vote clips'' budget. Leave it empty to keep the vote clip."},
+       {"name":"nameB","label":"Name","type":"text","required":true,"default":"Right","group":"duelSideB"},
+       {"name":"videoBUrl","label":"Vote clip","type":"image","required":true,"group":"duelSideB","help":"Plays on the right (bottom on a portrait slot) while the viewer decides. Counts toward the same 3.5 MB as the left vote clip."},
+       {"name":"winBUrl","label":"Winner clip","type":"image","group":"duelSideB","help":"Plays full-screen when this side is picked, and loads only then, so it does not count toward the vote clips'' budget. Leave it empty to keep the vote clip."},
+       {"name":"roundLabel","label":"Round label","type":"text","default":"ROUND 1","group":"duelRound","help":"The pill beside the countdown. Leave it empty for none."},
+       {"name":"questionText","label":"Question","type":"text","required":true,"default":"Who do you pick?","group":"duelRound"},
+       {"name":"hintText","label":"Hint","type":"text","default":"Tap to vote","group":"duelRound","help":"Under the question, until the viewer picks."},
+       {"name":"voteSeconds","label":"Countdown (s)","type":"range","min":4,"max":25,"default":10,"group":"duelRound","help":"Up to 25 seconds: the ad runs 30, and the winner needs the rest. If nobody picks in time, a side is chosen at random and its winner clip plays muted."},
+       {"name":"accentColor","label":"Accent color (hex)","type":"text","default":"#e11d48","group":"duelRound","help":"The blinking rings, the countdown, the hint and the button."},
+       {"name":"winText","label":"Winner line","type":"text","default":"{name} wins!","group":"duelFinish","help":"Over the winner. {name} is replaced by the picked side''s name."},
+       {"name":"ctaText","label":"Button text","type":"text","default":"Watch more","group":"duelFinish"},
+       {"name":"sound","label":"Winner clip sound","type":"select","required":true,"default":"on","group":"duelFinish","options":[{"value":"on","label":"On after the viewer''s tap"},{"value":"off","label":"Always muted"}],"help":"The winner clip''s own audio starts only inside the viewer''s tap, at the ad volume the player sets over VPAID; a countdown pick plays muted."},
+       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true,"group":"duelClick"}
+     ]}'::jsonb,
+    'standard',
+    true
   )
 on conflict (id) do update set
   name                = excluded.name,

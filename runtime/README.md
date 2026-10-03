@@ -20,6 +20,11 @@ through `/c/s/:token`, which gives it the CSP it runs under and a per-request to
   does not end by itself (animations, observers, audio) it stops in an
   `api.onStop(fn)` cleanup, which the base runs on every terminal path — and after
   which `api.clickThrough()` does nothing ([ADR-0024](../docs/decisions/0024-pick-message-template.md)).
+  Media a template plays itself, the base cannot pause: a template pauses and resumes it
+  in `api.onPause(fn)` / `api.onResume(fn)`, run from the player's `pauseAd` / `resumeAd`
+  ([ADR-0030](../docs/decisions/0030-duel-template.md)). The base itself pauses the timer
+  that drives a video-less ad's quartiles, and touches the player's video slot only when
+  the creative plays its base video there.
   An animation that runs until the viewer acts sticks to `transform` and `opacity`;
   one that moves layout or repaints on every frame (`top`/`left`, `clip-path` — the
   slider's swing) runs a bounded number of times, because Chrome's heavy-ad
@@ -63,6 +68,7 @@ through `/c/s/:token`, which gives it the CSP it runs under and a per-request to
 | `dist/quiz/vpaid.js` | `quiz/vpaid.js` | VPAID 2.0 |
 | `dist/age-gate/vpaid.js` | `age-gate/vpaid.js` | VPAID 2.0 |
 | `dist/pick-message/vpaid.js` | `pick-message/vpaid.js` | VPAID 2.0 |
+| `dist/duel/vpaid.js` | `duel/vpaid.js` | VPAID 2.0 |
 
 These keys match `templates.runtime_keys` in [`../supabase/seed.sql`](../supabase/seed.sql)
 and are what `runtime/manifest.ts` maps to real CDN URLs. The **object** key on the
@@ -109,7 +115,9 @@ fallback is dead weight and can go.
 
 **Order matters when shipping a template change.** Push the runtime first (harmless on
 its own — no saved creative references a capability it does not have yet), **commit the
-manifest**, then deploy the app, then apply the seed, **then run
+manifest**, then deploy the app — a push to `main`, after which CI builds and deploys both
+Workers, each reading the manifest at build time; wait for both deploy jobs — then apply
+the seed, **then run
 `npm run snapshot:backfill`**.
 
 That last step is not optional. Seeding before the deploy leaves the live configurator

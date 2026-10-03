@@ -85,6 +85,9 @@ Remaining before a true end-to-end demo (needs external setup / assets):
       confirm the chime plays inside IMA's cross-origin iframe after a tap,
       stays silent when the player mutes the ad, and what iOS does with it
       under the hardware silent switch.
+      Duel ([ADR-0030](decisions/0030-duel-template.md)) needs the same check for an
+      unmuted winner clip: it plays with sound after a tap inside IMA, falls back to
+      muted when refused, and goes silent when the player mutes the ad mid-clip.
 - [ ] **`/security-review`** on payments, auth, and the public endpoints before push.
 
 ## Out of scope (post-MVP)

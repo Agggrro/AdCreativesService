@@ -12,6 +12,7 @@ export const PREVIEW_UNIT_PATHS: Record<string, string> = {
   quiz: "quiz/vpaid.js",
   "age-gate": "age-gate/vpaid.js",
   "pick-message": "pick-message/vpaid.js",
+  duel: "duel/vpaid.js",
   shoppable: "shoppable/vpaid/unit.js",
 };
 

@@ -16,35 +16,39 @@ export interface RuntimeManifest {
 }
 
 export const RUNTIME_MANIFEST: RuntimeManifest = {
-  "generatedAt": "2026-10-03T10:01:55.663Z",
+  "generatedAt": "2026-10-03T20:43:28.822Z",
   "assets": {
     "age-gate/vpaid.js": {
-      "url": "https://media.smithcdn.net/runtime/age-gate/vpaid.29339a78.js",
-      "sha256": "29339a780b9da4b35773fadd79a78ee4429d92ef060f979c14f84b7550c7fe5f"
+      "url": "https://media.smithcdn.net/runtime/age-gate/vpaid.13e74b54.js",
+      "sha256": "13e74b544f3e6fe976b60f48f3e35d3930095a63b4c8939c6aed61e1a19e8d39"
+    },
+    "duel/vpaid.js": {
+      "url": "https://media.smithcdn.net/runtime/duel/vpaid.04783130.js",
+      "sha256": "0478313022480b65f67b43bfeef0fe9706a44b44b6005d2b35248ed449cf0078"
     },
     "pick-message/vpaid.js": {
-      "url": "https://media.smithcdn.net/runtime/pick-message/vpaid.573fbd2b.js",
-      "sha256": "573fbd2b047420bf8a067ff1fbd46ba245436839ae6ce5f364832ab56dde469b"
+      "url": "https://media.smithcdn.net/runtime/pick-message/vpaid.1ec53cb9.js",
+      "sha256": "1ec53cb970bd35d89db3dff15b5c27a186035f1ec87da5d7ab8d8139aca5e37f"
     },
     "quiz/vpaid.js": {
-      "url": "https://media.smithcdn.net/runtime/quiz/vpaid.8eeec37b.js",
-      "sha256": "8eeec37b4944c14ad272522f5f32c06f5d281137e0de62e5b6ddf41b15e279da"
+      "url": "https://media.smithcdn.net/runtime/quiz/vpaid.b6029f4a.js",
+      "sha256": "b6029f4abbbf127d57cbc84a27f2181b3c67ecae36e067887fd9ad74cf92b432"
     },
     "scratch-reveal/vpaid.js": {
-      "url": "https://media.smithcdn.net/runtime/scratch-reveal/vpaid.25bb8dc2.js",
-      "sha256": "25bb8dc2a4aad0c98ba301c66bb039a4177c1f70feb193c2f43f58694d2117e8"
+      "url": "https://media.smithcdn.net/runtime/scratch-reveal/vpaid.87a8edcf.js",
+      "sha256": "87a8edcfd8a876e1e4ff547e31a6636d41c65e432f63213474d2b5db971e2b6f"
     },
     "shoppable/simid/index.html": {
       "url": "https://media.smithcdn.net/runtime/shoppable/simid/index.ede9a3a6.html",
       "sha256": "ede9a3a68d0cde4ce17cca4c227d069d8ac56907149048f8eff79c2b7818f77c"
     },
     "shoppable/vpaid/unit.js": {
-      "url": "https://media.smithcdn.net/runtime/shoppable/vpaid/unit.a77fdfff.js",
-      "sha256": "a77fdffff6ef75abfbfc91b9bb2e3fa763f7b6f24abb74031cbbd90a19b35bea"
+      "url": "https://media.smithcdn.net/runtime/shoppable/vpaid/unit.5ac906f3.js",
+      "sha256": "5ac906f38aafd6b86d1a9f240c528d95c74bb43fc1757a65ec3d52dfe7d1479e"
     },
     "slider/vpaid.js": {
-      "url": "https://media.smithcdn.net/runtime/slider/vpaid.2433b694.js",
-      "sha256": "2433b694630b6d72ebcbd97e53f128c85888b0d19ab81cad53b293d95824df6f"
+      "url": "https://media.smithcdn.net/runtime/slider/vpaid.35bcf99b.js",
+      "sha256": "35bcf99b473d831b2dc16df7e98da885020c5cc96a1d1a893dc03170f178e766"
     }
   }
 };
