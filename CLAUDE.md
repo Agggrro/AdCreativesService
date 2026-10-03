@@ -21,10 +21,11 @@ we push after a case is built and verified locally).
 - **Styling/UI:** Tailwind CSS, Lucide React
 - **DB + Auth:** Supabase (PostgreSQL, RLS)
 - **Billing:** Stripe (webhooks are the source of truth)
-- **Hosting:** Cloudflare Workers — `creosmith-ads` serves the ad domain
-  (`workers/ads`); the app is moving there from Vercel through OpenNext as
-  `creosmith-web` (`wrangler.jsonc`, `workers/web`)
-  ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)). **The app's
+- **Hosting:** Cloudflare Workers, since 2026-10-03 — `creosmith-web` is the app on
+  `creosmith.com`, through OpenNext (`wrangler.jsonc`, `workers/web`), and
+  `creosmith-ads` the ad domain (`workers/ads`)
+  ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)). Vercel serves
+  nothing and stays only as the rollback target until it is decommissioned. **The app's
   Worker is built and deployed by CI only** — `opennextjs-cloudflare build` copies any
   `.env*` file into the bundle, so a build next to `.env.local` would ship its secrets.
 - **Serving snapshots:** Workers KV (`creosmith-snapshots`)
@@ -149,8 +150,8 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
 ## Local creative debugging
 
 Building and fixing templates should not require a human in devtools. Three things make
-the loop self-contained; all three are local-only and return **404** in production and on
-every Vercel deployment (`lib/dev-only.ts`). What actually keeps them off the network is
+the loop self-contained; all three are local-only and return **404** in production — in
+any Worker and on any Vercel deployment (`lib/dev-only.ts`). What actually keeps them off the network is
 that `npm run dev` binds `127.0.0.1` — the header check beside it is a second lock, not
 the control, because request headers are spoofable. See [docs/security.md](docs/security.md).
 
@@ -199,8 +200,8 @@ in Chrome** for those, which drives the user's real browser with its real extens
 - Validate all external input (VAST query params, Stripe webhook signatures).
 - Conventional Commits. Push to GitHub only after a case is built **and verified locally**.
 - **Trunk-based: commit straight to `main`.** There are no feature branches and no PR
-  review step in this pipeline — a push to `main` is what deploys to production (Vercel
-  builds the app; CI deploys the ad Worker once every gate has passed), so
+  review step in this pipeline — a push to `main` is what deploys to production (CI
+  deploys both Workers once every gate has passed), so
   "ship it" means commit to `main` and push. Local verification is the gate that replaces
   the review, which is why the quality gates above are not optional. Do not create a
   branch unless explicitly asked for one.

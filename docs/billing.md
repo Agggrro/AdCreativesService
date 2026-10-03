@@ -105,10 +105,18 @@ over a matrix of statuses, periods and plan types, and is the gate that enforces
 - **Every call is bounded** — Stripe 8 s and one retry; the database 10 s, and a timed-out
   read is not retried (the client renames the timeout so postgrest-js stops at once, and
   the webhook's own reads opt out of retries); KV over REST 4 s a try. The run's ceiling
-  is 60 s on Vercel and, on a Worker, Stripe's own 20 s — when Stripe stops waiting the
-  Worker run is cancelled. Both sit well inside the two-minute claim timeout below, so a
-  run cut off mid-way is taken over, never overlapped. Vercel Blob, written only while
-  the app is still on Vercel, has no bound of its own.
+  is Stripe's own 20 s — when Stripe stops waiting the Worker run is cancelled (it was
+  60 s on Vercel). That sits well inside the two-minute claim timeout below, so a run
+  cut off mid-way is taken over, never overlapped.
+- **The endpoint** (test mode) is `we_1UMTD4RuVae2qc3x1gDiAHSD` →
+  `https://creosmith.com/api/stripe/webhook`, the five events listed below. It was
+  created for the Worker at the cutover (ADR-0029 §4), because Vercel keeps secrets
+  write-only and the old one's could not be copied; its signing secret lives only in the
+  Worker (`STRIPE_WEBHOOK_SECRET`). The Vercel-era endpoint `we_1TqK4CRuVae2qc3xdK2MFBKJ`,
+  same URL and events, is **disabled, not deleted**: its secret is the one Vercel holds,
+  so re-enabling it is part of a rollback. Both ran for the minutes of the switch — each
+  event is delivered to every endpoint under the same id, so the claim ledger let
+  whichever arrived first handle it and the other answer `Duplicate`.
 - Handle at minimum:
   - `checkout.session.completed` → create/link subscription, set `stripe_customer_id`.
   - `customer.subscription.created|updated` → sync `status`, `current_period_end`,
@@ -140,7 +148,7 @@ over a matrix of statuses, periods and plan types, and is the gate that enforces
   - When a store can neither take the write nor clear it (the same outage, the same
     limit), it keeps the previous document — logged as `[snapshot-stale]` — until a
     retry or **the reconciler** republishes it: `/api/cron/reconcile`, every ten minutes
-    on the app's Worker (daily while the app is on Vercel), compares every snapshot
+    on the app's Worker, compares every snapshot
     changed in the last four days with Postgres and republishes what drifted. Postgres
     is right in all of these cases — the row is written before the snapshot.
   - The publish reads the subscriptions again after writing and republishes if they

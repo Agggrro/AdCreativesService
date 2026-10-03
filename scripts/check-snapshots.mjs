@@ -11,7 +11,7 @@
  * `npm run snapshot:backfill`, which is idempotent.
  *
  * Audits every store this machine can reach — Workers KV (the one the ad Worker
- * serves from, ADR-0029) and, while the app still writes it, Vercel Blob — for
+ * serves from, ADR-0029) and, while Vercel is kept for a rollback, Vercel Blob — for
  * documents that are missing and for documents that no longer match the rows.
  *
  * Needs SUPABASE_SERVICE_ROLE_KEY and the snapshot-store variables — see .env.example.
@@ -27,7 +27,7 @@ if (!process.env.SNAPSHOT_KV_API_TOKEN) {
     "SNAPSHOT_KV_* is not set — KV is the store the ad domain serves from, and a\n" +
       "check that cannot read it would report total drift that isn't real. Set\n" +
       "CLOUDFLARE_ACCOUNT_ID, SNAPSHOT_KV_NAMESPACE_ID and SNAPSHOT_KV_API_TOKEN in\n" +
-      ".env.local (and, while the app still writes it, BLOB_READ_WRITE_TOKEN).",
+      ".env.local (and, while Vercel is kept for a rollback, BLOB_READ_WRITE_TOKEN).",
   );
   process.exit(1);
 }

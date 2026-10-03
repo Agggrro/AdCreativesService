@@ -24,7 +24,7 @@
  *
  * Needs SUPABASE_SERVICE_ROLE_KEY (bypasses RLS to see every row), the
  * SNAPSHOT_KV_* variables (KV is what the ad domain serves from, ADR-0029) and,
- * while the app still writes it, BLOB_READ_WRITE_TOKEN. None is logged.
+ * while Vercel is kept for a rollback, BLOB_READ_WRITE_TOKEN. None is logged.
  */
 import { createServiceClient } from "@/lib/supabase/service";
 import {
@@ -47,7 +47,7 @@ if (!process.env.SNAPSHOT_KV_API_TOKEN) {
     "SNAPSHOT_KV_* is not set. KV is the store the ad domain serves from\n" +
       "(ADR-0029), and a backfill that cannot write it repairs nothing that serves.\n" +
       "Set CLOUDFLARE_ACCOUNT_ID, SNAPSHOT_KV_NAMESPACE_ID and SNAPSHOT_KV_API_TOKEN\n" +
-      "in .env.local — and BLOB_READ_WRITE_TOKEN while the app still writes Blob.",
+      "in .env.local — and BLOB_READ_WRITE_TOKEN while Vercel is kept for a rollback.",
   );
   process.exit(1);
 }

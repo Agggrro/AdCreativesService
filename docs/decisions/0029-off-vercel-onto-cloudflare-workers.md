@@ -135,10 +135,11 @@ fails on `next/font/google` in 16.3.8. What changes in the app is only what was 
 - **Snapshots: Workers KV**, namespace `creosmith-snapshots`, with the keys ADR-0015 already
   used. Workers read through a binding with `cacheTtl: 60` — the same window the Blob
   cache gave, so the kill-switch budget (about two minutes) is unchanged. Node scripts
-  write through the KV REST API. Until the app leaves Vercel it **writes both stores and
-  reads Blob** — not KV, because over REST that is the Cloudflare API, whose rate limit
-  is shared by everything the account does, deploys included. Afterwards KV is the only
-  store and the Blob code goes. **The audit (`/api/cron/health`, `npm run check:snapshots`)
+  write through the KV REST API. Until the app left Vercel it **wrote both stores and
+  read Blob** — not KV, because over REST that is the Cloudflare API, whose rate limit
+  is shared by everything the account does, deploys included. Since the switch the app's
+  Worker reads and writes KV alone, through its binding; the Node scripts still write
+  both, which keeps Blob fit for a rollback, and the Blob code goes with Vercel. **The audit (`/api/cron/health`, `npm run check:snapshots`)
   checks every store**, for documents that are missing and for documents whose content no
   longer matches the rows — a cancellation that reached Blob but not KV would otherwise
   serve on the ad domain while every check read the store that was right. **A failed
@@ -185,13 +186,36 @@ fails on `next/font/google` in 16.3.8. What changes in the app is only what was 
   the Worker's reach: it would set a cookie on the ad domain and break every player's
   fetch of the tag. Security level stays "essentially off", Browser Integrity Check and
   Bot Fight Mode off; a rate limit here is a block rule, never a challenge.
-- **Then the app**, the same way: a route on `creosmith.com` to `creosmith-web`, rollback by
-  deleting it. The `SNAPSHOT_KV_*` variables **stay** in Vercel's environment until
-  Vercel is decommissioned: a rolled-back app without them would refuse every
-  snapshot write, every webhook included. And after the cutover only KV is written,
-  so a rollback also runs `npm run snapshot:backfill` to bring Blob current for the
-  legacy paths that read it there. Vercel is decommissioned after a quiet week, by
-  the owner.
+- **Then the app, the same way — done 2026-10-03 at 13:43 UTC.** The route
+  `creosmith.com/*` to `creosmith-web` was deployed while the records were still DNS-only,
+  where it does nothing; proxying the apex records was the switch. `www` followed, with a
+  zone redirect rule that 308s it to the bare domain, path and query kept, as Vercel did.
+  The zone answers as Vercel did: HSTS `max-age=63072000` set at the zone (it reaches the
+  Worker's answers too), TLS 1.2 at least, Always Use HTTPS, Full (strict) toward the
+  origin. And nothing challenges: Stripe and the partner networks' servers call the
+  webhook and `/pb`, not always with a browser's User-Agent, so Browser Integrity Check,
+  Bot Fight Mode and the security level's challenges are off here as on the ad domain.
+- **The Stripe webhook got a second endpoint**, because its secret could not be read out
+  of Vercel: same URL, same events, created minutes before the switch, its secret piped
+  straight into the Worker. Stripe delivers every event to every endpoint under one id,
+  so through the switch whichever runtime held the matching secret handled it, the claim
+  ledger turned the other delivery into `Duplicate`, and one that failed on the wrong
+  side was retried onto the right one — nothing is lost while both are enabled. The old
+  endpoint was disabled, not deleted, once DNS had moved and a real Stripe-signed
+  delivery had reached the Worker.
+- **Rolling the app back** is three steps: turn the proxy off on the apex records, so
+  traffic goes straight to Vercel (removing the route works too, but the next push puts
+  it back); re-enable the old Stripe endpoint, whose secret is the one Vercel holds; and
+  `npm run snapshot:backfill`, because the app now writes only KV and the Vercel
+  deployment reads Blob. The `SNAPSHOT_KV_*` variables **stay** in Vercel's environment
+  until it is decommissioned: a rolled-back app without them would refuse every snapshot
+  write, every webhook included. The proxy-off path leans on Vercel's own certificate,
+  which cannot renew while the route holds the domain — its HTTP-01 challenge reaches
+  the app, which has no responder — so it is good until that certificate expires,
+  2026-11-14. On the ad domain the Worker forwards ACME challenges to Vercel instead,
+  so its certificate keeps renewing for as long as Vercel is there.
+- **Vercel is decommissioned after a quiet week, by the owner.** Then the Blob store and
+  its code, the dual write, `vercel.json` and the ad Worker's ACME forward go.
 
 ### 5. Deploys
 

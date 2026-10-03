@@ -262,9 +262,11 @@ The ad-serving path does not read any of the above at request time. It reads two
 documents in the Workers KV namespace `creosmith-snapshots` — which has no public URL —
 republished by the writers that change the underlying rows
 ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md),
-[ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)). While the app still
-runs on Vercel, every write also lands in the private Vercel Blob store the documents
-lived in before, and a write counts only when both stores took it:
+[ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)). The app's Worker
+writes KV alone, through its binding. The Node scripts (`npm run snapshot:backfill`)
+write over the REST API and, while Vercel is kept for a rollback, also to the private
+Vercel Blob store the documents lived in before — a write of theirs counts only when
+both stores took it:
 
 | Key | Projection of | Republished by |
 | --- | --- | --- |

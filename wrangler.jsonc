@@ -17,22 +17,19 @@
   "main": "workers/web/index.ts",
   "compatibility_date": "2026-09-15",
   // global_fetch_strictly_public: a fetch to our own zone goes through the front
-  // door like any other, not straight to the zone's origin — which is Vercel
-  // until the cutover, and nothing after it.
+  // door like any other, not straight to the zone's origin — which is Vercel's
+  // address, kept only for a rollback, and nothing once Vercel is decommissioned.
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
-    // The app domain (ADR-0029 §4). Its records stay pointed at Vercel and are
-    // proxied, so this route is what sends the traffic here: until the records are
-    // proxied it does nothing, and rollback is turning the proxy off (or removing
-    // this route) — Vercel still serves everything behind it. www is not routed:
+    // The app domain (ADR-0029 §4), since 2026-10-03. Its records still point at
+    // Vercel and are proxied, so this route is what sends the traffic here, and
+    // rollback is turning the proxy off (or removing this route) — Vercel still
+    // serves everything behind it until it is decommissioned. www is not routed:
     // a zone redirect rule sends it to the bare domain, as Vercel did.
-    { "pattern": "creosmith.com/*", "zone_name": "creosmith.com" },
-    // Staging, kept until the cutover is verified. A write made here lands in KV
-    // alone, while the app still on Vercel reads Blob for the legacy paths.
-    { "pattern": "next.creosmith.com", "custom_domain": true }
+    { "pattern": "creosmith.com/*", "zone_name": "creosmith.com" }
   ],
 
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },

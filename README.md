@@ -13,8 +13,8 @@ it lapses, the dynamic VAST stops serving the interactive payload.
 ## Tech stack
 
 Next.js (App Router, TypeScript) · Tailwind CSS · Lucide React · Supabase (Postgres,
-Auth, RLS) · Stripe · Cloudflare Workers (the ad domain, with the app moving off Vercel —
-[ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)) · Workers KV
+Auth, RLS) · Stripe · Cloudflare Workers (the app and the ad domain, off Vercel since
+2026-10-03 — [ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)) · Workers KV
 (serving snapshots) · Cloudflare R2 (advertiser media and creative units,
 [ADR-0028](docs/decisions/0028-creative-media-on-r2.md)).
 

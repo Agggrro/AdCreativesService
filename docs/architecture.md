@@ -109,8 +109,10 @@ will — tags already pasted into a DSP point there.
 ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md),
 [`workers/ads/src/index.ts`](../workers/ads/src/index.ts)). It answers the paths above,
 `/c/u/…` (runtime scripts only: a forward to the media host for tags built before units
-moved there) and `robots.txt`; it forwards `/`, `/cdn…`, `/c/player`, `/_next/…` and ACME
-challenges to the app unchanged, GET and HEAD only, and everything else is a 404. No cookie is ever set on that host —
+moved there) and `robots.txt`; it forwards `/`, `/cdn…`, `/c/player` and `/_next/…` to
+the app's Worker unchanged, over a service binding that keeps the ad domain's `Host`, GET
+and HEAD only; ACME challenges go to the zone's origin (Vercel, while it exists); and
+everything else is a 404. No cookie is ever set on that host —
 the Worker strips `Set-Cookie` from anything it forwards — and every answer carries
 HSTS. The postback endpoint `/pb` lives on the app domain only.
 
@@ -126,8 +128,10 @@ VAST document is therefore the same bytes whichever runtime built it —
 The ad domain's DNS is on Cloudflare since
 [ADR-0028](decisions/0028-creative-media-on-r2.md). The apex records are proxied and a
 Workers Route `smithcdn.net/*` sends every request to the Worker; the zone's origin is
-still Vercel until the app moves (ADR-0029 §4), which is what the forwarded paths reach,
-and **deleting the route is the rollback** — traffic falls straight through to Vercel.
+still Vercel until it is decommissioned (ADR-0029 §4), and **deleting the route is the
+rollback** — traffic falls straight through to Vercel, which still serves everything.
+The app domain is set up the same way: `creosmith.com`'s records are proxied, a route
+`creosmith.com/*` sends it to `creosmith-web`, and turning the proxy off is its rollback.
 `media.smithcdn.net` is the R2 bucket's custom domain: advertiser media and, since
 ADR-0029, the VPAID units — a separate host, so none of the routing above applies to it.
 
@@ -488,16 +492,17 @@ discovering that externally hosted media routinely breaks via hotlink protection
 
 | Concern | Runtime | Why |
 | --- | --- | --- |
-| Dashboard / auth pages | Node (Vercel) | Rich, low QPS. Moving to a Worker through OpenNext ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) §2) |
+| Dashboard / auth pages | Cloudflare Worker `creosmith-web` — Next through OpenNext, `nodejs_compat` | Rich, low QPS. On the Worker since 2026-10-03, on Vercel before ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) §2) |
 | `GET /v`, `/t`, `/r`, `/c/s/:token` on the ad domain | Cloudflare Worker `creosmith-ads` (`nodejs_compat`), tag in the Cache API for 60 s | The impression path: about a millisecond of CPU per request, billed per request rather than per function invocation. Reads KV snapshots, not Postgres, and mints asset URLs locally — no Supabase call to build a tag ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md), [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
-| `GET /api/vast` (legacy, app domain) | Node + CDN cache (`s-maxage=60`) | The same handler as the Worker's, through a Next route; also what `npm run dev` serves |
+| `GET /api/vast` (legacy, app domain) | App Worker, no edge cache in front | The same handler as the ad Worker's, through a Next route; also what `npm run dev` serves. A Worker's own answers are not cached by the zone, so `s-maxage` is advisory here and each request reads KV through the binding — fine for the few tags still pointing at it |
 | VPAID unit | R2 + Cloudflare CDN at `media.smithcdn.net` (1y immutable) | Content-addressed URL straight in `<MediaFile>` — nothing of ours in the path ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md), ADR-0029) |
 | Advertiser media | Cloudflare R2 + Cloudflare CDN at `media.smithcdn.net` (1 day, Smart Tiered Cache) | The heaviest bytes on the ad path — two looping videos are ~7 MB an impression — so they live where egress is free at any volume and no Vercel or Supabase quota is spent on them ([ADR-0028](decisions/0028-creative-media-on-r2.md)) |
-| `GET /api/creative/unit/[token]` | Node | Fallback only, for a logical key not yet in `runtime/manifest.ts`; app domain only. Removable once every template has been pushed |
-| Serving snapshots | Workers KV `creosmith-snapshots`, 60 s edge cache | Written by the creative writers and the Stripe webhook (through the REST API while the app is on Vercel, which also still writes its private Blob store); read by the ad Worker through its binding. KV has no public URL, which matters because keys derive from `creative_id`, public in every tag ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
+| `GET /api/creative/unit/[token]` | App Worker | Fallback only, for a logical key not yet in `runtime/manifest.ts`; app domain only. Removable once every template has been pushed |
+| Serving snapshots | Workers KV `creosmith-snapshots`, 60 s edge cache | Written by the creative writers and the Stripe webhook through the app Worker's binding, and by the Node scripts over the REST API — which also write the private Blob store a rollback to Vercel would read; read by both Workers through their bindings. KV has no public URL, which matters because keys derive from `creative_id`, public in every tag ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
 | `GET /r` | Ad Worker (`/api/click`: Node, app domain) | The click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)): `node:crypto` for the link signature and the click id, and the service-role `record_click()` in `waitUntil` — the 302 never waits on Postgres. Excluded from the middleware matcher |
-| `GET\|POST /pb` → `/api/postback` | Node | S2S postbacks from partner networks. Awaits `record_postback()`, because the network needs to know whether it landed — a 5xx is what makes it retry. Excluded from the middleware matcher |
-| `POST /api/stripe/webhook` | Node | Needs raw body for signature verification |
-| `GET /c/s/:token` → `/api/creative/simid/[token]` | Ad Worker (Node route on the app domain) | Re-serves the SIMID document from the media host with headers an iframe will run; the Supabase `creatives` bucket only for a key not in the manifest |
-| `/api/tools/vast/*` | Node | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). Node is required, not incidental: the SSRF guard installs its own `lookup` on the socket via `node:http`/`node:dns`, which has no edge equivalent. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |
-| `/api/dev/*`, `/dev/harness` | Node, **loopback only** | Developer surfaces: a password-less sign-in for a local test account, and a unit served off local `runtime/dist/` so the harness shows the working copy rather than the published object. Kept off the network by the *listener* — `npm run dev` binds `127.0.0.1` — with [`lib/dev-only.ts`](../lib/dev-only.ts) (not production, not Vercel, loopback headers) as a second lock that answers 404. See [security.md](security.md) for why the header check alone would not be enough |
+| `GET\|POST /pb` → `/api/postback` | App Worker | S2S postbacks from partner networks. Awaits `record_postback()`, because the network needs to know whether it landed — a 5xx is what makes it retry. Excluded from the middleware matcher |
+| `POST /api/stripe/webhook` | App Worker | Needs the raw body for signature verification, checked through WebCrypto (`constructEventAsync`) |
+| `GET /c/s/:token` → `/api/creative/simid/[token]` | Ad Worker (the app Worker on the app domain) | Re-serves the SIMID document from the media host with headers an iframe will run; the Supabase `creatives` bucket only for a key not in the manifest |
+| Daily audit, reconciler | The app Worker's `scheduled()` — 03:00 UTC, and every ten minutes | Call `/api/cron/health` and `/api/cron/reconcile` in-process with the cron bearer, and fail the run on drift so it shows in the Worker's cron history (`workers/web/index.ts`). Vercel's crons until ADR-0029 |
+| `/api/tools/vast/*` | App Worker | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). On the Worker the SSRF guard resolves every name first and refuses any private answer, then fetches — a pre-flight with a rebinding window that [security.md](security.md) weighs; under `npm run dev` it still pins the socket's own `lookup` through `node:http`. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |
+| `/api/dev/*`, `/dev/harness` | Node, **loopback only** | Developer surfaces: a password-less sign-in for a local test account, and a unit served off local `runtime/dist/` so the harness shows the working copy rather than the published object. Kept off the network by the *listener* — `npm run dev` binds `127.0.0.1` — with [`lib/dev-only.ts`](../lib/dev-only.ts) (not production, not a Worker, not Vercel, loopback headers) as a second lock that answers 404. See [security.md](security.md) for why the header check alone would not be enough |
