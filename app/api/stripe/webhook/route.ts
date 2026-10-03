@@ -147,11 +147,12 @@ async function upsertSubscription(supabase: DB, sub: Stripe.Subscription): Promi
   try {
     await publishEntitlementSnapshot(userId, supabase);
   } catch (err) {
-    // Stripe's retries are finite, so a 500 alone could still end with the CDN
+    // Stripe's retries are finite, so a 500 alone could still end with a store
     // holding stale entitlement forever. Dropping the document first makes the
-    // failure safe on its own: with no snapshot the serving path falls back to
-    // Postgres, which is slower but never wrong. Then rethrow so the event is
-    // retried and the snapshot gets rebuilt.
+    // failure safe on its own: with no entitlement document the serving path
+    // does not serve this user's tags at all — fail closed, so a cancellation
+    // can never keep serving. Then rethrow so the event is retried and the
+    // snapshot gets rebuilt, which is what turns a new subscription's tags on.
     await unpublishEntitlementSnapshot(userId).catch((clearErr) => {
       console.error("entitlement snapshot is stale and could not be cleared", {
         userId,

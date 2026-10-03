@@ -120,7 +120,8 @@ export async function POST(request: Request): Promise<Response> {
   // mixed-content/private-network failure that surfaces only as code 1005.
   const siteUrl = getRequestOrigin(request);
 
-  const scriptUrl = resolveInteractiveUrl(serving, siteUrl);
+  // Same-origin unit, so its telemetry reaches the configurator (ADR-0019).
+  const scriptUrl = resolveInteractiveUrl(serving, siteUrl, { sameOriginUnit: true });
   if (!scriptUrl) {
     return Response.json(
       { error: "interactive asset not available for this template/format" },

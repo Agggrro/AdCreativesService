@@ -1,0 +1,58 @@
+// creosmith-ads — the ad domain, smithcdn.net (ADR-0029).
+//
+// Deployed by CI on a push to main (.github/workflows/ci.yml), or by hand with
+//   npx wrangler deploy -c workers/ads/wrangler.jsonc
+// Secrets are set once with `wrangler secret put` and never live in this file:
+//   PREVIEW_TOKEN_SECRET, TRACK_TOKEN_SECRET, SUPABASE_SERVICE_ROLE_KEY
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "creosmith-ads",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-15",
+  // node:crypto and Buffer for the token modules, and process.env populated
+  // from the vars and secrets below — the shared modules read their config there.
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Reachable only on the hostnames below; no *.workers.dev and no preview URLs.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    // The ad domain. A route rather than a custom domain: on a route, a plain
+    // `fetch` of the incoming request goes to the zone's origin, which is how
+    // the forwarded paths reach the app while it is still on Vercel — and
+    // deleting the route is the rollback (ADR-0029 §4). Needs the apex records
+    // proxied; with them DNS-only, it is inert.
+    { "pattern": "smithcdn.net/*", "zone_name": "smithcdn.net" },
+    // Staging: a hostname of its own, to check the Worker against the live tag.
+    // Removed once the ad domain is on the Worker.
+    { "pattern": "edge.smithcdn.net", "custom_domain": true }
+  ],
+
+  "kv_namespaces": [
+    // creosmith-snapshots — serving snapshots (lib/serving/store-kv.ts).
+    { "binding": "SNAPSHOTS", "id": "f95d56504dbf4f5b8281be99fd64d223" }
+  ],
+
+  // Keys the tag cache by deploy (workers/ads/src/index.ts, serveVast).
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://creosmith.com",
+    "NEXT_PUBLIC_CDN_URL": "https://smithcdn.net",
+    "NEXT_PUBLIC_MEDIA_URL": "https://media.smithcdn.net",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://stnxpvkustifiaomfzua.supabase.co"
+  },
+
+  "alias": {
+    "server-only": "./src/shims/empty.ts",
+    "client-only": "./src/shims/empty.ts"
+  },
+
+  // Console output only. An invocation log per impression would be a bill that
+  // grows with traffic for lines nobody reads; the `[serving-fallback]` and
+  // `[click-redirect]` lines are what is worth searching.
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false }
+  }
+}

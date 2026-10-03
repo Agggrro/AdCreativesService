@@ -106,8 +106,9 @@ over a matrix of statuses, periods and plan types, and is the gate that enforces
     exactly how a cancelled subscription keeps serving.
   - The snapshot stores `current_period_end`, not a boolean verdict, so entitlement
     still lapses on time even if no webhook arrives at all.
-- **Kill-switch latency: ~60s response cache + up to 60s of Blob propagation**, so
-  ~2 minutes worst case (it was ~1 minute when the view was read live).
+- **Kill-switch latency: ~60s response cache + up to 60s of snapshot propagation**
+  (Workers KV's edge cache since ADR-0029, Blob's before), so ~2 minutes worst case
+  (it was ~1 minute when the view was read live).
 - **Idempotent:** each event id is claimed in `public.stripe_events` before
   processing; a duplicate returns 200 without reprocessing, and a handler failure
   rolls back the claim so Stripe's retry can reprocess.

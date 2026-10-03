@@ -1,0 +1,4 @@
+# The VAST golden documents are compared byte for byte (lib/vast/golden.test.ts).
+# Never let a checkout rewrite their line endings: with core.autocrlf=true a
+# Windows checkout would turn them CRLF and fail the test on that machine only.
+lib/vast/__golden__/** -text

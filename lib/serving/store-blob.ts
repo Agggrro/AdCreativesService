@@ -3,13 +3,16 @@ import {
   creativeKey,
   entitlementKey,
   SNAPSHOT_CACHE_SECONDS,
+  SnapshotReadError,
   type SnapshotStore,
 } from "./store";
 import { SNAPSHOT_SCHEMA_VERSION } from "./types";
 import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
 
 /**
- * Vercel Blob implementation of the snapshot store.
+ * Vercel Blob implementation of the snapshot store — the one the app is leaving
+ * (ADR-0029). While it still runs on Vercel it reads here and writes here and to
+ * Workers KV (`dualWriteStore` in store-kv.ts); afterwards this file goes.
  *
  * **The store must be private.** Keys are derived from `creative_id`, and that
  * id is published in every VAST tag URL a customer pastes into a DSP — so a
@@ -27,32 +30,42 @@ import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
 const ACCESS = "private" as const;
 
 /**
- * `buildKey` is called inside the try rather than by the caller: key building
- * rejects a non-uuid id by throwing, and on the read side the contract is to
- * fail soft. A junk id becomes a miss (and then a database fallback), not a 500
- * on the public serving path.
+ * A non-uuid id cannot name a document, so key building's refusal is a miss
+ * here, not a failure — the routes validate first, and this keeps the store
+ * safe on its own. Everything else that goes wrong is a {@link SnapshotReadError}
+ * (lib/serving/store.ts).
  */
 async function readSnapshot<T extends { schema_version: number }>(
   buildKey: () => string,
 ): Promise<T | null> {
+  let key: string;
   try {
-    const result = await get(buildKey(), { access: ACCESS });
-    // `null` is "no such blob" — a normal miss for a creative that has never
-    // been published. 304 cannot occur here: we send no `ifNoneMatch`.
-    if (!result || result.statusCode !== 200) return null;
-
-    const parsed = (await new Response(result.stream).json()) as T;
-
-    // An unknown version is treated as a miss so the caller falls back to
-    // Postgres. Without this, the first incompatible shape change would be an
-    // outage instead of a migration (see SNAPSHOT_SCHEMA_VERSION).
-    if (parsed?.schema_version !== SNAPSHOT_SCHEMA_VERSION) return null;
-
-    return parsed;
+    key = buildKey();
   } catch {
-    // Reads fail soft, by contract: the caller falls back to the database.
     return null;
   }
+
+  let parsed: T;
+  try {
+    const result = await get(key, { access: ACCESS });
+    // `null` is "no such blob" — a normal miss for a creative that has never
+    // been published. 304 cannot occur here: we send no `ifNoneMatch`.
+    if (!result) return null;
+    if (result.statusCode !== 200) {
+      throw new Error(`unexpected status ${result.statusCode}`);
+    }
+    parsed = (await new Response(result.stream).json()) as T;
+  } catch (err) {
+    throw new SnapshotReadError(`snapshot read failed: ${key}`, { cause: err });
+  }
+
+  // An unknown version is "cannot read", so the caller falls back to Postgres.
+  // Without this, the first incompatible shape change would be an outage
+  // instead of a migration (see SNAPSHOT_SCHEMA_VERSION).
+  if (parsed?.schema_version !== SNAPSHOT_SCHEMA_VERSION) {
+    throw new SnapshotReadError(`snapshot has an unknown schema version: ${key}`);
+  }
+  return parsed;
 }
 
 async function writeSnapshot(key: string, snapshot: unknown): Promise<void> {

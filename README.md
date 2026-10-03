@@ -13,7 +13,9 @@ it lapses, the dynamic VAST stops serving the interactive payload.
 ## Tech stack
 
 Next.js (App Router, TypeScript) · Tailwind CSS · Lucide React · Supabase (Postgres,
-Auth, RLS) · Stripe · Vercel · Cloudflare R2 (advertiser media,
+Auth, RLS) · Stripe · Cloudflare Workers (the ad domain, with the app moving off Vercel —
+[ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)) · Workers KV
+(serving snapshots) · Cloudflare R2 (advertiser media and creative units,
 [ADR-0028](docs/decisions/0028-creative-media-on-r2.md)).
 
 ## Commands
@@ -23,10 +25,12 @@ Auth, RLS) · Stripe · Vercel · Cloudflare R2 (advertiser media,
 | `npm run dev` | Next.js dev server, bound to `127.0.0.1` (see [docs/security.md](docs/security.md)) |
 | `npm run lint` / `npm run typecheck` / `npm run build` | The pre-push gates |
 | `npm run build:runtime` | Build the VPAID units into `runtime/dist/` (wipes it first) |
-| `npm run runtime:push [prefix]` | Upload the built units to the public runtime Blob store ([ADR-0017](docs/decisions/0017-runtime-assets-on-public-cdn.md)) |
+| `npm run runtime:push [prefix]` | Upload the built units to R2, content-addressed, and rewrite `runtime/manifest.ts` ([ADR-0017](docs/decisions/0017-runtime-assets-on-public-cdn.md), [ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
+| `npm run test:vast` / `test:ads` / `test:cors` / `test:snapshots` | Pin the ad path's bytes, the ad Worker's behaviour, its CORS, and the snapshot store's contract |
+| `npx wrangler deploy -c workers/ads/wrangler.jsonc` | Deploy the ad Worker by hand — CI does it on every push to `main` |
 | `npm run db:schema` / `npm run db:seed` | Apply `supabase/schema.sql` / `supabase/seed.sql` |
 
-The last three read `.env.local`. See [runtime/README.md](runtime/README.md) for the
+The `runtime:` and `db:` commands read `.env.local`. See [runtime/README.md](runtime/README.md) for the
 order to run them in when shipping a template change, and [.env.example](.env.example)
 for the variables they need.
 
@@ -49,5 +53,5 @@ for the variables they need.
 
 1. **Dashboard** (authenticated, RLS) — showcase, configure creatives, manage billing.
 2. **Database** (Supabase) — with a denormalized serving record for the hot path.
-3. **Ad-serving** (public, edge, cached) — `GET /api/vast`, format-aware, subscription-gated,
+3. **Ad-serving** (public, edge, cached) — `GET /v` on the ad Worker, format-aware, subscription-gated,
    fails closed; Stripe webhook as source of truth.

@@ -18,6 +18,9 @@ const eslintConfig = defineConfig([
     // shows up on a machine that has actually run the runtime build, which is
     // why it went unnoticed.
     "runtime/dist/**",
+    // Wrangler's local state and bundles (`wrangler dev`, ADR-0029) — generated,
+    // gitignored, and thousands of lines of other people's code.
+    "**/.wrangler/**",
   ]),
   {
     // Hand-written ES5 creative units, not app code. Two default rules model

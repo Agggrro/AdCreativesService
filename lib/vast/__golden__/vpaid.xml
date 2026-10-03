@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.2">
+  <Ad id="11111111-2222-4333-8444-555555555555">
+    <InLine>
+      <AdSystem version="1.0">CreoSmith</AdSystem>
+      <Error><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=error&exp=1791032400&sig=7k9JMXDsrrsgQayzrcERYlB-JP_JXGs4Odb3kVU1mbQ&code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=impression&exp=1791032400&sig=M_2tWRJ42mC6qNnJ3jIkKeIewR4Pn5b98zckbD70tZo]]></Impression>
+      <AdServingId>11111111-2222-4333-8444-555555555555</AdServingId>
+      <AdTitle><![CDATA[CreoSmith Interactive Creative]]></AdTitle>
+      <Creatives>
+        <Creative id="11111111-2222-4333-8444-555555555555" sequence="1">
+          <UniversalAdId idRegistry="creosmith">11111111-2222-4333-8444-555555555555</UniversalAdId>
+          <Linear>
+            <Duration>00:00:15</Duration>
+            <AdParameters><![CDATA[{"videoUrl":"https://media.smithcdn.net/u/clip.mp4","clickThroughUrl":"https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=_UMLd-aEP3ZH1JmRigG3veNhfJJzUDT3JwuzHwFUA6M","exitUrlA":"https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=exitUrlA&exp=1791115200&sig=vj5SYYq8etu1XhbU1j94LzpbqJ-Q6jJVkfR-wH6HwGc","storeUrl":"market://details?id=example","coverText":"Привет & <b>«ok»</b> ]]]]><![CDATA[> end","durationSeconds":15,"width":640,"height":360,"viewableTrackingUrl":"https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=viewable&exp=1791032400&sig=I6bmh91YD3O35AeKbyvndhsVJiAQojThpPExbTeFR10"}]]></AdParameters>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="application/javascript" apiFramework="VPAID" width="640" height="360"><![CDATA[https://media.smithcdn.net/runtime/quiz/vpaid.8eeec37b.js]]></MediaFile>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360"><![CDATA[https://media.smithcdn.net/u/clip.mp4]]></MediaFile>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=_UMLd-aEP3ZH1JmRigG3veNhfJJzUDT3JwuzHwFUA6M]]></ClickThrough>
+              <ClickTracking><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=click&exp=1791032400&sig=UkADMYRzgEBgKIs72YYWrQGsHBsgo_SgxGgX8xCMlH0]]></ClickTracking>
+            </VideoClicks>
+
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

@@ -112,9 +112,9 @@ export async function unpublishCreativeSnapshot(creativeId: string): Promise<voi
 }
 
 /**
- * Drop a user's entitlement document so the serving path falls back to
- * Postgres. A fail-safe for a republish that would not land — never part of a
- * normal flow.
+ * Drop a user's entitlement document, which turns their tags off until the next
+ * successful publish — fail closed, see `deleteEntitlement` in store.ts. A
+ * fail-safe for a republish that would not land — never part of a normal flow.
  */
 export async function unpublishEntitlementSnapshot(userId: string): Promise<void> {
   await snapshots.deleteEntitlement(userId);

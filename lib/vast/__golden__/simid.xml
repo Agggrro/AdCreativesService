@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.2">
+  <Ad id="11111111-2222-4333-8444-555555555555">
+    <InLine>
+      <AdSystem version="1.0">CreoSmith</AdSystem>
+      <Error><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=error&exp=1791032400&sig=7k9JMXDsrrsgQayzrcERYlB-JP_JXGs4Odb3kVU1mbQ&code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=impression&exp=1791032400&sig=M_2tWRJ42mC6qNnJ3jIkKeIewR4Pn5b98zckbD70tZo]]></Impression>
+      <AdServingId>11111111-2222-4333-8444-555555555555</AdServingId>
+      <AdTitle><![CDATA[CreoSmith Interactive Creative]]></AdTitle>
+      <AdVerifications>
+        <Verification vendor="dv.example-omid">
+          <JavaScriptResource apiFramework="omid" browserOptional="true"><![CDATA[https://cdn.dv.example/omid.js]]></JavaScriptResource>
+          <VerificationParameters><![CDATA[a=b&c]]]]><![CDATA[>d]]></VerificationParameters>
+        </Verification>
+      </AdVerifications>
+      <Creatives>
+        <Creative id="11111111-2222-4333-8444-555555555555" sequence="1">
+          <UniversalAdId idRegistry="creosmith">11111111-2222-4333-8444-555555555555</UniversalAdId>
+          <Linear>
+            <Duration>00:00:30</Duration>
+            <AdParameters><![CDATA[{"videoUrl":"https://media.smithcdn.net/u/clip.webm","clickThroughUrl":"https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=_UMLd-aEP3ZH1JmRigG3veNhfJJzUDT3JwuzHwFUA6M","productName":"Shoes","productImageUrl":"https://media.smithcdn.net/u/p.png","verificationVendor":"dv.example-omid","verificationScriptUrl":"https://cdn.dv.example/omid.js","verificationParameters":"a=b&c]]]]><![CDATA[>d","durationSeconds":30}]]></AdParameters>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/webm" width="640" height="360"><![CDATA[https://media.smithcdn.net/u/clip.webm]]></MediaFile>
+              <InteractiveCreativeFile apiFramework="SIMID" type="text/html"><![CDATA[https://smithcdn.net/c/s/eyJwYXRoIjoic2hvcHBhYmxlL3NpbWlkL2luZGV4Lmh0bWwiLCJleHAiOjE3OTEwMjk0MDB9.YCB__JsIR7KYkefY8sH3Cr3o_zzu_KDSI7FmA-X4zU8]]></InteractiveCreativeFile>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=_UMLd-aEP3ZH1JmRigG3veNhfJJzUDT3JwuzHwFUA6M]]></ClickThrough>
+              <ClickTracking><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=click&exp=1791032400&sig=UkADMYRzgEBgKIs72YYWrQGsHBsgo_SgxGgX8xCMlH0]]></ClickTracking>
+            </VideoClicks>
+
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

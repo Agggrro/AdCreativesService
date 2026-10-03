@@ -1,6 +1,6 @@
 # 0017. Creative runtime assets on a public, content-addressed CDN
 
-- Status: Accepted
+- Status: Accepted — the store is R2 behind `media.smithcdn.net` since [ADR-0029](0029-off-vercel-onto-cloudflare-workers.md); the design stands
 - Date: 2026-08-16
 
 ## Context

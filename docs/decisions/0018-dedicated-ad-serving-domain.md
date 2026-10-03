@@ -1,6 +1,6 @@
 # 0018. A dedicated ad-serving domain, with neutral paths
 
-- Status: Accepted — its CORS consequence is superseded by [ADR-0026](0026-vast-cors-credentialed-requests.md)
+- Status: Accepted — its CORS consequence is superseded by [ADR-0026](0026-vast-cors-credentialed-requests.md); its routing lives in the ad Worker since [ADR-0029](0029-off-vercel-onto-cloudflare-workers.md)
 - Date: 2026-08-16
 
 ## Context

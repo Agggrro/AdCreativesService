@@ -29,10 +29,10 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0012](0012-viewability-measurement.md) | Viewability measurement — OMID pass-through for SIMID, a custom module for VPAID | Accepted |
 | [0013](0013-public-free-tools-section.md) | A public free-tools section, and a nav for signed-out visitors | Accepted |
 | [0014](0014-vast-inspection-engine.md) | The VAST inspection engine — prose-derived rules, and dry-run by substitution | Accepted |
-| [0015](0015-serving-snapshots-on-cdn.md) | Serving snapshots on the CDN, not a live database read | Accepted |
+| [0015](0015-serving-snapshots-on-cdn.md) | Serving snapshots on the CDN, not a live database read | Accepted (store amended by 0029) |
 | [0016](0016-three-events-hourly-counters.md) | Three ingested events, counted into hourly buckets | Accepted |
-| [0017](0017-runtime-assets-on-public-cdn.md) | Creative runtime assets on a public, content-addressed CDN | Accepted |
-| [0018](0018-dedicated-ad-serving-domain.md) | A dedicated ad-serving domain, with neutral paths | Accepted (CORS superseded by 0026) |
+| [0017](0017-runtime-assets-on-public-cdn.md) | Creative runtime assets on a public, content-addressed CDN | Accepted (store amended by 0029) |
+| [0018](0018-dedicated-ad-serving-domain.md) | A dedicated ad-serving domain, with neutral paths | Accepted (CORS superseded by 0026, routing amended by 0029) |
 | [0019](0019-creative-telemetry-channel.md) | Creative telemetry over an origin-locked postMessage channel | Accepted |
 | [0020](0020-validator-reports-faults-not-opinions.md) | The validator reports faults, not opinions | Accepted |
 | [0021](0021-validator-player-on-an-isolated-origin.md) | The validator's player runs on an isolated origin | Accepted |
@@ -43,6 +43,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0026](0026-vast-cors-credentialed-requests.md) | VAST responses answer credentialed requests, as VAST 4.2 requires | Accepted |
 | [0027](0027-conversion-goals.md) | Conversion goals: a goal on the postback, one conversion per goal per click | Accepted |
 | [0028](0028-creative-media-on-r2.md) | Creative media on Cloudflare R2, served from the ad domain | Accepted |
+| [0029](0029-off-vercel-onto-cloudflare-workers.md) | Off Vercel: the ad path and the app on Cloudflare Workers | Accepted |
 
 ## Template
 

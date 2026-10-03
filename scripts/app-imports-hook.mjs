@@ -56,12 +56,15 @@ export async function resolve(specifier, context, next) {
   // Relative imports written without an extension (`./index`, `./store`). Node's
   // ESM resolver requires one; the app is written for a bundler that does not.
   // Only consulted after the plain resolution has actually failed, so a real
-  // file always wins.
+  // file always wins. A directory (`./adapters`) fails with its own code and
+  // resolves to its index the same way.
   if (specifier.startsWith(".")) {
     try {
       return await next(specifier, context);
     } catch (err) {
-      if (err?.code !== "ERR_MODULE_NOT_FOUND" || !context.parentURL) throw err;
+      const unresolved =
+        err?.code === "ERR_MODULE_NOT_FOUND" || err?.code === "ERR_UNSUPPORTED_DIR_IMPORT";
+      if (!unresolved || !context.parentURL) throw err;
       const base = fileURLToPath(new URL(specifier, context.parentURL));
       for (const suffix of CANDIDATES) {
         const candidate = `${base}${suffix}`;

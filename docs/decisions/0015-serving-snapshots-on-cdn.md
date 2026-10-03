@@ -1,6 +1,6 @@
 # 0015. Serving snapshots on the CDN, not a live database read
 
-- Status: Accepted
+- Status: Accepted — the store is Workers KV since [ADR-0029](0029-off-vercel-onto-cloudflare-workers.md); the design stands
 - Date: 2026-08-16
 
 ## Context

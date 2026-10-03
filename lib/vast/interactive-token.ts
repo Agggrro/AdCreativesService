@@ -17,11 +17,15 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * makes the two modules circular, and the failure is `SIGNED_URL_TTL_SECONDS is
  * not initialized` at request time — invisible to typecheck, lint and build.
  *
- * Deliberately a little longer than the VAST response cache, so a cached VAST
- * can never hand a player a URL that has already expired (ADR-0003:
- * short-lived, signed, per-request access).
+ * Longer than the oldest VAST document the serving path may hand out, so a
+ * cached tag never carries a URL that has already expired (ADR-0003:
+ * short-lived, signed, per-request access). Since ADR-0029 that is the ad
+ * Worker's 60 s cache plus the last good copy it serves for another 300 s while
+ * our state cannot be read — so ten minutes, not the two that covered a 60 s
+ * cache alone. It guards an anonymous template, as public in substance as the
+ * VPAID unit beside it; the length costs nothing.
  */
-export const INTERACTIVE_TOKEN_TTL_SECONDS = 120;
+export const INTERACTIVE_TOKEN_TTL_SECONDS = 600;
 
 /**
  * Only ever proxy our own runtime objects, never an arbitrary bucket path — one

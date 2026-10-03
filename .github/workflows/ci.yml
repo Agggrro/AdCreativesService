@@ -16,10 +16,19 @@ on:
     # 03:00 UTC daily.
     - cron: "0 3 * * *"
 
-# A newer push makes an in-flight run irrelevant.
+# A newer push makes an in-flight pull-request run irrelevant. Not one on main:
+# cancelling that run would cancel its deploy job mid-flight whatever the job's
+# own concurrency says, so runs on main queue instead.
+# The event is part of the group, so the 03:00 nightly can never cancel a
+# queued push run — and with it that push's Worker deploy.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Read the repository, nothing else. The deploy authenticates to Cloudflare with
+# its own secret, not with the workflow token.
+permissions:
+  contents: read
 
 jobs:
   checks:
@@ -41,11 +50,53 @@ jobs:
 
       - run: npm run lint
 
+      # Every suite runs here, none needs a secret. test:vast and test:cors pin
+      # the bytes and headers the ad path emits, which since ADR-0029 two
+      # runtimes serve from the same modules.
       - run: npm run test:entitlement
+      - run: npm run test:vast
+      - run: npm run test:ads
+      - run: npm run test:cors
+      - run: npm run test:snapshots
+      - run: npm run test:media
+      - run: npm run test:postback
+
+      # The ad Worker bundles: an import that only resolves under Next (or not
+      # at all in a Worker) fails here, before the deploy job, not in production.
+      - run: npx wrangler deploy -c workers/ads/wrangler.jsonc --dry-run --outdir /tmp/ads-dry-run
 
       # No secrets: app/sitemap.ts returns its static pages when the Supabase
       # env vars are absent, so a build with none is a real build.
       - run: npm run build
+
+  # The ad domain (ADR-0029). A push to main is production for the Worker as it
+  # is for the app, and only after every gate above has passed. Secrets live in
+  # the Worker (`wrangler secret put`), never here; this token can deploy
+  # Workers and edit the two zones' routes and DNS, nothing else.
+  deploy-ads:
+    name: deploy the ad Worker
+    needs: checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Never cancelled mid-deploy by a newer push; the newer run deploys after.
+    concurrency:
+      group: deploy-ads
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      - name: wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 4e9bc9b3bf84f2a176586ef8dad3b43c
+        run: npx wrangler deploy -c workers/ads/wrangler.jsonc
 
   drift:
     name: nightly drift checks

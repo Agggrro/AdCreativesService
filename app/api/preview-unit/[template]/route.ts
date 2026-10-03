@@ -14,7 +14,8 @@ export async function GET(
   { params }: { params: Promise<{ template: string }> },
 ): Promise<Response> {
   const { template } = await params;
-  const path = PATHS[template];
+  // Own keys only: `/api/preview-unit/constructor` must not find an inherited function.
+  const path = Object.hasOwn(PATHS, template) ? PATHS[template] : undefined;
   const js = (body: string, status = 200) =>
     new Response(body, {
       status,

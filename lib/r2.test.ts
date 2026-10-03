@@ -1,6 +1,13 @@
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { deleteObjects, presignUpload, r2, type R2 } from "./r2.ts";
+import {
+  RUNTIME_KEY_RE,
+  deleteObjects,
+  presignUpload,
+  putRuntimeObject,
+  r2,
+  type R2,
+} from "./r2.ts";
 
 /**
  * Run with `npm run test:media`.
@@ -121,5 +128,53 @@ test("another owner's keys are refused without a request", async () => {
 test("any missing variable leaves R2 off", () => {
   for (const name of Object.keys(ENV)) {
     assert.equal(withEnv({ ...ENV, [name]: undefined }, r2), null, name);
+  }
+});
+
+test("runtime keys are content-addressed paths under runtime/, and nothing else", () => {
+  for (const key of [
+    "runtime/quiz/vpaid.8eeec37b.js",
+    "runtime/age-gate/vpaid.29339a78.js",
+    "runtime/shoppable/vpaid/unit.12345678.js",
+    "runtime/shoppable/simid/index.ede9a3a6.html",
+  ]) {
+    assert.ok(RUNTIME_KEY_RE.test(key), key);
+  }
+  for (const key of [
+    KEY,
+    "runtime/quiz/vpaid.js",
+    "runtime/quiz/vpaid.8EEEC37B.js",
+    "runtime/quiz/vpaid.8eeec37b.mp4",
+    "runtime/../quiz/vpaid.8eeec37b.js",
+    "runtime//vpaid.8eeec37b.js",
+    "/runtime/quiz/vpaid.8eeec37b.js",
+    "media/runtime/quiz/vpaid.8eeec37b.js",
+  ]) {
+    assert.ok(!RUNTIME_KEY_RE.test(key), key);
+  }
+});
+
+test("a runtime write is refused for a media key, and sent immutable for a runtime one", async () => {
+  const sent: Request[] = [];
+  const fetchMock = mock.method(globalThis, "fetch", async (input: Request) => {
+    sent.push(input);
+    return new Response(null, { status: 200 });
+  });
+  try {
+    const body = new Uint8Array([1, 2, 3]);
+    await assert.rejects(putRuntimeObject(connect(), KEY, body, "video/mp4"), /not a runtime key/);
+    assert.equal(sent.length, 0);
+
+    await putRuntimeObject(connect(), "runtime/quiz/vpaid.8eeec37b.js", body, "application/javascript");
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].method, "PUT");
+    assert.equal(
+      sent[0].url,
+      `https://${ENV.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/creative-media/runtime/quiz/vpaid.8eeec37b.js`,
+    );
+    assert.equal(sent[0].headers.get("cache-control"), "public, max-age=31536000, immutable");
+    assert.equal(sent[0].headers.get("content-type"), "application/javascript");
+  } finally {
+    fetchMock.mock.restore();
   }
 });

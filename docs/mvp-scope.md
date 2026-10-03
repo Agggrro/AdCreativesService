@@ -134,14 +134,15 @@ Remaining before a true end-to-end demo (needs external setup / assets):
    moved to a public Vercel Blob store
    ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)) and advertiser media to
    Cloudflare R2 behind `media.smithcdn.net`
-   ([ADR-0028](decisions/0028-creative-media-on-r2.md)) — both still free tier, still no
-   paid CDN.
+   ([ADR-0028](decisions/0028-creative-media-on-r2.md)); then the units joined the media
+   on R2 and the ad path moved to a Cloudflare Worker
+   ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)).
 3. **Billing:** recurring Stripe subscriptions with a **7-day trial** for new accounts
    that attach a card. Draft prices: **$2/week** & **$5/month** (single template),
    **$30/month** (Ultimate/all-access). See [billing.md](billing.md).
 4. **VAST cache:** TTL **~60s** + **snapshot republished on the Stripe webhook**.
    Subscription changes take effect within **~2 minutes worst case** — the 60s response
-   cache plus up to 60s of Blob propagation
+   cache plus up to 60s of snapshot propagation (Workers KV since ADR-0029)
    ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md); it was ~1 minute while the
    serving view was read live). Acceptable per product.
 
@@ -149,6 +150,8 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 
 Building and testing the MVP runs on **free tiers ($0)**: GitHub, Next.js/Tailwind/
 Lucide, Google IMA, Supabase Free (DB/Auth/Storage), Stripe test mode, Vercel Hobby.
-**Going commercial** adds ~$20/mo (Vercel Pro — Hobby is non-commercial only) and
-~$25/mo (Supabase Pro, to avoid project sleeping), plus Stripe per-transaction fees.
-See [ADR-0004](decisions/0004-mvp-on-free-tiers.md).
+**Going commercial** moved hosting to Cloudflare Workers Paid ($5/mo plus about $0.30
+per million requests past ten million — [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md))
+instead of Vercel Pro, whose per-invocation pricing sat on the impression path. Still to
+add: ~$25/mo for Supabase Pro, to avoid project sleeping, plus Stripe per-transaction
+fees. See [ADR-0004](decisions/0004-mvp-on-free-tiers.md).

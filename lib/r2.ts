@@ -1,6 +1,9 @@
 import "server-only";
 import { AwsClient } from "aws4fetch";
 import { MEDIA_KEY_RE, MEDIA_MAX_BYTES, mediaExtension, mediaHost } from "@/lib/creative-media";
+import { RUNTIME_KEY_RE } from "@/lib/runtime-keys";
+
+export { RUNTIME_KEY_RE };
 
 /**
  * Cloudflare R2 — the store behind media.smithcdn.net (ADR-0028) — over its S3
@@ -138,4 +141,49 @@ export async function deleteObjects(r: R2, ownerId: string, keys: string[]): Pro
     }),
   );
   return failed;
+}
+
+/**
+ * Runtime objects (ADR-0029) — keys checked against RUNTIME_KEY_RE, which no
+ * media key can match, so nothing here can write over an advertiser's upload
+ * and `deleteObjects` can never reach a unit.
+ *
+ * The year a content-addressed object may be cached: its bytes never change
+ * under its key.
+ */
+const RUNTIME_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+function runtimeObjectUrl(r: R2, key: string): string {
+  if (!RUNTIME_KEY_RE.test(key)) throw new Error("not a runtime key");
+  return `https://${r.accountId}.r2.cloudflarestorage.com/${r.bucket}/${key}`;
+}
+
+/** The size of a runtime object in bytes, or null when there is none. */
+export async function runtimeObjectSize(r: R2, key: string): Promise<number | null> {
+  const res = await r.client.fetch(runtimeObjectUrl(r, key), { method: "HEAD" });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`R2 HEAD ${res.status}`);
+  return Number(res.headers.get("content-length") ?? NaN);
+}
+
+/** Store one runtime object, with the headers R2 will serve it under. */
+export async function putRuntimeObject(
+  r: R2,
+  key: string,
+  body: Uint8Array<ArrayBuffer>,
+  contentType: string,
+): Promise<void> {
+  const res = await r.client.fetch(runtimeObjectUrl(r, key), {
+    method: "PUT",
+    headers: {
+      "content-type": contentType,
+      "cache-control": RUNTIME_CACHE_CONTROL,
+      // R2 serves HTML inline, as a page on the media host. The SIMID document is
+      // only ever served through `/c/s/:token`, which reads the bytes and sends its
+      // own headers; opened directly, it should download rather than run.
+      ...(key.endsWith(".html") ? { "content-disposition": "attachment" } : {}),
+    },
+    body,
+  });
+  if (!res.ok) throw new Error(`R2 PUT ${res.status}`);
 }

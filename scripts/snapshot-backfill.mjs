@@ -22,8 +22,9 @@
  * Reuses the app's own publish functions rather than reimplementing them, via
  * the resolution hooks in scripts/app-imports-hook.mjs.
  *
- * Needs SUPABASE_SERVICE_ROLE_KEY (bypasses RLS to see every row) and, because
- * this runs outside Vercel, BLOB_READ_WRITE_TOKEN. Neither is logged.
+ * Needs SUPABASE_SERVICE_ROLE_KEY (bypasses RLS to see every row), the
+ * SNAPSHOT_KV_* variables (KV is what the ad domain serves from, ADR-0029) and,
+ * while the app still writes it, BLOB_READ_WRITE_TOKEN. None is logged.
  */
 import { createServiceClient } from "@/lib/supabase/service";
 import {
@@ -41,14 +42,19 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_
   );
   process.exit(1);
 }
-if (!process.env.BLOB_READ_WRITE_TOKEN) {
+if (!process.env.SNAPSHOT_KV_API_TOKEN) {
   console.error(
-    "BLOB_READ_WRITE_TOKEN is not set.\n" +
-      "On Vercel the Blob SDK uses OIDC, but this script runs locally and needs the\n" +
-      "static token: Vercel dashboard -> Storage -> your Blob store -> .env.local tab.",
+    "SNAPSHOT_KV_* is not set. KV is the store the ad domain serves from\n" +
+      "(ADR-0029), and a backfill that cannot write it repairs nothing that serves.\n" +
+      "Set CLOUDFLARE_ACCOUNT_ID, SNAPSHOT_KV_NAMESPACE_ID and SNAPSHOT_KV_API_TOKEN\n" +
+      "in .env.local — and BLOB_READ_WRITE_TOKEN while the app still writes Blob.",
   );
   process.exit(1);
 }
+// Said out loud, so a run that skipped a store cannot pass for a full one.
+console.log(
+  `writing to: KV${process.env.BLOB_READ_WRITE_TOKEN ? " + Vercel Blob" : " only (no BLOB_READ_WRITE_TOKEN)"}`,
+);
 
 const arg = process.argv[2];
 const onlyCreativeId = arg && UUID_RE.test(arg) ? arg : null;

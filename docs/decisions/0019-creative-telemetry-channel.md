@@ -35,8 +35,13 @@ window.parent.postMessage({ __creosmith: 1, v: 1, runId, seq, template, name, at
 ```
 
 `CREOSMITH_ORIGIN` is read from `document.currentScript.src` while the unit is still
-executing, and the unit is always served from our own origin
-(`resolveInteractiveUrl`, `lib/storage.ts`). The record goes to both `parent` and `top`,
+executing. Our previews load the unit from the page's own origin (`/c/u/…`,
+`resolveInteractiveUrl(…, { sameOriginUnit: true })` in `lib/storage.ts`), so the record
+reaches the page playing it. *Amended by [ADR-0029](0029-off-vercel-onto-cloudflare-workers.md):*
+a served tag names the unit on the media host instead, so a unit playing from a real tag —
+including one pasted into the validator's `/c/player` — posts to `media.smithcdn.net`,
+which is no page of ours, and nothing is received. That is the channel failing closed,
+and the price of keeping a Worker invocation off every unit load. The record goes to both `parent` and `top`,
 because the unit sits one frame deep in some players and two in others; the receiver
 de-duplicates on `runId` + `seq`.
 

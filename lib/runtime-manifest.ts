@@ -26,24 +26,14 @@ export interface RuntimeAsset {
  * route to fall back to.
  */
 export function runtimeAsset(logicalKey: string): RuntimeAsset | null {
-  return RUNTIME_MANIFEST.assets[logicalKey] ?? null;
+  // Own keys only: a key can reach here from a URL (`/api/preview-unit/…`), and
+  // `constructor` must not resolve to an inherited function.
+  return Object.hasOwn(RUNTIME_MANIFEST.assets, logicalKey)
+    ? RUNTIME_MANIFEST.assets[logicalKey]
+    : null;
 }
 
 /** True once anything has been pushed. Used by the health check and by scripts. */
 export function hasRuntimeManifest(): boolean {
   return Object.keys(RUNTIME_MANIFEST.assets).length > 0;
-}
-
-/**
- * The asset's path within the store (no leading slash), for composing our own
- * URL for it. Null when the key has not been pushed.
- */
-export function runtimeAssetPath(logicalKey: string): string | null {
-  const asset = runtimeAsset(logicalKey);
-  if (!asset) return null;
-  try {
-    return new URL(asset.url).pathname.replace(/^\/+/, "");
-  } catch {
-    return null;
-  }
 }

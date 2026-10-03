@@ -108,10 +108,9 @@ const nextConfig: NextConfig = {
   },
 
   async rewrites() {
-    // Origin of the public blob store, read off the first pushed asset — its
-    // store id is part of the hostname and nothing else knows it. Null before
-    // anything has been pushed, in which case the `/c/u/` rewrite is simply not
-    // registered; nothing resolves to it either.
+    // Origin of the runtime store, read off the first pushed asset — the media
+    // host since ADR-0029. Null before anything has been pushed, in which case
+    // the `/c/u/` rewrite is simply not registered; nothing resolves to it either.
     const first = Object.values(RUNTIME_MANIFEST.assets)[0];
     let assetOrigin: string | null = null;
     if (first) {
@@ -148,13 +147,20 @@ const nextConfig: NextConfig = {
 
     const afterFiles = [...NEUTRAL_PATHS];
     if (assetOrigin) {
-      // The VPAID unit, served from our own host. An external rewrite proxies at
-      // the edge and passes the upstream's headers through, so the object's
-      // year-long immutable cache still applies — this costs a hop inside
-      // Vercel's network, not a function invocation.
+      // A VPAID unit from our own host. Served tags name the unit's media-host
+      // URL directly (ADR-0029); this path is for the configurator's previews,
+      // which load the unit from the page's own origin so the unit's telemetry
+      // can reach it (ADR-0019), and for tags built before the move.
+      //
+      // **Scripts under `runtime/` only.** The store behind the media host also
+      // holds every advertiser's uploads and the SIMID document, so `/c/u/:path*`
+      // would proxy the whole bucket through the app — 25 MB videos on our
+      // transfer, and HTML rendered on the origin that holds the session.
+      // Mirrors RUNTIME_SCRIPT_KEY_RE (lib/runtime-keys.ts), which next.config.ts
+      // cannot import.
       afterFiles.push({
-        source: "/c/u/:path*",
-        destination: `${assetOrigin}/:path*`,
+        source: "/c/u/:path(runtime/(?:[a-z0-9_-]+/)*[a-z0-9_-]+\\.[0-9a-f]{8}\\.js)",
+        destination: `${assetOrigin}/:path`,
       });
     }
 

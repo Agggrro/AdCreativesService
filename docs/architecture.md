@@ -102,36 +102,53 @@ in the wild — **public, unauthenticated, high QPS, latency-sensitive**.
 It answers on both domains, under a neutral public path
 ([ADR-0018](decisions/0018-dedicated-ad-serving-domain.md)): `/v` for the tag, `/t`
 for the beacons, `/r` for clicks ([ADR-0023](decisions/0023-conversion-postbacks.md)),
-`/c/s/…` and `/c/u/…` for the creative assets. `/api/*` still resolves and always
+`/c/s/…` for the SIMID document. `/api/*` still resolves on the app domain and always
 will — tags already pasted into a DSP point there.
 
-On the ad domain (`NEXT_PUBLIC_CDN_URL`), those five paths plus one information page
-are the *only* things that answer; everything else is 404 at the routing layer, and
-no cookie is ever set on that host. The postback endpoint `/pb` is registered on
-every host like the rest but handed out only on the app domain, so the ad domain's
-catch-all keeps answering it 404.
+**The ad domain is a Cloudflare Worker, `creosmith-ads`**
+([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md),
+[`workers/ads/src/index.ts`](../workers/ads/src/index.ts)). It answers the paths above,
+`/c/u/…` (runtime scripts only: a forward to the media host for tags built before units
+moved there) and `robots.txt`; it forwards `/`, `/cdn…`, `/c/player`, `/_next/…` and ACME
+challenges to the app unchanged, GET and HEAD only, and everything else is a 404. No cookie is ever set on that host —
+the Worker strips `Set-Cookie` from anything it forwards — and every answer carries
+HSTS. The postback endpoint `/pb` lives on the app domain only.
 
-The ad domain's DNS is hosted on Cloudflare since
-[ADR-0028](decisions/0028-creative-media-on-r2.md). Its apex records point at Vercel
-**DNS-only**, not proxied: Vercel issues the certificate and must see the viewer's own
-IP (geo for `/r`, rate limits). The one proxied hostname is `media.smithcdn.net`, the R2
-bucket's custom domain for advertiser media — a separate host, so none of the routing
-above applies to it.
+**One implementation, two runtimes.** The handlers are
+[`lib/serving/http/`](../lib/serving/http): functions of `(request, platform)`, where
+the platform supplies the snapshot store, `waitUntil` and the viewer's country. The
+Worker builds its platform from its KV binding, `ctx.waitUntil` and `request.cf`; the
+Next routes in `app/api/{vast,track,click,creative}` are one-line wrappers using Next's
+`after()` and the geo header, and serve `npm run dev` and the legacy `/api/*` paths. A
+VAST document is therefore the same bytes whichever runtime built it —
+`npm run test:vast` pins them, signatures included.
+
+The ad domain's DNS is on Cloudflare since
+[ADR-0028](decisions/0028-creative-media-on-r2.md). The apex records are proxied and a
+Workers Route `smithcdn.net/*` sends every request to the Worker; the zone's origin is
+still Vercel until the app moves (ADR-0029 §4), which is what the forwarded paths reach,
+and **deleting the route is the rollback** — traffic falls straight through to Vercel.
+`media.smithcdn.net` is the R2 bucket's custom domain: advertiser media and, since
+ADR-0029, the VPAID units — a separate host, so none of the routing above applies to it.
 
 Request flow:
 
 1. Parse + validate `creative_id` (and optional `format` override, macros).
-2. Read the serving state from the **CDN snapshots**, not the database
-   ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)): `creative/<creative_id>`
-   for the creative and its template's runtime facts, then
-   `entitlement/<user_id>` for that user's subscription rows. Neither read touches
-   Postgres.
-   - **Fallback:** if the creative snapshot is absent or carries an unrecognised
-     `schema_version`, the endpoint falls back to the `get_creative_serving` RPC
-     (service-role; PostgREST doesn't expose the `private` schema, so a SECURITY
-     DEFINER function in `public` — EXECUTE restricted to `service_role` — is the
-     read path). See [data-model.md](data-model.md). A miss degrades to the previous
-     behaviour, never to a dark ad.
+2. Read the serving state from the **snapshots** in Workers KV, not the database
+   ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md),
+   [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)):
+   `serving/creative/<creative_id>.json` for the creative and its template's runtime
+   facts, then `serving/entitlement/<user_id>.json` for that user's subscription rows.
+   Neither read touches Postgres; each is answered from the data centre's own KV cache
+   for up to 60 s.
+   - **Fallback:** if the creative snapshot is absent, or either document cannot be
+     read (the store did not answer, the body is unparseable, or it carries an
+     unrecognised `schema_version`), the endpoint falls back to the
+     `get_creative_serving` RPC (service-role; PostgREST doesn't expose the `private`
+     schema, so a SECURITY DEFINER function in `public` — EXECUTE restricted to
+     `service_role` — is the read path). See [data-model.md](data-model.md). A miss
+     degrades to the previous behaviour, never to a dark ad. A missing *entitlement*
+     document is not a miss: it is a user who never subscribed, and does not serve.
 3. **Subscription gate:** is there an active subscription covering this creative's
    template (single-template sub for that `template_id`, OR an all-access sub)?
    Evaluated in `lib/serving/entitlement.ts` from the snapshot's facts — including
@@ -149,29 +166,38 @@ Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
   kept fresh by webhooks.
 - **No RLS dependency.** Use a scoped service-role client; never expose the service
   key to the client.
-- **Cache deliberately.** Short-TTL edge cache keyed by `creative_id` (+ format) and
-  the requesting `Origin` (see the CORS rule below), with explicit invalidation when
-  the creative config or subscription status changes.
+- **Cache deliberately.** The Worker keeps each tag 60 s in its data centre's Cache
+  API, keyed on `creative_id` alone — a DSP's cache-buster no longer makes every
+  request a miss — and on the deploy's version, so a new build never serves the old
+  one's document. The body is stored without CORS headers; they are added per request
+  (see the CORS rule below). Players see `Cache-Control: public, max-age=0`: Vercel's CDN
+  passed on a bare `public`, which lets a downstream cache invent a lifetime of its own.
 - **Fail closed.** Any error or ambiguity → empty/fallback VAST, never the payload.
 - **Answer by reason, not uniformly.** A settled "no ad" (unknown id, lapsed
-  subscription, archived creative) is a 200 with empty VAST and the full
-  `s-maxage=60` — it is correct and stable. A failure to read our own state is a
-  **503**, and successful responses carry `stale-if-error=300`, so the CDN hands the
-  player the last good document instead of an empty one. Both used to be an empty
-  200, which made a one-second blip indistinguishable from "no ad" and cached it as
-  a valid answer for a full minute on every PoP that missed during it.
+  subscription, archived creative) is a 200 with empty VAST, cached the full 60 s — it
+  is correct and stable. A failure to read our own state is a **503**, and the player
+  is handed the last good document instead of an empty one: the Worker keeps every
+  good answer for a further five minutes under a second cache key (the Cache API has
+  no `stale-if-error`, so this is that directive rebuilt), and a 503 is never stored.
+  The Postgres fallback is bounded at 2.5 s, so a database that is slow rather than down
+  still ends in that 503 while the player waits; and while the last good copy is being
+  served it is also the fresh copy for ten seconds, so an outage is retried every ten
+  seconds per data centre, not on every request. The SIMID token inside a tag lives ten
+  minutes for the same reason: a tag can be handed out six minutes old.
+  Both used to be an empty 200, which made a one-second blip indistinguishable from
+  "no ad" and cached it as a valid answer for a full minute on every PoP that missed
+  during it.
 - **CORS by the VAST 4.2 rule, with `Vary: Origin`.** The tag is read cross-origin by
   players on publishers' pages, and some fetch it with credentials — the player's
   choice, not ours. VAST 4.2 requires the request's `Origin` echoed with
   `Access-Control-Allow-Credentials: true`, and `*` only when `Origin` is null or absent;
   a bare `*` fails every credentialed player (`lib/vast/cors.ts`,
   [ADR-0026](decisions/0026-vast-cors-credentialed-requests.md)). `Vary: Origin` is on
-  every response so the CDN keeps a copy per origin — the cache sharding ADR-0018 had
-  avoided by sending `*`, and paid for in players that could not read the tag. The
-  handler is the only source of these headers; `next.config.ts` sets `*` for `/t` and
-  `/c/…` only.
-- **No database write on the beacon path.** `GET /api/track` hands its insert to
-  `waitUntil` and returns 204 immediately — up to seven beacons fire per impression.
+  every response so a shared cache downstream keeps a copy per origin. The handler is
+  the only source of these headers, on a cache hit as on a miss; `next.config.ts` and
+  the Worker set `*` for `/t` and `/c/…` only.
+- **No database write on the beacon path.** `/t` hands its counter upsert to
+  `waitUntil` and returns 204 immediately.
 
 ### Click redirect `GET /r` and postbacks `GET|POST /pb`
 
@@ -186,7 +212,7 @@ Conversion attribution, the way trackers do it
   other scheme passes through untracked. The units open what they are handed, so no
   template changed. The preview context sets `click_fields: []`: previews are never
   tracked.
-- **`/r` (`app/api/click/route.ts`)** reads the destination from the creative's own
+- **`/r` (`lib/serving/http/click.ts`)** reads the destination from the creative's own
   config (snapshot first, `get_creative_serving` on a miss) by field name, then checks the
   signature against that creative's current owner — forged, missing, minted for another
   owner or more than a week past expiry is a `404`, which is what keeps it from being a
@@ -379,27 +405,36 @@ into static assets). This is the protection model — see
 [ADR-0003](decisions/0003-access-control-over-code-hiding.md), whose domain/referer
 allow-listing layer was dropped as never-implemented.
 
-**Hosting: a public Vercel Blob store, content-addressed**
-([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)). `npm run runtime:push`
-hashes each built file, uploads it as `runtime/<template>/<file>.<sha256[0..8]>.js`
-with a year-long cache, and writes the committed `runtime/manifest.ts` that maps
-logical `runtime_keys` to real URLs. The app imports that manifest at build time, so
-resolving a unit URL costs no network call.
+**Hosting: R2, content-addressed, on the media host**
+([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md),
+[ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)). `npm run runtime:push`
+hashes each built file, uploads it to the `creative-media` bucket as
+`runtime/<template>/<file>.<sha256[0..8]>.js` with a year-long immutable cache, and
+writes the committed `runtime/manifest.ts` that maps logical `runtime_keys` to
+`https://media.smithcdn.net/runtime/…`. The app and the ad Worker import that manifest
+at build time, so resolving a unit URL costs no network call. Runtime keys
+(`lib/runtime-keys.ts`) and advertiser media keys (`{uuid}/{uuid}.{ext}`) cannot match
+each other, so nothing that writes or deletes one can reach the other. Units moved there
+from a public Vercel Blob store in ADR-0029, superseded hashes included
+(`npm run runtime:migrate`).
 
 The two formats then diverge, and not symmetrically:
 
-- **VPAID goes straight to the CDN.** `<MediaFile>` carries the public hashed URL,
-  so the player fetches it with no function in the path and a stable cache key. The
-  previous scheme put a 120s token in the URL, which changed every minute — meaning
-  nearly every asset fetch was a cache miss *and* a Supabase download.
-- **SIMID keeps a proxy route,** because it cannot be served directly by anyone.
-  Vercel Blob sets `content-disposition: attachment` on HTML ("prevents hosting HTML
-  pages", per its docs) and Supabase Storage forces `.html` to `text/plain` with a
-  script-blocking `Content-Security-Policy: sandbox`. Either way a player's iframe
-  will not run the document: the video plays (it's a plain `<MediaFile>`, unaffected)
-  but the interactive overlay's script never runs. `GET /api/creative/simid/[token]`
-  fetches the bytes and re-serves them as `text/html` with a permissive-but-scoped
-  CSP.
+- **VPAID goes straight to the CDN.** `<MediaFile>` carries the public hashed URL on
+  the media host, so the player fetches it from Cloudflare's cache with nothing of ours
+  in the path and a stable cache key. The previous scheme put a 120s token in the URL,
+  which changed every minute — meaning nearly every asset fetch was a cache miss *and*
+  a Supabase download.
+- **SIMID keeps a proxy route,** for its headers and its token. The stores it lived in
+  before would not serve HTML an iframe can run — Vercel Blob set
+  `content-disposition: attachment` on it ("prevents hosting HTML pages", per its docs),
+  Supabase Storage forces `.html` to `text/plain` with a script-blocking
+  `Content-Security-Policy: sandbox` — and in a player that means the video plays (it's a
+  plain `<MediaFile>`, unaffected) while the interactive overlay's script never runs. R2
+  serves HTML inline but bare, so new copies there are stored as attachments and the
+  media host's `.html` responses carry `Content-Security-Policy: sandbox`. `/c/s/:token`
+  ([`lib/serving/http/interactive.ts`](../lib/serving/http/interactive.ts)) fetches the
+  bytes and re-serves them as `text/html` with a permissive-but-scoped CSP.
 
 `lib/runtime-bytes.ts` falls back to the Supabase `creatives` bucket for any logical
 key not yet in the manifest, which is what let this ship before the public store
@@ -453,16 +488,16 @@ discovering that externally hosted media routinely breaks via hotlink protection
 
 | Concern | Runtime | Why |
 | --- | --- | --- |
-| Dashboard / auth pages | Node (Vercel) | Rich, low QPS |
-| `GET /api/vast` | Node + CDN cache (`s-maxage=60`) | Reads CDN snapshots, not Postgres, and mints asset URLs locally — no Supabase call on this path at all ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)). Node only for the `node:crypto` HMAC; edge needs those helpers ported to Web Crypto first, and is the natural next optimization. |
-| VPAID unit | Public Vercel Blob (CDN, 1y immutable) | Content-addressed URL straight in `<MediaFile>` — no function at all ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)) |
+| Dashboard / auth pages | Node (Vercel) | Rich, low QPS. Moving to a Worker through OpenNext ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) §2) |
+| `GET /v`, `/t`, `/r`, `/c/s/:token` on the ad domain | Cloudflare Worker `creosmith-ads` (`nodejs_compat`), tag in the Cache API for 60 s | The impression path: about a millisecond of CPU per request, billed per request rather than per function invocation. Reads KV snapshots, not Postgres, and mints asset URLs locally — no Supabase call to build a tag ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md), [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
+| `GET /api/vast` (legacy, app domain) | Node + CDN cache (`s-maxage=60`) | The same handler as the Worker's, through a Next route; also what `npm run dev` serves |
+| VPAID unit | R2 + Cloudflare CDN at `media.smithcdn.net` (1y immutable) | Content-addressed URL straight in `<MediaFile>` — nothing of ours in the path ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md), ADR-0029) |
 | Advertiser media | Cloudflare R2 + Cloudflare CDN at `media.smithcdn.net` (1 day, Smart Tiered Cache) | The heaviest bytes on the ad path — two looping videos are ~7 MB an impression — so they live where egress is free at any volume and no Vercel or Supabase quota is spent on them ([ADR-0028](decisions/0028-creative-media-on-r2.md)) |
-| `GET /api/creative/unit/[token]` | Node | Fallback only, for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
-| Serving snapshots | Vercel Blob (private), 60s cache | Written by the creative writers and the Stripe webhook; read by `/api/vast`. Private because keys derive from `creative_id`, which is public in every tag URL. |
-| `GET /r` → `/api/click` | Node | The click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)): `node:crypto` for the link signature and the click id, and the service-role `record_click()` in `waitUntil` — the 302 never waits on Postgres. Excluded from the middleware matcher |
+| `GET /api/creative/unit/[token]` | Node | Fallback only, for a logical key not yet in `runtime/manifest.ts`; app domain only. Removable once every template has been pushed |
+| Serving snapshots | Workers KV `creosmith-snapshots`, 60 s edge cache | Written by the creative writers and the Stripe webhook (through the REST API while the app is on Vercel, which also still writes its private Blob store); read by the ad Worker through its binding. KV has no public URL, which matters because keys derive from `creative_id`, public in every tag ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
+| `GET /r` | Ad Worker (`/api/click`: Node, app domain) | The click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)): `node:crypto` for the link signature and the click id, and the service-role `record_click()` in `waitUntil` — the 302 never waits on Postgres. Excluded from the middleware matcher |
 | `GET\|POST /pb` → `/api/postback` | Node | S2S postbacks from partner networks. Awaits `record_postback()`, because the network needs to know whether it landed — a 5xx is what makes it retry. Excluded from the middleware matcher |
 | `POST /api/stripe/webhook` | Node | Needs raw body for signature verification |
-| `GET /api/creative/simid/[token]` | Node | Service-role Storage download; must be Node for supabase-js storage support, same as `/api/vast` |
+| `GET /c/s/:token` → `/api/creative/simid/[token]` | Ad Worker (Node route on the app domain) | Re-serves the SIMID document from the media host with headers an iframe will run; the Supabase `creatives` bucket only for a key not in the manifest |
 | `/api/tools/vast/*` | Node | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). Node is required, not incidental: the SSRF guard installs its own `lookup` on the socket via `node:http`/`node:dns`, which has no edge equivalent. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |
-| Creative runtime assets | Supabase Storage (free tier, CDN) | Static-ish, signed URLs, geo-distributed |
 | `/api/dev/*`, `/dev/harness` | Node, **loopback only** | Developer surfaces: a password-less sign-in for a local test account, and a unit served off local `runtime/dist/` so the harness shows the working copy rather than the published object. Kept off the network by the *listener* — `npm run dev` binds `127.0.0.1` — with [`lib/dev-only.ts`](../lib/dev-only.ts) (not production, not Vercel, loopback headers) as a second lock that answers 404. See [security.md](security.md) for why the header check alone would not be enough |

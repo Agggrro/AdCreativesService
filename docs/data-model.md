@@ -243,8 +243,8 @@ bucket that took over the advertiser media:
 
 | Bucket | Access | Holds | Notes |
 | --- | --- | --- | --- |
-| `creatives` | **Private** — fallback only | Runtime SIMID/VPAID units (code) | No longer the primary home: the runtime lives in a public, content-addressed Vercel Blob store ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md)), and this bucket is read only by `lib/runtime-bytes.ts` for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
-| R2 `creative-media` (Cloudflare) | **Public-read**, served at `media.smithcdn.net` | Advertiser-uploaded images/gifs/video for `"image"`-typed config fields — every upload since [ADR-0028](decisions/0028-creative-media-on-r2.md) | Public because the URL is baked into `<AdParameters>` and must keep resolving for the creative's lifetime. Not in `schema.sql`: there is no RLS in R2. The browser uploads with a presigned PUT that signs type and size; deletes go through `deleteCreative` with the server's bucket-scoped key, guarded in `lib/r2.ts` by the owner's `{userId}/` prefix and the exact key shape (`MEDIA_KEY_RE`). Cached for a day at the edge and in browsers, so a deleted creative's files stop being served within a day |
+| `creatives` | **Private** — fallback only | Runtime SIMID/VPAID units (code) | No longer the primary home: the runtime lives content-addressed under `runtime/` in the R2 `creative-media` bucket ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md), [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)), and this bucket is read only by `lib/runtime-bytes.ts` for a logical key not yet in `runtime/manifest.ts`. Removable once every template has been pushed |
+| R2 `creative-media` (Cloudflare) | **Public-read**, served at `media.smithcdn.net` | Advertiser-uploaded images/gifs/video for `"image"`-typed config fields — every upload since [ADR-0028](decisions/0028-creative-media-on-r2.md) — and, under `runtime/`, the content-addressed creative units ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)), which no media key can name | Public because the URL is baked into `<AdParameters>` and must keep resolving for the creative's lifetime. Not in `schema.sql`: there is no RLS in R2. The browser uploads with a presigned PUT that signs type and size; deletes go through `deleteCreative` with the server's bucket-scoped key, guarded in `lib/r2.ts` by the owner's `{userId}/` prefix and the exact key shape (`MEDIA_KEY_RE`). Cached for a day at the edge and in browsers, so a deleted creative's files stop being served within a day |
 | Supabase `creative-media` | **Public-read** | The same media, uploaded before ADR-0028 or on a deployment without the R2 variables | Created declaratively in `supabase/schema.sql`. Uploads go straight from the browser, RLS-gated to the uploader's own `{auth.uid()}/...` path prefix ([ADR-0010](decisions/0010-advertiser-media-uploads.md)). `npm run media:migrate` copies what a creative references to R2 and repoints its config; the objects stay here as the rollback |
 
 A media URL in `config_json` is ours when `parseOwnMediaUrl()` (`lib/creative-media.ts`)
@@ -258,8 +258,12 @@ replaced file stays behind as an orphan.
 ## Serving snapshots (outside Postgres)
 
 The ad-serving path does not read any of the above at request time. It reads two JSON
-documents in a **private** Vercel Blob store, republished by the writers that change
-the underlying rows ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md)):
+documents in the Workers KV namespace `creosmith-snapshots` — which has no public URL —
+republished by the writers that change the underlying rows
+([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md),
+[ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)). While the app still
+runs on Vercel, every write also lands in the private Vercel Blob store the documents
+lived in before, and a write counts only when both stores took it:
 
 | Key | Projection of | Republished by |
 | --- | --- | --- |

@@ -78,7 +78,8 @@ export async function GET(
     // canonical URL — it is fetched by third-party players, not same-origin.)
     const siteUrl = getRequestOrigin(request);
 
-    const interactiveUrl = resolveInteractiveUrl(serving, siteUrl);
+    // Same-origin unit, so its telemetry reaches the page playing it (ADR-0019).
+    const interactiveUrl = resolveInteractiveUrl(serving, siteUrl, { sameOriginUnit: true });
     if (!interactiveUrl) return vastResponse(emptyVast(), request);
 
     const config = parseCreativeConfig(payload.cfg);

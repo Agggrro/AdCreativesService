@@ -21,7 +21,10 @@ we push after a case is built and verified locally).
 - **Styling/UI:** Tailwind CSS, Lucide React
 - **DB + Auth:** Supabase (PostgreSQL, RLS)
 - **Billing:** Stripe (webhooks are the source of truth)
-- **Hosting:** Vercel
+- **Hosting:** Cloudflare Workers — `creosmith-ads` serves the ad domain
+  (`workers/ads`); the app is moving there from Vercel through OpenNext
+  ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md))
+- **Serving snapshots:** Workers KV (`creosmith-snapshots`)
 - **Advertiser media:** Cloudflare R2 behind `media.smithcdn.net` ([ADR-0028](docs/decisions/0028-creative-media-on-r2.md))
 
 ## Non-negotiable AdTech rules
@@ -42,6 +45,10 @@ bug even if the code "works". Details in [docs/adtech-standards.md](docs/adtech-
    - **Never call Stripe on this path.** Subscription state is denormalized and
      refreshed via Stripe webhooks.
    - Prefer edge runtime + short-TTL cache with explicit invalidation.
+   - **The ad domain is a Worker running the app's own handlers.** `workers/ads` routes
+     to `lib/serving/http/`, the same modules the Next routes wrap — change the handler,
+     never a copy, and `npm run test:vast` pins the bytes both runtimes emit
+     ([ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)).
    - **CORS is the VAST 4.2 rule:** echo the `Origin` with
      `Access-Control-Allow-Credentials: true` — `*` only for a request with no origin —
      plus `Vary: Origin`, all through `lib/vast/cors.ts` and pinned by `npm run test:cors`.
@@ -103,7 +110,17 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
   `config_schema`, or the runtime build — run the **`creative-check`** skill. It is
   mandatory: a template is verified by running it in `/dev/harness`, never by reasoning
   that it should work.
-- After writing/changing VAST/SIMID/VPAID output → **`vast-spec-reviewer`** subagent.
+- After writing/changing VAST/SIMID/VPAID output → **`vast-spec-reviewer`** subagent, and
+  `npm run test:vast` — the golden documents and signatures in `lib/vast/__golden__/`.
+  Rewrite them (`UPDATE_GOLDEN=1`) only for a change you meant, after reading the diff.
+- After changing the ad path's handlers (`lib/serving/http/`) or the ad Worker
+  (`workers/ads`) → `npm run test:vast`, `npm run test:ads` (the Worker's cache, last-good
+  copy, forwards and headers, against fakes), `npm run test:cors`, and a dry-run bundle
+  (`npx wrangler deploy -c workers/ads/wrangler.jsonc --dry-run --outdir <tmp>`): an
+  import that only resolves under Next fails there, not in production.
+- After changing the snapshot store (`lib/serving/store*.ts`, `lib/serving/kv.ts`) →
+  `npm run test:snapshots`. A failed read must stay distinguishable from a missing
+  document; the serving path depends on it.
 - After changing the VAST **inspection** rules (`lib/vast-inspect/`) → `npm run check:vast`
   against a running dev server. It pins the fixture corpus and the dry-run guarantee;
   a false positive on a conformant tag is as much a defect as a missed violation.
@@ -179,7 +196,8 @@ in Chrome** for those, which drives the user's real browser with its real extens
 - Validate all external input (VAST query params, Stripe webhook signatures).
 - Conventional Commits. Push to GitHub only after a case is built **and verified locally**.
 - **Trunk-based: commit straight to `main`.** There are no feature branches and no PR
-  review step in this pipeline — a push to `main` is what Vercel deploys to production, so
+  review step in this pipeline — a push to `main` is what deploys to production (Vercel
+  builds the app; CI deploys the ad Worker once every gate has passed), so
   "ship it" means commit to `main` and push. Local verification is the gate that replaces
   the review, which is why the quality gates above are not optional. Do not create a
   branch unless explicitly asked for one.

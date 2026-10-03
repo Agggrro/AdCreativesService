@@ -1,6 +1,6 @@
 import type { CreativeServing } from "@/types/database.types";
 import { signInteractiveToken } from "./vast/interactive-token";
-import { runtimeAssetPath } from "./runtime-manifest";
+import { runtimeAsset } from "./runtime-manifest";
 
 /** Bucket holding the interactive runtime assets (SIMID docs / VPAID units). */
 export const CREATIVES_BUCKET = "creatives";
@@ -31,30 +31,43 @@ const PROXY_ROUTE = {
  *
  * The two formats end up in different places, for reasons that are not symmetric:
  *
- * **VPAID → a public, content-addressed CDN URL** from `runtime/manifest.ts`
- * (ADR-0017). The unit is `.js` loaded via `<script src>`, so it can be served
- * straight off Vercel's CDN with a year-long cache and never touch a function.
- * The previous scheme put a 120s token in the path, which meant the URL changed
- * every minute — every change a cache miss and a function invocation on the ad
- * path. What is given up is that 120s window on a file which, by ADR-0003, was
- * never secret: the advertiser's config rides in the VAST `<AdParameters>`, not
- * in the unit, so a lapsed subscription still yields an empty VAST and a saved
- * URL only ever returns an anonymous template.
+ * **VPAID → a public, content-addressed URL** from `runtime/manifest.ts`
+ * (ADR-0017): an R2 object on the media host (ADR-0029). The unit is `.js`
+ * loaded via `<script src>`, so it is served straight off Cloudflare's cache
+ * with a year-long lifetime and nothing of ours wakes up for it. The previous
+ * scheme put a 120s token in the path, which meant the URL changed every
+ * minute — every change a cache miss and a function invocation on the ad path.
+ * What is given up is that 120s window on a file which, by ADR-0003, was never
+ * secret: the advertiser's config rides in the VAST `<AdParameters>`, not in the
+ * unit, so a lapsed subscription still yields an empty VAST and a saved URL only
+ * ever returns an anonymous template.
  *
- * **SIMID → still our proxy route**, because it cannot be otherwise. Vercel Blob
- * sets `content-disposition: attachment` on HTML (its docs say this "prevents
- * hosting HTML pages"), and Supabase Storage forces `.html` to `text/plain` with
- * a script-blocking `Content-Security-Policy: sandbox`. Either way a player's
- * iframe will not run the document, so `/api/creative/simid/[token]` re-serves
- * the bytes with headers that work.
+ * **SIMID → still our proxy route.** The document needs headers of our own — a
+ * CSP that lets its inline script run and scopes everything else — and a
+ * per-request token (ADR-0003). Vercel Blob and Supabase Storage would not serve
+ * it runnable at all; R2 serves it inline but bare, and the copy there is stored
+ * as an attachment. `/c/s/:token` re-serves the bytes with the headers that work
+ * (lib/serving/http/interactive.ts).
  *
  * Falls back to the proxy route for VPAID when the manifest has no entry — the
  * normal state of a checkout that has never run `npm run runtime:push`, and the
  * reason this change can ship before the public store exists.
  */
+export interface InteractiveUrlOptions {
+  /**
+   * Load a pushed VPAID unit from `origin` — `/c/u/…`, a rewrite to the same
+   * object — instead of from the media host. For our own previews only: a unit
+   * posts its telemetry to the origin its script came from (ADR-0019), and on
+   * the media host that is no page of ours, so the configurator's players would
+   * hear nothing. A served tag never sets this.
+   */
+  sameOriginUnit?: boolean;
+}
+
 export function resolveInteractiveUrl(
   serving: CreativeServing,
   origin: string,
+  options: InteractiveUrlOptions = {},
 ): string | null {
   const keys = serving.runtime_keys;
   if (!keys || typeof keys !== "object" || Array.isArray(keys)) return null;
@@ -66,14 +79,19 @@ export function resolveInteractiveUrl(
   if (format !== "simid" && format !== "vpaid") return null;
 
   if (format === "vpaid") {
-    const assetPath = runtimeAssetPath(path);
-    if (assetPath) {
-      // Our own host, not the blob store's. `/c/u/:path*` is an edge rewrite to
-      // the store (next.config.ts) — no function wakes, nothing reads Supabase,
-      // and the year-long cache on the content-addressed object still applies.
-      // What it buys is one domain in the tag: a customer's ad ops whitelists
-      // one hostname instead of ours plus `*.public.blob.vercel-storage.com`.
-      return `${origin.replace(/\/+$/, "")}/c/u/${assetPath}`;
+    const asset = runtimeAsset(path);
+    if (asset) {
+      if (options.sameOriginUnit) {
+        const key = new URL(asset.url).pathname.replace(/^\/+/, "");
+        return `${origin.replace(/\/+$/, "")}/c/u/${key}`;
+      }
+      // The object's own URL, on the media host. It used to be our ad host's
+      // `/c/u/…`, an edge rewrite to the Blob store that woke nothing on Vercel;
+      // on Workers that path would be an invocation per unit load (ADR-0029).
+      // The media host is already in every tag that carries an upload; for one
+      // that does not, it is a second hostname — a publisher whose CSP names
+      // only `smithcdn.net` must allow `media.smithcdn.net` too.
+      return asset.url;
     }
     // else: fall through to the proxy, which still reads from Supabase Storage.
   }

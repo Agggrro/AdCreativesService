@@ -12,12 +12,19 @@ import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
  * A creative that saves successfully but never reaches the CDN is a worse
  * failure than a slower read, so the shipped implementation is Vercel Blob.
  *
+ * Since ADR-0029 the store is Workers KV (`store-kv.ts`); the Blob store stays
+ * only for the deployment the app is leaving, which writes both.
+ *
  * Contract, and it differs by direction on purpose:
  *
- *   - **Reads fail soft.** Any problem — missing object, unreadable body,
- *     unknown schema version — returns `null`, and the caller falls back to
- *     Postgres. A snapshot miss must degrade to today's behaviour, never to a
- *     dark ad.
+ *   - **Reads tell a miss from a failure.** `null` means there is no such
+ *     document. A read that could not be answered — the store did not respond,
+ *     or the document is unusable (unparseable, or a schema version this build
+ *     does not know) — throws {@link SnapshotReadError}. For a creative both end
+ *     in the Postgres fallback. For entitlement they must not: no document is a
+ *     user who never subscribed, while a failed read is "we do not know". Before
+ *     ADR-0029 both came back as `null`, so one failed read served an empty ad
+ *     that the CDN then kept for a minute.
  *   - **Writes fail hard.** `put*`/`delete*` throw, so the caller can refuse to
  *     report success. A writer that swallows a failed publish leaves the CDN
  *     serving stale entitlement, which is the one thing this design must not do.
@@ -29,13 +36,27 @@ export interface SnapshotStore {
 
   putEntitlement(snapshot: EntitlementSnapshot): Promise<void>;
   /**
-   * Used as a fail-safe, not as part of normal operation: dropping the document
-   * forces the serving path back to Postgres, which is slower but correct. The
-   * Stripe webhook reaches for this when a republish fails, so a finite number
-   * of retries cannot leave stale entitlement serving forever.
+   * Used as a fail-safe, not as part of normal operation. Dropping the document
+   * **fails closed**: with no entitlement document the serving path treats the
+   * user as unsubscribed, so their tags serve empty until the next successful
+   * publish — it does not read Postgres for them. The Stripe webhook reaches for
+   * this when a republish fails, so a finite number of retries cannot leave
+   * stale entitlement serving forever; the price is that a *new* subscription
+   * whose publish failed stays dark until a retry or a backfill lands it.
    */
   deleteEntitlement(userId: string): Promise<void>;
   getEntitlement(userId: string): Promise<EntitlementSnapshot | null>;
+}
+
+/**
+ * A snapshot read that could not be answered — as opposed to a document that
+ * does not exist, which is `null`. See the contract above.
+ */
+export class SnapshotReadError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "SnapshotReadError";
+  }
 }
 
 /**
@@ -48,6 +69,10 @@ export interface SnapshotStore {
  * worst case ~2 min rather than the ~1 min in docs/mvp-scope.md. That is a real
  * change and it is written down in docs/billing.md and ADR-0015 rather than
  * left for someone to discover.
+ *
+ * On Workers KV (ADR-0029) the same number is the binding's `cacheTtl`: how long
+ * a data centre may answer a read — a miss included — from its own cache before
+ * it asks again. The budget does not move.
  */
 export const SNAPSHOT_CACHE_SECONDS = 60;
 

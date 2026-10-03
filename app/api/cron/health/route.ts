@@ -93,7 +93,9 @@ export async function GET(request: Request): Promise<Response> {
     if (!health.healthy) {
       console.error(`${LOG_PREFIX} DRIFT — ${summary}`, {
         missingCreatives: health.creatives.missing,
+        staleCreatives: health.creatives.stale,
         missingEntitlements: health.entitlements.missing,
+        staleEntitlements: health.entitlements.stale,
       });
       return Response.json(health, { status: 503 });
     }

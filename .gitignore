@@ -53,3 +53,7 @@ Thumbs.db
 .claude/settings.local.json
 
 certificates
+
+# Cloudflare Workers local state and local secrets (ADR-0029)
+.wrangler/
+.dev.vars*

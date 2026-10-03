@@ -1,12 +1,12 @@
 # Creative runtime assets
 
 The interactive units served inside the VAST creative. **Source** lives here; the
-**built** output (`npm run build:runtime` → `runtime/dist/**`) is uploaded to a
-**public, content-addressed Vercel Blob store** and recorded in `runtime/manifest.ts`
-([ADR-0017](../docs/decisions/0017-runtime-assets-on-public-cdn.md)). VPAID units are
-then fetched straight off the CDN by the player; the SIMID document still goes through
-`/api/creative/simid/[token]`, because no object store will serve HTML as a runnable
-document.
+**built** output (`npm run build:runtime` → `runtime/dist/**`) is uploaded,
+**content-addressed**, to the R2 bucket behind `media.smithcdn.net` and recorded in
+`runtime/manifest.ts` ([ADR-0017](../docs/decisions/0017-runtime-assets-on-public-cdn.md),
+[ADR-0029](../docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)). VPAID units are
+then fetched straight off Cloudflare's cache by the player; the SIMID document still goes
+through `/c/s/:token`, which gives it the CSP it runs under and a per-request token.
 
 ## Layout
 
@@ -72,25 +72,33 @@ CDN is not the logical key: it carries a content hash
 
 ## Setup
 
-1. Create a Vercel Blob store with access **Public** and connect it to the project.
-   Public because the player fetches the VPAID unit straight off the CDN with no
-   function in the path. This is a *different* store from the private one holding the
-   serving snapshots — Blob allows 100 stores even on Hobby, and its docs recommend
-   separating public from private content.
-2. Put its read/write token in `.env.local` as `RUNTIME_BLOB_READ_WRITE_TOKEN`.
+1. The units live in the R2 bucket that holds advertiser media (`creative-media`),
+   under `runtime/` — public, because the player fetches the VPAID unit straight off
+   the CDN with nothing of ours in the path. A runtime key
+   (`runtime/<path>.<sha8>.<js|html>`, `lib/runtime-keys.ts`) and a media key
+   (`{uuid}/{uuid}.{ext}`) can never match each other, so media deletes cannot reach a
+   unit and the push cannot overwrite an upload. **`runtime/` is locked** by an R2 bucket
+   lock rule (`runtime-immutable`, indefinite): no key can overwrite or delete a unit
+   once it is there — the app's own key included, which is the point (ADR-0029).
+2. `.env.local` needs the R2 variables (`R2_*`, `NEXT_PUBLIC_MEDIA_URL`) — the same
+   bucket-scoped token the media uploads use.
 3. Run `npm run build:runtime`, then `npm run runtime:push`. The push hashes each
-   built file, uploads it under a content-addressed key, and writes
-   `runtime/manifest.ts`. `npm run runtime:push quiz` pushes a single template and
-   updates only its manifest entry. `build:runtime` wipes `dist/` first, so a unit
-   whose key moves (as `shoppable`'s once did) cannot leave a phantom object behind.
-4. **Commit `runtime/manifest.ts`.** The app imports it at build time, so an
-   unpushed commit means the deployed app still points at the previous URLs.
+   built file, uploads it under a content-addressed key with a year-long immutable
+   cache, and writes `runtime/manifest.ts`. A key already there is not re-uploaded —
+   the lock would refuse it — but its served bytes are checked against the hash, and a
+   mismatch stops the push.
+   `npm run runtime:push quiz` pushes a single template and updates only its manifest
+   entry. `build:runtime` wipes `dist/` first, so a unit whose key moves (as
+   `shoppable`'s once did) cannot leave a phantom object behind.
+4. **Commit `runtime/manifest.ts`.** The app *and the ad Worker* import it at build
+   time, so an unpushed commit means both still point at the previous URLs — which
+   keep working, since no hash is ever deleted.
 5. Apply [`../supabase/schema.sql`](../supabase/schema.sql) then
    [`../supabase/seed.sql`](../supabase/seed.sql) — `npm run db:schema` and
    `npm run db:seed`. Both files are idempotent full-applies, so re-running the seed
    *is* how a template change ships; there is no migrations directory.
 
-Commands read `.env.local`. `runtime:push` needs `RUNTIME_BLOB_READ_WRITE_TOKEN`; the
+Commands read `.env.local`. `runtime:push` needs the R2 variables; the
 `db:*` commands need `DATABASE_URL`, which nothing else uses — see
 [`.env.example`](../.env.example).
 

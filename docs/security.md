@@ -13,8 +13,9 @@
 | `GET /api/vast/preview/[token]` | Third-party player SDKs (Google IMA, Fluid Player), fetched with no session | Public by necessity; self-authorizing via HMAC signature + 120s expiry, **fail closed** like `/api/vast` |
 | `/c/player` (browser) | Whoever pastes a tag into the validator — the creative it names is executed here | Runs `VpaidMode.INSECURE` on an **isolated origin** with no session, no storage and no API of ours; fails closed when none is configured (ADR-0021) |
 | `POST /api/stripe/webhook` | Stripe | Signature-verified; treat unsigned/invalid as hostile |
-| Creative runtime assets, via `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 120s token that names one Storage path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
-| Serving snapshots (Vercel Blob) | Read only by our own functions, never by a player | **Private store, not public.** Keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md) |
+| Creative runtime assets, via `/c/s/:token` on the ad Worker and `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 10-minute token that names one runtime path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
+| The ad domain (`creosmith-ads` Worker) | The open internet, on every path of `smithcdn.net` | Answers the ad paths through the same handlers as the app, 404s everything else, and **forwards only** `/`, `/cdn…`, `/c/player`, `/_next/…` and ACME challenges to the app, GET and HEAD only — so no dashboard, auth or API route, and no server action, is reachable on the ad domain. `Set-Cookie` is stripped from every response; the zone adds none after it, because Bot Fight Mode, Browser Integrity Check and challenges stay off on this zone. `/c/u/…` forwards only a content-addressed runtime **script** (`RUNTIME_SCRIPT_KEY_RE`) to the media host — never an advertiser's object, never the SIMID document, never an arbitrary path. The app's own `/c/u/` rewrite (`next.config.ts`) is held to the same pattern. See [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
+| Serving snapshots (Workers KV) | Read only by the ad Worker's binding, never by a player | **No public URL exists for KV**: a document is readable only through a binding or an API token. That property matters because keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. Until the app leaves Vercel it also writes the private Blob store it used before. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md), [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
 | `GET /r` (click redirect) | A viewer's browser leaving an ad, from a link anyone holding the tag could have fetched | Public by necessity. The destination is read from the creative's own config by field name, never from the request, **and only a genuine signature minted by `/v` gets a redirect** — forged, missing or week-old links are 404, so no account can use the ad domain as a redirect to what it configured. See "Click redirect and postbacks" below |
 | `GET\|POST /pb` (postback) | A partner network's server | Authenticated only by the account's postback key in the URL; a wrong key writes nothing. See "Click redirect and postbacks" below |
@@ -27,8 +28,9 @@
 
 - `SUPABASE_SERVICE_ROLE_KEY` — **server-only**, full DB power, bypasses RLS. Must
   never reach the client bundle or any `NEXT_PUBLIC_*` var. Used only on: the serving
-  read (`/api/vast`) and its Storage fallback for a unit not yet in the manifest
-  (`lib/runtime-bytes.ts`); the beacon, click and postback writes; the Stripe webhook
+  read (`/v`, in the ad Worker and the Next route alike) and its Storage fallback for a
+  unit not yet in the manifest (`lib/runtime-bytes.ts`); the beacon, click and postback
+  writes; the Stripe webhook
   write path; serving-snapshot publishing and its health check (`lib/serving/publish.ts`,
   `lib/serving/health.ts`, `/api/cron/health`, `scripts/snapshot-backfill.mjs`); the
   one-off media move to R2, which reads every creative and rewrites the config of each
@@ -39,23 +41,48 @@
 - `PREVIEW_TOKEN_SECRET` — server-only. Signs the short-TTL live-preview tokens
   (`lib/vast/preview-token.ts`). Independent of the Supabase/Stripe secrets above —
   never derive one from another.
-- `TRACK_TOKEN_SECRET` — server-only, optional. Signs tracking-beacon URLs
-  (`lib/track-token.ts`). Until it's set, beacon signing derives a key from
-  `PREVIEW_TOKEN_SECRET` via HMAC domain separation (a label-keyed KDF, not
-  secret reuse) so this shipped without a required new Vercel variable — set a
-  dedicated value (`openssl rand -base64 32`) to fully separate the two trust
-  domains.
-- `BLOB_READ_WRITE_TOKEN` — server-only. Read/write access to the serving-snapshot
-  store. On Vercel the SDK authenticates with OIDC instead (`BLOB_STORE_ID` +
+- `TRACK_TOKEN_SECRET` — server-only. Signs tracking-beacon URLs and click links
+  (`lib/track-token.ts`). Set since 2026-10-03; before that, beacon signing derived a
+  key from `PREVIEW_TOKEN_SECRET` via HMAC domain separation (a label-keyed KDF, not
+  secret reuse), which the code still does when it is unset.
+- **Where these live.** Since ADR-0029 the signing secrets (`PREVIEW_TOKEN_SECRET`,
+  `TRACK_TOKEN_SECRET`) and `SUPABASE_SERVICE_ROLE_KEY` are held twice: as secrets of
+  the ad Worker (`wrangler secret put`, read through `process.env`) and in the app's
+  environment. **The two copies must be equal** — a beacon or click link minted by one
+  runtime is verified by the other — so they change together or not at all. Vercel
+  stores them write-only, which is why the move rotated both signing secrets once
+  rather than copying them.
+- `BLOB_READ_WRITE_TOKEN` — server-only. Read/write access to the private Blob store
+  the snapshots lived in before ADR-0029, still written while the app runs on Vercel.
+  On Vercel the SDK authenticates with OIDC instead (`BLOB_STORE_ID` +
   `VERCEL_OIDC_TOKEN`, both injected and rotated by the platform, neither secret), so
-  this static token is needed only for code running **outside** Vercel — which today
-  means `npm run snapshot:backfill` and `npm run media:migrate`.
+  this static token is needed only for code running **outside** Vercel. Goes with the
+  Blob store.
+- `SNAPSHOT_KV_API_TOKEN` — server-only. A Cloudflare API token holding **Workers KV
+  Storage: Edit on the account and nothing else**, for writing snapshots from outside
+  a Worker: the Node scripts, and the Vercel deployment until the app moves. It can
+  read and rewrite every serving snapshot — which is to say, decide whether a tag
+  serves — so it is as sensitive as the service-role key's write to the same rows.
+  `lib/serving/kv.ts` sends it only to `api.cloudflare.com` and never logs it. Roll it
+  in the Cloudflare dashboard if it leaks. `CLOUDFLARE_ACCOUNT_ID` and
+  `SNAPSHOT_KV_NAMESPACE_ID` beside it are identifiers, not secrets.
+- `CLOUDFLARE_API_TOKEN` — **CI and the operator's machine only, never the app.** The
+  deploy token for both Workers: Workers Scripts and KV edit on the account, Workers
+  Routes, DNS and certificates on the two zones, and nothing else. It is a GitHub
+  Actions secret for the deploy job and a line in `.env.local`; no Worker and no
+  deployment of the app holds it.
 - `R2_SECRET_ACCESS_KEY` — **server-only**. With `R2_ACCESS_KEY_ID`, the S3 credential
   of a Cloudflare token with object read and write on the `creative-media` R2 bucket and
   nothing else in the account ([ADR-0028](decisions/0028-creative-media-on-r2.md)).
   Leaked, it can overwrite or delete any advertiser's media — which is all public
-  already, so it reads nothing new. Used only by `lib/r2.ts`: signing uploads
-  (`requestMediaUpload`), `deleteCreative`, and `npm run media:migrate`. The remedy
+  already, so it reads nothing new. Since ADR-0029 the creative runtime shares the bucket
+  under `runtime/`, and that prefix is **locked**: an indefinite R2 bucket lock rule
+  (`runtime-immutable`) refuses any overwrite or delete of an existing unit, whoever
+  holds the key (`409 ObjectLockedByBucketPolicy`, verified). A leaked key can add
+  objects there, which no tag names — the committed manifest decides what is served,
+  and `runtime:push` checks each served unit's bytes against its hash.
+  Used only by `lib/r2.ts`: signing uploads (`requestMediaUpload`), `deleteCreative`,
+  `npm run media:migrate`, and `npm run runtime:push` / `runtime:migrate`. The remedy
   for a leak is to roll the token in the Cloudflare dashboard. The access key id is
   not a secret — every presigned upload URL carries it in `X-Amz-Credential` — and
   neither are `R2_ACCOUNT_ID`, `R2_BUCKET` and `NEXT_PUBLIC_MEDIA_URL`.
@@ -79,7 +106,7 @@ not get talked out of a correct change by an imagined one:
   (`builder.ts` → `signTrackToken`, `storage.ts` → `signInteractiveToken`). No tag needs
   reissuing.
 - **Only tokens in flight at deploy break** — beacons up to their 1-hour TTL, interactive
-  creative URLs up to 120s. The effect is undercounted events in that window, and it
+  creative URLs up to 10 minutes. The effect is undercounted events in that window, and it
   fails closed (a dropped beacon), never open.
 - **Click links are the exception, and they fail visibly** ([ADR-0023](decisions/0023-conversion-postbacks.md)).
   They are signed with the same key but redirect only on a genuine signature, so after a
@@ -173,7 +200,9 @@ rename to do it.
   links and can replay them. That can dilute click counts and CR — bounded by
   `record_click()`'s 600 per creative per minute, and a flood past that cap denies that
   minute's genuine clicks their ids. It cannot create a conversion. **A per-IP rate limit
-  on `/r` and `/pb` in the Vercel Firewall is the recommended next layer**; it is
+  on `/r` and `/pb` is the recommended next layer** — since ADR-0029 a Cloudflare rate
+  limiting rule on each zone, and on the ad domain a **block** rule, never a challenge: a
+  challenge sets a cookie on the ad domain and breaks the players fetching from it. It is
   configuration, and not yet set.
 - **Crawlers get the redirect, not a click.** Known bot, scanner and HTTP-library user
   agents (`isLikelyBot()`), HEAD requests and stale links are redirected identically —
@@ -355,11 +384,15 @@ template. ADR-0003 already refuses to claim the code is unrecoverable. The resid
 exposure is bandwidth (hotlinking), the same one ADR-0010 accepted for the public
 `creative-media` bucket — and, since [ADR-0028](decisions/0028-creative-media-on-r2.md),
 for the media host `media.smithcdn.net`, where R2 makes delivery free of charge, so
-hotlinking costs nothing there either; Cloudflare can rate-limit the host if abuse is
+hotlinking costs nothing there either. Every response from the media host carries
+`X-Content-Type-Options: nosniff`, and any `.html` there `Content-Security-Policy:
+sandbox` (zone response-header rules, ADR-0029): the host serves our runtime and
+strangers' uploads, and neither should ever run as a page on it. Cloudflare can rate-limit the host if abuse is
 ever observed.
 
 **The SIMID document is still one hop indirect**, reached through our own route
-with an HMAC-signed, 120s-TTL token (`lib/vast/interactive-token.ts`). The token
+with an HMAC-signed, 10-minute token (`lib/vast/interactive-token.ts`; 120s until
+ADR-0029, whose tag cache and last-good copy can hand out a document six minutes old). The token
 authorizes exactly one object path, matched against a closed list of shapes per
 kind — `^[a-z0-9_-]+/simid/index\.html$` for SIMID,
 `^[a-z0-9_-]+/(?:vpaid\.js|vpaid/unit\.js)$` for VPAID (still used by the fallback
@@ -385,7 +418,7 @@ VPAID route and re-served as executable JavaScript, or the reverse.
   govern nothing.
 
 This does not weaken ADR-0003's lever. The URL is still signed and still expires
-in 120s; only the signer changed, from Supabase to us.
+(in 10 minutes since ADR-0029); only the signer changed, from Supabase to us.
 
 **The OMID verification pass-through (ADR-0012) does not change this.** A
 SIMID creative's `verificationScriptUrl` (advertiser-supplied) only ever
