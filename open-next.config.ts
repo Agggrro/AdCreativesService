@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
 import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/static-assets-incremental-cache";
 
@@ -17,9 +16,18 @@ import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incre
  * deployed app's `process.env`. Next to `.env.local` that ships the service-role
  * key, the Stripe secret, the deploy token and a real account's password — so
  * the build refuses to run beside any of them. It runs in CI, where none exists.
+ *
+ * `fs` is fetched at run time rather than imported: this file is evaluated in
+ * Node at build time, but OpenNext also compiles it for the Worker, where a
+ * static `node:fs` import does not resolve. In the Worker there is nothing to
+ * find, and the check passes.
  */
 const BUNDLED_ENV_FILES = [".env", ".env.local", ".env.production", ".env.production.local"];
-const present = BUNDLED_ENV_FILES.filter((file) => existsSync(file));
+type Fs = { existsSync(path: string): boolean };
+const fs = (
+  globalThis as { process?: { getBuiltinModule?: (id: string) => unknown } }
+).process?.getBuiltinModule?.("node:fs") as Fs | undefined;
+const present = fs ? BUNDLED_ENV_FILES.filter((file) => fs.existsSync(file)) : [];
 if (present.length > 0) {
   throw new Error(
     `Refusing to build the app Worker beside ${present.join(", ")}: OpenNext would bundle ` +
