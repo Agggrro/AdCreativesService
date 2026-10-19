@@ -16,15 +16,15 @@ export interface RuntimeManifest {
 }
 
 export const RUNTIME_MANIFEST: RuntimeManifest = {
-  "generatedAt": "2026-10-19T15:08:43.705Z",
+  "generatedAt": "2026-10-19T16:43:58.642Z",
   "assets": {
     "age-gate/vpaid.js": {
       "url": "https://media.smithcdn.net/runtime/age-gate/vpaid.13e74b54.js",
       "sha256": "13e74b544f3e6fe976b60f48f3e35d3930095a63b4c8939c6aed61e1a19e8d39"
     },
     "duel/vpaid.js": {
-      "url": "https://media.smithcdn.net/runtime/duel/vpaid.3af12a2a.js",
-      "sha256": "3af12a2aa2a16f55a2630ac735b1c514d05fc87f20fbd35ff35031f1a4579e3e"
+      "url": "https://media.smithcdn.net/runtime/duel/vpaid.3150f94f.js",
+      "sha256": "3150f94fe75680b7e83c9ed8c5fef4003b6f92a3606f09d3d1ee5994a409b72c"
     },
     "pick-message/vpaid.js": {
       "url": "https://media.smithcdn.net/runtime/pick-message/vpaid.1ec53cb9.js",

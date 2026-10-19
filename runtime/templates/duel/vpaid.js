@@ -113,6 +113,8 @@ var TEMPLATE = {
     // A picture win has no end of its own; a side with an after clip of its own
     // moves on to it after this long.
     var PICTURE_WIN_MS = 3000;
+    // How long the winner line stays before it fades.
+    var BANNER_MS = 2500;
     var view = slot.ownerDocument.defaultView || window;
 
     var still = false;
@@ -140,6 +142,7 @@ var TEMPLATE = {
       resizeTimer = null,
       soundTimer = null,
       holdTimer = null,
+      bannerTimer = null,
       observer = null,
       onResize = null,
       blinks = [],
@@ -266,6 +269,17 @@ var TEMPLATE = {
       (still ? "" : "transition:opacity .35s ease .25s;");
     wrap.appendChild(banner);
 
+    // The button is the one way to the offer (a tap on the clip does nothing, so
+    // nobody lands there by accident), so it moves until it is pressed: the
+    // button breathes and a ring ripples out of it. Transform and opacity only,
+    // the two a long-running ad animation may use (runtime/README.md).
+    var ctaBox = document.createElement("div");
+    ctaBox.style.cssText =
+      "position:absolute;left:50%;transform:translateX(-50%);visibility:hidden;opacity:0;" +
+      "pointer-events:none;" + (still ? "" : "transition:opacity .35s ease;");
+    var halo = document.createElement("span");
+    halo.style.cssText =
+      FILL + "border-radius:999px;border:2px solid " + accent + ";pointer-events:none;opacity:0;";
     var cta = document.createElement("button");
     cta.type = "button";
     cta.tabIndex = -1;
@@ -274,15 +288,15 @@ var TEMPLATE = {
     // The reset first: its `font:inherit` would otherwise undo the weight below.
     cta.style.cssText =
       BUTTON_RESET +
-      "position:absolute;left:50%;padding:0;font-weight:800;border-radius:999px;" +
+      "position:relative;display:block;padding:0;font-weight:800;border-radius:999px;" +
       "background:" + accent + ";color:" + accentInk + ";white-space:nowrap;overflow:hidden;" +
-      "text-overflow:ellipsis;box-shadow:0 6px 18px rgba(0,0,0,.45);" +
-      "visibility:hidden;opacity:0;pointer-events:none;transform:translateX(-50%) translateY(8px);" +
-      (still ? "" : "transition:opacity .35s ease,transform .35s cubic-bezier(.22,1,.36,1);");
+      "text-overflow:ellipsis;box-shadow:0 6px 18px rgba(0,0,0,.45);";
     cta.addEventListener("click", function () {
       clickThrough("button");
     });
-    wrap.appendChild(cta);
+    ctaBox.appendChild(halo);
+    ctaBox.appendChild(cta);
+    wrap.appendChild(ctaBox);
 
     // --- layout -----------------------------------------------------------------
     /**
@@ -358,7 +372,7 @@ var TEMPLATE = {
       cta.style.fontSize = Math.round(clamp(m * 0.05, 13, 22)) + "px";
       cta.style.padding = Math.round(fs * 0.6) + "px " + Math.round(fs * 1.6) + "px";
       cta.style.maxWidth = w - 2 * pad + "px";
-      cta.style.bottom = Math.round(pad * 1.5) + "px";
+      ctaBox.style.bottom = Math.round(pad * 1.5) + "px";
 
       geo = { w: w, h: h, layout: row ? "row" : "column" };
       return true;
@@ -488,6 +502,7 @@ var TEMPLATE = {
       clearTimeout(resizeTimer);
       clearTimeout(soundTimer);
       clearTimeout(holdTimer);
+      clearTimeout(bannerTimer);
       if (observer) observer.disconnect();
       if (onResize) view.removeEventListener("resize", onResize);
       for (var k = 0; k < sides.length; k++) releaseVideos(sides[k].el);
@@ -560,8 +575,9 @@ var TEMPLATE = {
       // A paused ad picks nothing: the winner would start, with its sound,
       // under a player that shows the ad as paused.
       if (stopped || paused) return;
+      // Only the pick: after it the clip is to watch, and the button alone leads
+      // to the offer, so a tap on the video is never a click-through by mistake.
       if (picked === -1) pick(i, "tap");
-      else if (i === picked) clickThrough("winner");
     }
 
     function pick(i, via) {
@@ -602,15 +618,47 @@ var TEMPLATE = {
       } else {
         banner.textContent = names[i];
       }
+      // The winner side is a picture now, not a control.
+      won.el.style.pointerEvents = "none";
+      won.el.style.cursor = "default";
+      won.el.tabIndex = -1;
+
+      // The winner line is an announcement, not a fixture: it shows, then fades
+      // out of the way of the clip and the wait that follows.
       banner.style.visibility = "visible";
       banner.style.opacity = "1";
-      cta.style.visibility = "visible";
-      cta.style.pointerEvents = "auto";
+      bannerTimer = setTimeout(function () {
+        if (stopped) return;
+        if (!still) banner.style.transition = "opacity .6s ease";
+        banner.style.opacity = "0";
+        bannerTimer = setTimeout(function () {
+          if (!stopped) banner.style.visibility = "hidden";
+          api.debug("banner", { shown: false });
+        }, still ? 0 : 650);
+      }, BANNER_MS);
+
+      ctaBox.style.visibility = "visible";
+      ctaBox.style.pointerEvents = "auto";
       cta.tabIndex = 0;
       cta.removeAttribute("aria-hidden");
-      void cta.offsetWidth;
-      cta.style.opacity = "1";
-      cta.style.transform = "translateX(-50%)";
+      void ctaBox.offsetWidth;
+      ctaBox.style.opacity = "1";
+      if (!still && typeof cta.animate === "function") {
+        // Kept with the vote blinks, so pauseAd, resumeAd and the end reach them.
+        blinks.push(
+          cta.animate(
+            [{ transform: "scale(1)" }, { transform: "scale(1.07)" }, { transform: "scale(1)" }],
+            { duration: 1100, iterations: Infinity, easing: "ease-in-out", delay: 400 },
+          ),
+          halo.animate(
+            [
+              { transform: "scale(1)", opacity: 0.8 },
+              { transform: "scale(1.3, 1.6)", opacity: 0 },
+            ],
+            { duration: 1400, iterations: Infinity, easing: "ease-out", delay: 400 },
+          ),
+        );
+      }
     }
 
     /** The player's ad volume, 0–1. Anything that is not a volume is silence. */
@@ -671,10 +719,7 @@ var TEMPLATE = {
         fit.media.addEventListener("playing", function shown() {
           fit.media.removeEventListener("playing", shown);
           if (stopped) return;
-          fit.el.style.opacity = "1";
-          s.fit = fit;
-          releaseVideos(old.el);
-          if (old.el.parentNode) old.el.parentNode.removeChild(old.el);
+          dissolve(s, fit, old);
         });
         winVideo.addEventListener("error", function () {
           if (stopped) return;
@@ -850,10 +895,7 @@ var TEMPLATE = {
       fit.media.addEventListener("playing", function shown() {
         fit.media.removeEventListener("playing", shown);
         if (stopped) return;
-        fit.el.style.opacity = "1";
-        s.fit = fit;
-        releaseVideos(old.el);
-        if (old.el.parentNode) old.el.parentNode.removeChild(old.el);
+        dissolve(s, fit, old);
         api.debug("after", { side: SIDES[i], clip: clip });
       });
       fit.media.addEventListener("error", function () {
@@ -864,9 +906,37 @@ var TEMPLATE = {
       });
     }
 
+    /**
+     * Hand a side over to a new clip by dissolving into it, not cutting. The
+     * pick lands mid-loop, so the vote clip's frame never matches the first frame
+     * of the win clip, and even matched scenes differ by a little motion. The old
+     * clip is released once the new one covers it. Reduced motion cuts instead.
+     */
+    var DISSOLVE_MS = 450;
+    function dissolve(s, fit, old) {
+      s.fit = fit;
+      function drop() {
+        releaseVideos(old.el);
+        if (old.el.parentNode) old.el.parentNode.removeChild(old.el);
+      }
+      if (still) {
+        fit.el.style.opacity = "1";
+        drop();
+        return;
+      }
+      fit.el.style.transition = "opacity " + DISSOLVE_MS + "ms ease";
+      void fit.el.offsetWidth;
+      fit.el.style.opacity = "1";
+      setTimeout(function () {
+        if (!stopped) drop();
+      }, DISSOLVE_MS + 50);
+    }
+
     function clickThrough(via) {
       if (stopped || fired || picked === -1 || Date.now() - pickedAt < CTA_GUARD_MS) return;
       fired = true;
+      // Pressed: the button has said what it had to.
+      stopBlink();
       api.debug("cta", { via: via });
       api.clickThrough();
     }

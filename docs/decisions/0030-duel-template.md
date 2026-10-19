@@ -37,7 +37,14 @@ Ship the mechanic as a new VPAID template, **Duel** (`duel`,
   and a clip that will not load leaves the one showing in place. An image works too.
 - **The winner line sits in the top row, centred**, as a compact dark pill on the close
   control's middle line — the row the countdown bar leaves at the pick. The first version
-  put a large line across the top of the winner's clip, over the face.
+  put a large line across the top of the winner's clip, over the face. It is an
+  announcement, not a fixture: it stays 2.5 s and fades out, so the wait that follows has
+  nothing over it.
+- **Scenes dissolve into each other.** The pick lands mid-loop, so the vote clip's frame
+  never matches the first frame of the win clip; each hand-over fades the new clip in over
+  450 ms instead of cutting (a cut under reduced motion). Clips that chain well still matter:
+  the win clip's end should be the after clip's start, and a looping clip's end its own
+  start.
 - **The configurator draws the scenario.** The clip fields form a `kind: "scenario"`
   group: one row per side, its name and then three compact stages in play order, with
   each field's help behind its column header (docs/design-system.md §6, "Scenario"). Eight
@@ -55,9 +62,12 @@ Ship the mechanic as a new VPAID template, **Duel** (`duel`,
   of its own round, and it is shown that way: no tick, and the winner line is the name
   alone rather than the advertiser's `{name} wins!`, which claims a vote. It means every impression reaches the end state and
   its button.
-- **One click-through, from the end state only.** The button, or a tap on the winner, fires
-  it once. The pick raises none, and a tap on the winner within 600ms of the pick counts as
-  the same gesture.
+- **One click-through, from the button only** (amended 2026-10-19). The button fires it
+  once; the pick raises none, and after the pick the winner's clip is not a control at all.
+  Letting a tap on the full-slot video lead to the offer turned every touch on the clip into
+  a click-through nobody meant, so the button is the one way there. It moves until it is
+  pressed, so a viewer knows it is the thing to press: it breathes and a ring ripples out of
+  it, on `transform` and `opacity` only, stopped by the press, `pauseAd` and the end.
 - **The player's pause reaches the clips.** Every clip is the unit's own `<video>`, which
   the base's `pauseAd` (it pauses only the video slot) never touched — a player pausing
   the ad after a click-through would have left the winner sounding behind the landing
