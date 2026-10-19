@@ -14,9 +14,14 @@
  * votes, no chat — nothing it would have to invent. Every word on screen is the
  * advertiser's copy, and the defaults claim nothing.
  *
+ * Each side runs a three-scene scenario: its vote clip loops while the viewer
+ * decides, its win clip plays once when it is picked, and its after clip loops
+ * once the win clip has ended — the wait that follows the act.
+ *
  * Config (AdParameters):
  *   videoAUrl, videoBUrl        the two clips during the vote (image, gif or video)
- *   winAUrl, winBUrl            each side's winner clip; absent => its vote clip
+ *   winAUrl, winBUrl            each side's win clip, played once; absent => its vote clip
+ *   afterAUrl, afterBUrl        each side's after clip, looped; absent => its vote clip
  *   nameA, nameB                a name over each side
  *   roundLabel                  the label beside the countdown; absent => none
  *   questionText                the line across the middle
@@ -31,7 +36,7 @@
  * Sound is ADR-0024's rule: it starts inside the viewer's tap or not at all —
  * a winner clip that has not begun within 800ms plays on muted — at the
  * player's VPAID volume (api.volume()), re-read while it plays, and it sounds
- * once: the clip then loops on muted. The player's pauseAd pauses it
+ * once: the win clip plays through, then the after clip loops, muted. The player's pauseAd pauses it
  * (api.onPause). Everything the unit started stops with the ad (api.onStop).
  *
  * Duration is 30 to match DEFAULT_DURATION_SECONDS in lib/vast/builder.ts, as
@@ -104,6 +109,10 @@ var TEMPLATE = {
     var names = [str("nameA", "A"), str("nameB", "B")];
     var voteUrls = [url("videoAUrl"), url("videoBUrl")];
     var winUrls = [url("winAUrl") || voteUrls[0], url("winBUrl") || voteUrls[1]];
+    var afterUrls = [url("afterAUrl") || voteUrls[0], url("afterBUrl") || voteUrls[1]];
+    // A picture win has no end of its own; a side with an after clip of its own
+    // moves on to it after this long.
+    var PICTURE_WIN_MS = 3000;
     var view = slot.ownerDocument.defaultView || window;
 
     var still = false;
@@ -120,6 +129,7 @@ var TEMPLATE = {
     var picked = -1,
       pickedAt = 0,
       fired = false,
+      afterEntered = false,
       stopped = false,
       paused = false,
       deadline = 0,
@@ -129,6 +139,7 @@ var TEMPLATE = {
     var tickTimer = null,
       resizeTimer = null,
       soundTimer = null,
+      holdTimer = null,
       observer = null,
       onResize = null,
       blinks = [],
@@ -244,12 +255,15 @@ var TEMPLATE = {
     wrap.appendChild(center);
 
     // --- the end state: winner line and button --------------------------------
+    // Pinned to the top row — the one the countdown bar leaves — and centred on
+    // the slot, as a compact label: the winner's clip below it stays clear.
     var banner = document.createElement("div");
     banner.style.cssText =
-      "position:absolute;left:" + CLOSE_CLEAR + "px;right:" + CLOSE_CLEAR + "px;text-align:center;" +
-      "font-weight:800;pointer-events:none;visibility:hidden;opacity:0;" +
-      "text-shadow:0 2px 6px rgba(0,0,0,.7);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" +
-      (still ? "" : "transition:opacity .35s ease;");
+      "position:absolute;left:50%;transform:translateX(-50%);max-width:calc(100% - " +
+      2 * CLOSE_CLEAR + "px);box-sizing:border-box;text-align:center;font-weight:800;" +
+      "pointer-events:none;visibility:hidden;opacity:0;border-radius:999px;" +
+      "background:rgba(0,0,0,.6);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" +
+      (still ? "" : "transition:opacity .35s ease .25s;");
     wrap.appendChild(banner);
 
     var cta = document.createElement("button");
@@ -332,8 +346,15 @@ var TEMPLATE = {
       hint.style.marginTop = Math.round(fs * 0.5) + "px";
       center.style.top = Math.round((h - center.offsetHeight) / 2) + "px";
 
-      banner.style.fontSize = Math.round(clamp(m * 0.075, 15, 34)) + "px";
-      banner.style.top = Math.max(CLOSE_CLEAR, pad) + "px";
+      // Same row and height as the countdown bar, centred on the close control's
+      // middle line (10px inset + 13px half of its 26px box).
+      var bfs = Math.round(clamp(m * 0.05, 13, 22));
+      banner.style.fontSize = bfs + "px";
+      banner.style.lineHeight = "1.2";
+      var bpad = Math.round(bfs * 0.3);
+      banner.style.padding = bpad + "px " + Math.round(bfs * 0.8) + "px";
+      // From the font, not offsetHeight: the text is only written at the pick.
+      banner.style.top = Math.max(4, Math.round(10 + 13 - (bfs * 1.2 + 2 * bpad) / 2)) + "px";
       cta.style.fontSize = Math.round(clamp(m * 0.05, 13, 22)) + "px";
       cta.style.padding = Math.round(fs * 0.6) + "px " + Math.round(fs * 1.6) + "px";
       cta.style.maxWidth = w - 2 * pad + "px";
@@ -351,6 +372,7 @@ var TEMPLATE = {
       voteSeconds: voteSeconds,
       sound: soundOn ? "on" : "off",
       winClips: [!!url("winAUrl"), !!url("winBUrl")],
+      afterClips: [!!url("afterAUrl"), !!url("afterBUrl")],
       motion: still ? "reduced" : "full",
     });
 
@@ -465,6 +487,7 @@ var TEMPLATE = {
       clearInterval(tickTimer);
       clearTimeout(resizeTimer);
       clearTimeout(soundTimer);
+      clearTimeout(holdTimer);
       if (observer) observer.disconnect();
       if (onResize) view.removeEventListener("resize", onResize);
       for (var k = 0; k < sides.length; k++) releaseVideos(sides[k].el);
@@ -526,7 +549,6 @@ var TEMPLATE = {
         p.then(null, function () {
           if (stopped || v.muted || !v.getAttribute("src")) return;
           v.muted = true;
-          v.loop = true;
           var q = v.play();
           if (q && q.catch) q.catch(function () {});
         });
@@ -619,6 +641,11 @@ var TEMPLATE = {
           releaseVideos(s.fit.el);
           s.fit = pic;
           api.debug("win", { side: SIDES[i], clip: "image", sound: false });
+          if (url(i ? "afterBUrl" : "afterAUrl")) {
+            holdTimer = setTimeout(function () {
+              enterAfter(i);
+            }, PICTURE_WIN_MS);
+          }
         };
         img.onerror = function () {
           if (stopped) return;
@@ -650,12 +677,18 @@ var TEMPLATE = {
           if (old.el.parentNode) old.el.parentNode.removeChild(old.el);
         });
         winVideo.addEventListener("error", function () {
-          if (stopped || s.fit === fit) return;
+          if (stopped) return;
+          if (s.fit === fit) {
+            // Failed mid-stream, after it was shown: the frozen frame moves on.
+            enterAfter(i);
+            return;
+          }
           // The vote clip stays; it was never taken down.
           if (fit.el.parentNode) fit.el.parentNode.removeChild(fit.el);
           winVideo = null;
           clearTimeout(soundTimer);
           report({ side: SIDES[i], clip: "vote", sound: false, reason: "win-clip-error" });
+          enterAfter(i);
         });
       }
 
@@ -669,6 +702,11 @@ var TEMPLATE = {
       var clip = same ? "vote" : "win";
       var vol = withSound ? volume() : 0;
       var v = winVideo;
+      // The win scene plays once, sound or not; its end is the cue for the after scene.
+      v.loop = false;
+      v.addEventListener("ended", function () {
+        if (winVideo === v) enterAfter(i);
+      });
       if (vol > 0) {
         var alreadyPlaying = !v.paused && v.readyState >= 3,
           rewound = false;
@@ -681,13 +719,12 @@ var TEMPLATE = {
             /* not seekable yet: it plays on from where it is */
           }
         }
-        // Sound once: the clip plays through with its audio, then loops on muted.
-        v.loop = false;
+        // Sound once: the clip plays through with its audio; the after scene is muted.
         v.muted = false;
         v.removeAttribute("muted");
         v.volume = vol;
         var follow = function () {
-          if (stopped || v.muted && v.loop) return;
+          if (stopped || afterEntered) return;
           var now = volume();
           // A player that mutes and then unmutes the ad gets its sound back: the
           // viewer's tap is still the permission.
@@ -696,13 +733,6 @@ var TEMPLATE = {
         };
         v.addEventListener("playing", follow);
         v.addEventListener("timeupdate", follow);
-        v.addEventListener("ended", function () {
-          if (stopped) return;
-          v.muted = true;
-          v.loop = true;
-          var p = v.play();
-          if (p && p.catch) p.catch(function () {});
-        });
         if (alreadyPlaying && !rewound) {
           // Already playing — the vote clip carrying on as the winner — so its
           // sound starts now, inside the tap; no "playing" event will follow.
@@ -713,7 +743,6 @@ var TEMPLATE = {
           soundTimer = setTimeout(function () {
             if (reported || stopped) return;
             v.muted = true;
-            v.loop = true;
             report({ side: SIDES[i], clip: clip, sound: false, reason: "late" });
           }, SOUND_DEADLINE_MS);
           v.addEventListener("playing", function started() {
@@ -744,7 +773,6 @@ var TEMPLATE = {
             // Refused with sound: play it muted rather than freeze the winner.
             if (!v.muted) {
               v.muted = true;
-              v.loop = true;
               var q = v.play();
               if (q && q.catch) q.catch(function () {});
             }
@@ -754,6 +782,86 @@ var TEMPLATE = {
       } else if (vol === 0) {
         report({ side: SIDES[i], clip: clip, sound: false });
       }
+    }
+
+    /**
+     * The third scene: the side's after clip, looped and muted, once the win
+     * clip has ended. Laid over the last frame of the win clip and shown at its
+     * own first frame, so the hand-over has no black gap; one that will not load
+     * leaves the clip that is showing to loop instead. Its default is the vote
+     * clip — the side waiting again, as it did before the pick.
+     */
+    function enterAfter(i) {
+      if (stopped || afterEntered) return;
+      afterEntered = true;
+      clearTimeout(soundTimer);
+      var s = sides[i],
+        src = afterUrls[i],
+        // What is on screen: the win clip, or — when that never showed — the
+        // vote clip, whose own src the after default matches.
+        cur = winVideo || (s.fit.media && s.fit.media.tagName === "VIDEO" ? s.fit.media : null);
+      var clip = src === voteUrls[i] ? "vote" : "after";
+      function loopCurrent() {
+        if (!cur || stopped) return;
+        cur.muted = true;
+        cur.loop = true;
+        // A paused ad starts nothing: the resume plays it.
+        if (paused) {
+          resumeList.push(cur);
+          return;
+        }
+        var p = cur.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+      if (cur && src === cur.getAttribute("src")) {
+        // The after scene is the clip already showing: it simply loops on.
+        loopCurrent();
+        api.debug("after", { side: SIDES[i], clip: "same" });
+        return;
+      }
+      if (!adInteractIsVideoUrl(src)) {
+        var img = new Image();
+        img.onload = function () {
+          if (stopped) return;
+          var pic = adInteractFitMedia(src, api, "after:" + SIDES[i]);
+          s.el.replaceChild(pic.el, s.fit.el);
+          releaseVideos(s.fit.el);
+          s.fit = pic;
+          api.debug("after", { side: SIDES[i], clip: "image" });
+        };
+        img.onerror = function () {
+          loopCurrent();
+          if (!stopped) api.debug("after", { side: SIDES[i], clip: "same", reason: "after-image-error" });
+        };
+        img.src = src;
+        return;
+      }
+      var fit = adInteractFitMedia(src, api, "after:" + SIDES[i]);
+      fit.el.style.position = "absolute";
+      fit.el.style.top = fit.el.style.left = "0";
+      fit.el.style.opacity = "0";
+      s.el.insertBefore(fit.el, s.fit.el.nextSibling);
+      var old = s.fit;
+      if (paused) {
+        // The base's media layer autoplays; under a paused ad it waits for resume.
+        fit.media.pause();
+        resumeList.push(fit.media);
+      }
+      fit.media.addEventListener("playing", function shown() {
+        fit.media.removeEventListener("playing", shown);
+        if (stopped) return;
+        fit.el.style.opacity = "1";
+        s.fit = fit;
+        releaseVideos(old.el);
+        if (old.el.parentNode) old.el.parentNode.removeChild(old.el);
+        api.debug("after", { side: SIDES[i], clip: clip });
+      });
+      fit.media.addEventListener("error", function () {
+        if (stopped || s.fit === fit) return;
+        if (fit.el.parentNode) fit.el.parentNode.removeChild(fit.el);
+        loopCurrent();
+        api.debug("after", { side: SIDES[i], clip: "same", reason: "after-clip-error" });
+      });
     }
 
     function clickThrough(via) {

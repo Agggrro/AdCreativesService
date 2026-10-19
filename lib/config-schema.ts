@@ -47,7 +47,8 @@ export interface ConfigField {
   /**
    * Sub-block inside a `kind: "matrix"` group — for the quiz, the answer path
    * this exit belongs to ("A", "BA", "ABB"). Fields sharing a block are edited
-   * together as one collapsible row.
+   * together as one collapsible row. Inside a `kind: "scenario"` group it names
+   * one row of the playback scheme — for Duel, a side ("A", "B").
    */
   block?: string;
   /**
@@ -59,10 +60,15 @@ export interface ConfigField {
   showWhen?: ConfigFieldCondition[];
 }
 
-/** How a group renders. `matrix` groups are further partitioned by `block`. */
+/**
+ * How a group renders. `matrix` groups are further partitioned by `block`, as
+ * collapsible rows. `scenario` groups are too, but every row stays open as one
+ * line of a playback scheme: the block's text fields head the row, and its
+ * media fields follow as compact stages in schema order (ADR-0030).
+ */
 export interface ConfigGroup {
   id: string;
-  kind?: "section" | "matrix";
+  kind?: "section" | "matrix" | "scenario";
 }
 
 export interface ConfigSchema {
@@ -80,7 +86,7 @@ const VALID_TYPES: ConfigFieldType[] = [
   "select",
 ];
 
-const VALID_GROUP_KINDS: NonNullable<ConfigGroup["kind"]>[] = ["section", "matrix"];
+const VALID_GROUP_KINDS: NonNullable<ConfigGroup["kind"]>[] = ["section", "matrix", "scenario"];
 
 /** Defensively parse the `showWhen` array; a malformed clause is dropped, not thrown on. */
 function parseConditions(raw: unknown): ConfigFieldCondition[] | undefined {

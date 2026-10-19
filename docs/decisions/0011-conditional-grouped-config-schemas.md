@@ -36,7 +36,7 @@ properties, all defensively parsed, all inert for a schema that does not use the
 | --- | --- |
 | `showWhen: [{ field, equals[] }]` | The field is *active* only when every clause holds. AND, not OR. |
 | `group: string` | Section id. Consecutive fields sharing a group render as one hairline-separated section; the heading comes from `dict.configurator.groups`. |
-| `block: string` | Sub-block inside a `kind: "matrix"` group — for the quiz, the answer path an exit belongs to. |
+| `block: string` | Sub-block inside a `kind: "matrix"` group — for the quiz, the answer path an exit belongs to. Inside a `kind: "scenario"` group (added by [ADR-0030](0030-duel-template.md)), one row of a playback scheme — Duel's side. |
 
 plus a `groups: [{ id, kind }]` root key describing how each group renders.
 

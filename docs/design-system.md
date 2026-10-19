@@ -660,7 +660,7 @@ it holds a VAST document, and a proportional face makes indentation unreadable.
 
 A template's `config_schema` can group its fields
 ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)), and a group renders one
-of two ways.
+of three ways.
 
 **Section** (the default) — a `<fieldset>` whose legend is the `h3` role, separated by
 `border-t border-hairline`. Deliberately not `label-instr`: that role belongs to the field
@@ -688,6 +688,48 @@ answer-path exits. Rendering 24 inputs flat is the wall this exists to avoid.
   path itself — an icon is never the whole action (§10).
 - A completion counter (`ЗАПОЛНЕНО N / 8`) sits below in `label-instr`, because closed rows
   submit through hidden inputs and so cannot use native `required`.
+
+**Scenario** — for media that plays in a fixed order per block, such as Duel's
+vote → win → after clips for each side
+([ADR-0030](decisions/0030-duel-template.md)). Six labelled upload controls stacked one
+under another read as a form to wade through; the order they play in is the thing the
+user is configuring, so the layout draws that order.
+
+- **One row per block, one column per stage.** The row head holds the block's other
+  fields (Duel: the side's name), drawn by the form's own field renderer with the block id
+  prefixed to the label (`A · NAME` — machine text, no dictionary entry). The stages are
+  the block's media fields in schema order; past four the columns stop lining up, so a
+  schema keeps to four (every stage still renders and submits).
+- **Column headers carry the explanation, and come from the first block.** Each header is
+  `label-instr`, numbered in play order (`1 · VOTE`), and is the `HelpLabel` trigger for
+  that field's help text — the inline paragraph each field had goes behind it (§6, "Help
+  tooltip"). Because every block shares the header, a schema writes stage help that holds
+  for every block. A required stage puts the required word on its own line under the
+  header, in `fg-muted`: beside the help icon, Russian's `ОБЯЗАТЕЛЬНОЕ` outgrows a 106px
+  column.
+- **A stage is a compact tile, not a card**: 112px high, `--radius-ctl`, `border-line`
+  on `surface`, 6px padding. Its state is its content, in form as well as colour. Empty:
+  an `sm` secondary and an `sm` ghost button, each a word and nothing else (`Upload` /
+  `URL`) — `Загрузить` fills the 94px inside a 106px tile. URL entry: the 44px input and
+  an `sm` ghost word back to upload; the tile turns filled on blur or Enter, never on a
+  keystroke. Uploading: a spinner beside the word, as a `status`. Filled: a frame one
+  second into the clip (`#t=1` — a clip's first frame is often a fade from black;
+  `preload="metadata"`, never autoplaying, since the page's one live unit stays in the
+  preview well, §7), or the picture itself, above an `sm` ghost `Replace`. A medium that
+  will not render names its host in mono instead of a broken image.
+- **Focus follows the state.** Each state swaps whole controls, so the one with focus
+  unmounts: focus moves to the URL input, back to the upload control, or to `Replace`
+  after an upload. The upload control's real `<input type="file">` sits inside its label,
+  so the label's `has-[:focus-visible]` ring shows.
+- Consecutive stages are joined by a chevron in the gap, `aria-hidden`: the order is
+  already carried by the numbered headers.
+- **Accent budget spent: zero.** No rail either. A missing required clip is reported as
+  for every media field: the server's `field_required` on save, named in the form's error.
+- From 640px the row head is a 10rem column; below it the head spans the row above its
+  stages, which stay three across (106px each at 390). The narrowest case is not the
+  phone but the two-column configurator just past `lg`, where the form shares the page
+  with the 380px preview. The tile's focusable controls are never inside an
+  `overflow-hidden` box; only the thumbnail's own wrapper clips.
 
 ### Inputs
 

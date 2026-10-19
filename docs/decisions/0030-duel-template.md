@@ -26,10 +26,22 @@ Ship the mechanic as a new VPAID template, **Duel** (`duel`,
   and a button. No viewer counts, no vote percentages, no chat, no "live" claim from the
   template. Every word is the advertiser's copy, and the defaults (`ROUND 1`,
   `Who do you pick?`, `Tap to vote`, `{name} wins!`, `Watch more`) claim nothing.
-- **Each side has a vote clip and an optional winner clip.** The vote clips loop muted
-  side by side (stacked on a portrait slot), fitted by height ([ADR-0025](0025-media-fit-by-height.md)).
-  The pick folds the other side toward its edge, takes the slot, and plays its winner
-  clip, or keeps the vote clip if none is given. An image works too.
+- **Each side runs a three-scene scenario: vote → win → after** (amended 2026-10-19, after
+  the first examples). The vote clips loop muted side by side (stacked on a portrait slot),
+  fitted by height ([ADR-0025](0025-media-fit-by-height.md)). The pick folds the other
+  side toward its edge, takes the slot and plays its **win** clip once; when that ends,
+  the side's **after** clip loops, muted — the wait that follows the act, the sequence the
+  reference landing plays. Both are optional: an absent win clip is the vote clip carrying
+  on, and an absent after clip is the vote clip again. Each hand-over is laid over the
+  previous clip's last frame and shown at the new clip's first, so there is no black gap,
+  and a clip that will not load leaves the one showing in place. An image works too.
+- **The winner line sits in the top row, centred**, as a compact dark pill on the close
+  control's middle line — the row the countdown bar leaves at the pick. The first version
+  put a large line across the top of the winner's clip, over the face.
+- **The configurator draws the scenario.** The clip fields form a `kind: "scenario"`
+  group: one row per side, its name and then three compact stages in play order, with
+  each field's help behind its column header (docs/design-system.md §6, "Scenario"). Eight
+  stacked controls with a paragraph under each had made the form a wall.
 - **Sound follows ADR-0024's rule.** The winner clip's own audio is unmuted only when the
   viewer's tap made the pick, inside that tap, at `api.volume()`, re-read while it plays,
   so a player that mutes the ad mid-clip is honoured mid-clip and an unmute brings the
@@ -76,8 +88,8 @@ Ship the mechanic as a new VPAID template, **Duel** (`duel`,
   help asks for the two vote clips under about 3.5 MB together, which a 720p H.264 encode
   meets and two 1080p uploads do not. The countdown's own range stops at 25 s, because
   the ad runs 30.
-- **Two to four clips per impression.** The two vote clips load at mount, and the winner
-  clip loads when the pick is made, so a 1080×1920 source costs real bandwidth. The
+- **Two to five clips per impression.** The two vote clips load at mount, the win clip
+  when the pick is made and the after clip when the win clip ends, so a 1080×1920 source costs real bandwidth. The
   configurator's help text recommends vertical video; compressing clips before upload
   (the 720p recipe the slider uses) is the advertiser's lever.
 - **A winner clip that cannot start within 800ms of the tap plays muted.** A cold cache

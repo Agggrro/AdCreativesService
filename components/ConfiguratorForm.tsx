@@ -12,6 +12,7 @@ import { groupLabel } from "@/lib/i18n/dictionaries";
 import { MediaUploadField } from "@/components/MediaUploadField";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { FieldSection } from "@/components/configurator/FieldSection";
+import { ScenarioGrid } from "@/components/configurator/ScenarioGrid";
 import {
   OutcomeMatrix,
   isBlockComplete,
@@ -264,7 +265,15 @@ export function ConfiguratorForm({
 
           return (
             <FieldSection key={run.key} heading={groupLabel(dict, run.group)}>
-              {kinds.get(run.group) === "matrix" ? (
+              {kinds.get(run.group) === "scenario" ? (
+                <ScenarioGrid
+                  fields={run.fields}
+                  values={values}
+                  onChange={setValue}
+                  requiredLabel={dict.configurator.required}
+                  renderField={renderField}
+                />
+              ) : kinds.get(run.group) === "matrix" ? (
                 <OutcomeMatrix
                   blocks={toOutcomeBlocks(run.fields)}
                   values={values}
