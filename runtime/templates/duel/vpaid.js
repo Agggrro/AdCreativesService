@@ -221,7 +221,6 @@ var TEMPLATE = {
     pill.style.cssText =
       "flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:700;" +
       "border-radius:999px;background:rgba(0,0,0,.6);white-space:nowrap;";
-    if (!roundText) pill.style.display = "none";
     var track = document.createElement("span");
     track.style.cssText =
       "position:relative;flex:1;min-width:24px;border-radius:999px;overflow:hidden;" +
@@ -310,8 +309,10 @@ var TEMPLATE = {
         h = slot.clientHeight || 360,
         m = Math.min(w, h),
         row = w >= h,
-        pad = Math.round(clamp(m * 0.035, 8, 18)),
-        fs = clamp(m * 0.045, 11, 18);
+        // Floors low enough for the smallest players in use (a 220x125 slot on a
+        // phone): above about 250px the sizes are what they always were.
+        pad = Math.round(clamp(m * 0.035, 5, 18)),
+        fs = clamp(m * 0.045, 9, 18);
 
       for (var k = 0; k < 2; k++) {
         var s = sides[k];
@@ -339,7 +340,7 @@ var TEMPLATE = {
 
       // The bar sits on the close control's row, kept clear of it on the right
       // and mirrored on the left so it stays centred.
-      var barH = Math.round(clamp(m * 0.07, 20, 30)),
+      var barH = Math.round(clamp(m * 0.07, 14, 30)),
         space = Math.round(barH * 0.3);
       bar.style.left = CLOSE_CLEAR + "px";
       bar.style.right = CLOSE_CLEAR + "px";
@@ -347,13 +348,16 @@ var TEMPLATE = {
       bar.style.height = barH + "px";
       pill.style.marginRight = space + "px";
       clock.style.marginLeft = space + "px";
-      var small = Math.round(clamp(barH * 0.5, 10, 14));
+      var small = Math.round(clamp(barH * 0.5, 9, 14));
+      // The round label only where the bar has room for it beside the clock; on a
+      // narrow slot it would squeeze the countdown to nothing.
+      pill.style.display = roundText && w - 2 * CLOSE_CLEAR >= 200 ? "" : "none";
       pill.style.fontSize = clock.style.fontSize = small + "px";
       pill.style.padding = clock.style.padding =
         Math.round((barH - small * 1.2) / 2) + "px " + Math.round(small * 0.8) + "px";
       track.style.height = Math.max(4, Math.round(barH * 0.22)) + "px";
 
-      question.style.fontSize = Math.round(clamp(m * 0.07, 14, 32)) + "px";
+      question.style.fontSize = Math.round(clamp(m * 0.07, 10, 32)) + "px";
       question.style.padding = Math.round(fs * 0.35) + "px " + Math.round(fs * 0.8) + "px";
       hint.style.fontSize = Math.round(fs) + "px";
       hint.style.padding = Math.round(fs * 0.3) + "px " + Math.round(fs * 0.8) + "px";
@@ -362,15 +366,15 @@ var TEMPLATE = {
 
       // Same row and height as the countdown bar, centred on the close control's
       // middle line (10px inset + 13px half of its 26px box).
-      var bfs = Math.round(clamp(m * 0.05, 13, 22));
+      var bfs = Math.round(clamp(m * 0.05, 10, 22));
       banner.style.fontSize = bfs + "px";
       banner.style.lineHeight = "1.2";
       var bpad = Math.round(bfs * 0.3);
       banner.style.padding = bpad + "px " + Math.round(bfs * 0.8) + "px";
       // From the font, not offsetHeight: the text is only written at the pick.
       banner.style.top = Math.max(4, Math.round(10 + 13 - (bfs * 1.2 + 2 * bpad) / 2)) + "px";
-      cta.style.fontSize = Math.round(clamp(m * 0.05, 13, 22)) + "px";
-      cta.style.padding = Math.round(fs * 0.6) + "px " + Math.round(fs * 1.6) + "px";
+      cta.style.fontSize = Math.round(clamp(m * 0.05, 11, 22)) + "px";
+      cta.style.padding = Math.round(fs * 0.7) + "px " + Math.round(fs * 1.6) + "px";
       cta.style.maxWidth = w - 2 * pad + "px";
       ctaBox.style.bottom = Math.round(pad * 1.5) + "px";
 

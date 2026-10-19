@@ -110,6 +110,10 @@ Ship the mechanic as a new VPAID template, **Duel** (`duel`,
 - **The template cannot stop an advertiser from typing "LIVE" or a viewer count into a
   text field.** That holds for every text field in every template. The template ships no
   such claim, and DSP creative review applies to what an advertiser writes.
+- **It is laid out down to a 220×125 slot**, smaller than the harness's four sizes: a phone
+  player that small was the first to show the overlay crowding. Type and the countdown bar
+  scale down to floors of 9–10px and 14px, and the round label drops out when the bar has no
+  room for it beside the clock.
 - **iOS Safari treats `video.volume` as read-only**, so there only a full mute over VPAID
   is honoured, not a partial volume.
 - Not yet validated beyond the harness. IMA and Fluid behaviour, and unmuted playback on
