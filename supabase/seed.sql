@@ -263,9 +263,10 @@ insert into public.templates (
   -- Step Builder (ADR-0031). The first two or three steps of a "build your own"
   -- flow, a row of tiles each; the button opens the click-through with the picks
   -- appended, which `/r` forwards, so the landing carries on where the ad
-  -- stopped. Seeded as a draft (is_published = false) until its unit is on the
-  -- CDN and an app that knows its key is deployed — runtime/README.md, "Order
-  -- matters when shipping a template change".
+  -- stopped. It was seeded as a draft (is_published = false) until its unit was
+  -- on the CDN and an app that knows its key was deployed, and is published by
+  -- this commit — runtime/README.md, "Order matters when shipping a template
+  -- change".
   (
     '00000000-0000-4000-8000-000000000008',
     'Step Builder',
@@ -344,7 +345,7 @@ insert into public.templates (
        {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true,"group":"sbClick","help":"Where the button leads. With the picks passed on, they are appended to its query string, never over a parameter it already has; a landing that routes in its #fragment does not see them."}
      ]}'::jsonb,
     'standard',
-    false
+    true
   )
 on conflict (id) do update set
   name                = excluded.name,
