@@ -87,10 +87,9 @@ for it, and these counts feed a customer-facing dashboard. See
 [security.md](security.md).
 
 **What is not collected**, so no screen may imply it: `start`, the quartiles and `complete` are no
-longer emitted into the VAST at all, so the completion funnel is gone; `error` beacons
-arrive but are dropped at ingest because the name is absent from the event map; and
+longer emitted into the VAST at all, so the completion funnel is gone; and
 `/api/vast` writes nothing, so ad *requests* are uncounted and fill rate cannot be
-derived. **CTR is displayed** on the creative page, over impressions — see
+derived — nor can an error rate, although errors themselves are counted (below). **CTR is displayed** on the creative page, over impressions — see
 design-system.md §6 for why the denominator has to be stated.
 
 There is also no per-impression detail any more, by construction. Frequency, unique
@@ -106,6 +105,27 @@ creative, granted to `authenticated` only. Those last two are not analytics: the
 badge and the state rail depend on them. It works because the function owner is exempt
 from RLS; running `alter table public.creative_event_counters force row level security`
 would make it silently return zeros.
+
+### `creative_error_counters` (VAST errors — [ADR-0032](decisions/0032-vast-error-statistics.md))
+The `<Error>` beacon, counted the way `creative_event_counters` counts events: one row per
+(creative, VAST error code, hour). A separate table rather than an `error` value of
+`creative_event_type`, because an error is only worth reading with its code.
+
+| Field | Notes |
+| --- | --- |
+| `creative_id` | FK, `on delete cascade`. Part of the PK |
+| `code` | smallint, `0` or 100–999 (check constraint). The code the player substituted for `[ERRORCODE]`; **`0` means it sent none usable** — the macro left literal, empty, or malformed. **Not covered by the beacon's signature** (the player fills it in after we sign), so it is player-reported in the full sense: see [security.md](security.md) |
+| `bucket` | `date_trunc('hour', now())`; rolled into midnight after 30 days by `rollup_creative_events()`, alongside the event counters |
+| `count` | bigint, incremented in place |
+
+Ingested by the same `/t` handler ([`lib/serving/http/track.ts`](../lib/serving/http/track.ts)):
+a hit with `e=error` and a valid signature for event `error` calls
+`public.increment_creative_error(creative_id, code)` (service role only), with the code
+parsed by [`lib/vast/error-codes.ts`](../lib/vast/error-codes.ts). Read only through
+`public.get_creative_errors(creative_id)` — `SECURITY DEFINER`, the `owned` check inside,
+granted to `authenticated` — which returns all-time counts per code for the creative
+page's error section. **No error rate exists anywhere**: an error often fires before any
+impression, and ad requests are not counted.
 
 ### Conversion tracking ([ADR-0023](decisions/0023-conversion-postbacks.md))
 
@@ -205,6 +225,7 @@ Ledger of claimed and processed Stripe event ids. Service-role only; no client a
 auth.users 1──* creatives *──1 templates
 auth.users 1──* subscriptions *──0..1 templates   (null template_id = all-access)
 creatives  1──* creative_event_counters
+creatives  1──* creative_error_counters
 creatives  1──* creative_clicks
 creatives  1──* conversions            (click_id is a soft reference — clicks expire)
 auth.users 1──0..1 postback_keys
@@ -302,6 +323,7 @@ was missed or delayed.
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
 | `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
+| `creative_error_counters` | the same: RLS on, zero policies, table privileges revoked from `anon`/`authenticated`; written by `increment_creative_error()` (service role), read only through the owner-checked `public.get_creative_errors()` ([ADR-0032](decisions/0032-vast-error-statistics.md)) |
 | `creative_clicks`, `conversions`, `postback_keys`, `postback_log` | **no direct client access** (RLS on, zero policies, table and identity-sequence privileges revoked from `anon`/`authenticated`); clicks written by `record_click()` and conversions + log by `record_postback()`, both service role only; the owner reads through `get_creative_conversions()`, `ensure_postback_key()`, `has_postback_key()` and `get_postback_log()`, each scoped to `auth.uid()` ([ADR-0023](decisions/0023-conversion-postbacks.md)) |
 | `stripe_events` | **no direct client access**; written only by the webhook (service role) |
 | `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent. Since [ADR-0028](decisions/0028-creative-media-on-r2.md) new uploads go to R2, which has no RLS: there the same prefix rule is enforced in code (`requestMediaUpload` mints the key; `deleteCreative` deletes only keys under the caller's prefix) |

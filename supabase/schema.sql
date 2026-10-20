@@ -329,6 +329,57 @@ revoke all on function public.increment_creative_event(uuid, creative_event_type
 grant execute on function public.increment_creative_event(uuid, creative_event_type) to service_role;
 
 -- ---------------------------------------------------------------------------
+-- creative_error_counters  (VAST <Error> beacons — ADR-0032)
+-- ---------------------------------------------------------------------------
+-- The same (creative, hour) counting as creative_event_counters, keyed by the
+-- VAST error code the player substitutes for [ERRORCODE]. A separate table
+-- rather than an `error` value of creative_event_type: an error is only worth
+-- reading with its code, and carrying a code column on every impression and
+-- click counter would widen that table's key for no reading of it.
+--
+-- `code` is 100–999, the VAST 4.2 range, or 0 for a beacon whose [ERRORCODE]
+-- the player left literal, empty or malformed. The handler maps anything else
+-- to 0 before it gets here; the check is the second lock.
+create table if not exists public.creative_error_counters (
+  creative_id uuid not null references public.creatives(id) on delete cascade,
+  code        smallint not null check (code = 0 or code between 100 and 999),
+  -- date_trunc('hour', …), rolled into midnight after 30 days by the same cron.
+  bucket      timestamptz not null,
+  count       bigint not null default 0,
+  primary key (creative_id, code, bucket)
+);
+comment on table public.creative_error_counters is 'VAST error beacons per code (ADR-0032). Written via increment_creative_error(); read only through get_creative_errors().';
+
+-- No secondary index, for the reason creative_event_counters has none: every
+-- read scans by the creative_id prefix of the primary key.
+
+-- `p_code` is integer, not the column's smallint: an integer literal (and a
+-- JSON number through PostgREST) resolves to it without a cast, and the insert
+-- narrows it — a value out of range fails the check, not the lookup.
+create or replace function public.increment_creative_error(
+  p_creative_id uuid,
+  p_code        integer
+)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.creative_error_counters (creative_id, code, bucket, count)
+  values (p_creative_id, p_code, date_trunc('hour', now()), 1)
+  on conflict (creative_id, code, bucket)
+  do update set count = public.creative_error_counters.count + 1;
+$$;
+
+-- `anon` and `authenticated` named, not only `public`: a Supabase project's
+-- default privileges grant EXECUTE on new functions to those roles directly,
+-- and a revoke from PUBLIC does not touch a direct grant. The anon key ships
+-- in the client bundle and every creative_id is in a public tag URL, so
+-- leaving it would let anyone write any creative's error counts past /t.
+revoke all on function public.increment_creative_error(uuid, integer) from public, anon, authenticated;
+grant execute on function public.increment_creative_error(uuid, integer) to service_role;
+
+-- ---------------------------------------------------------------------------
 -- Roll hourly buckets older than the window into one midnight bucket per day.
 -- Called by the daily cron (app/api/cron/health). Idempotent: a second run over
 -- the same range finds only already-collapsed rows and changes nothing.
@@ -360,11 +411,32 @@ begin
     returning 1
   )
   select count(*) into v_rolled from merged;
+
+  -- The error counters (ADR-0032), folded the same way so the two tables age
+  -- identically. The return value stays the event counters' alone: the cron
+  -- logs it, and changing what it counts would silently change that log.
+  with collapsed as (
+    delete from public.creative_error_counters
+     where bucket < v_cutoff
+       and bucket <> date_trunc('day', bucket)
+    returning creative_id, code, date_trunc('day', bucket) as day, count
+  ), summed as (
+    select creative_id, code, day, sum(count) as count
+      from collapsed
+     group by creative_id, code, day
+  )
+  insert into public.creative_error_counters (creative_id, code, bucket, count)
+  select creative_id, code, day, count from summed
+  on conflict (creative_id, code, bucket)
+  do update set count = public.creative_error_counters.count + excluded.count;
+
   return coalesce(v_rolled, 0);
 end;
 $$;
 
-revoke all on function public.rollup_creative_events(int) from public;
+-- Named roles for the reason given at increment_creative_error: a negative
+-- argument would collapse every account's recent hourly buckets.
+revoke all on function public.rollup_creative_events(int) from public, anon, authenticated;
 grant execute on function public.rollup_creative_events(int) to service_role;
 
 -- ---------------------------------------------------------------------------
@@ -854,6 +926,7 @@ alter table public.templates       enable row level security;
 alter table public.creatives       enable row level security;
 alter table public.subscriptions   enable row level security;
 alter table public.creative_event_counters enable row level security;
+alter table public.creative_error_counters enable row level security;
 alter table public.stripe_events   enable row level security;
 alter table public.creative_clicks enable row level security;
 alter table public.conversions     enable row level security;
@@ -905,6 +978,8 @@ create policy subscriptions_select_own on public.subscriptions
 -- creative_event_counters: no direct client access. RLS enabled with no policy =>
 -- the anon/authenticated roles are denied. Writes go through the service role
 -- (increment_creative_event); reads go through get_creative_overview().
+-- creative_error_counters: the same (ADR-0032) — written by increment_creative_error,
+-- read only through get_creative_errors().
 
 -- creative_clicks, conversions, postback_keys, postback_log: the same shape
 -- (ADR-0023). No policy, so no direct client access. Clicks are written only by
@@ -991,6 +1066,8 @@ grant all on all sequences in schema public to anon, authenticated, service_role
 -- not stop it. SECURITY DEFINER functions are unaffected: they are checked
 -- against their owner, not the caller.
 revoke all on public.creative_event_counters, public.stripe_events from anon, authenticated;
+-- creative_error_counters (ADR-0032) has no client contract either.
+revoke all on public.creative_error_counters from anon, authenticated;
 -- The same for the conversion-tracking tables (ADR-0023): no client contract,
 -- so no table privilege for a missing policy to be the only thing guarding.
 revoke all on public.creative_clicks, public.conversions,
@@ -1243,6 +1320,42 @@ comment on function public.get_creative_overview() is
 
 revoke all on function public.get_creative_overview() from public;
 grant execute on function public.get_creative_overview() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- VAST errors by code for one creative (ADR-0032)
+-- ---------------------------------------------------------------------------
+-- All-time, like the overview's counts.
+-- The `owned` CTE is the ownership check, as in get_creative_conversions(): a
+-- creative the caller does not own yields no rows.
+create or replace function public.get_creative_errors(p_creative_id uuid)
+returns table (
+  code  smallint,
+  count bigint
+)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with owned as (
+    select c.id from public.creatives c
+     where c.id = p_creative_id
+       and c.user_id = (select auth.uid())
+  )
+  select x.code, sum(x.count)::bigint
+    from public.creative_error_counters x
+   where x.creative_id = (select id from owned)
+   group by x.code
+   order by 2 desc, 1;
+$$;
+
+comment on function public.get_creative_errors(uuid) is
+  'VAST error beacon counts per error code for one creative the caller owns (ADR-0032).';
+
+-- `anon` named for the reason given at increment_creative_error. Harmless
+-- here (auth.uid() is null, so no rows), but there is no reason to hold it.
+revoke all on function public.get_creative_errors(uuid) from public, anon;
+grant execute on function public.get_creative_errors(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Conversion report for one creative (ADR-0023)

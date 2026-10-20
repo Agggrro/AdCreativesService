@@ -200,7 +200,9 @@ Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
   the only source of these headers, on a cache hit as on a miss; `next.config.ts` and
   the Worker set `*` for `/t` and `/c/…` only.
 - **No database write on the beacon path.** `/t` hands its counter upsert to
-  `waitUntil` and returns 204 immediately.
+  `waitUntil` and returns 204 immediately. That includes the `<Error>` beacon, which is
+  counted per VAST code into `creative_error_counters`
+  ([ADR-0032](decisions/0032-vast-error-statistics.md)).
 
 ### Click redirect `GET /r` and postbacks `GET|POST /pb`
 

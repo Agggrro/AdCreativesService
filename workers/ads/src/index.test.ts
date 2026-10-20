@@ -2,6 +2,7 @@ import test, { beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import worker, { type Env } from "./index.ts";
 import { SNAPSHOT_SCHEMA_VERSION } from "../../../lib/serving/types.ts";
+import { signTrackToken } from "../../../lib/track-token.ts";
 
 /**
  * Run with `npm run test:ads`.
@@ -62,6 +63,8 @@ let pending: Promise<unknown>[];
 let forwarded: Request[];
 /** What the fake Supabase answers for the serving RPC: a row, nothing, or failure. */
 let database: "row" | "empty" | "down";
+/** Every counter write a beacon made: the RPC's name and its JSON body. */
+let writes: { rpc: string; body: unknown }[];
 
 const ctx = { waitUntil: (p: Promise<unknown>) => void pending.push(p) };
 
@@ -117,8 +120,14 @@ function publish(entitled = true): void {
   );
 }
 
-const fetchMock = mock.method(globalThis, "fetch", async (input: Request | string) => {
+const fetchMock = mock.method(globalThis, "fetch", async (input: Request | string, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input.url;
+  const counter = /^https:\/\/supabase\.test\/rest\/v1\/rpc\/(increment_creative_(?:event|error))/.exec(url);
+  if (counter) {
+    const body = typeof input === "string" ? init?.body : await input.text();
+    writes.push({ rpc: counter[1], body: JSON.parse(String(body)) });
+    return new Response(null, { status: 204 });
+  }
   if (url.startsWith(`${SUPABASE}/rest/v1/rpc/get_creative_serving`)) {
     if (database === "down") return new Response("boom", { status: 500 });
     return new Response(database === "row" ? JSON.stringify([{ ...creative, is_entitled: true, should_serve: true }]) : "[]", {
@@ -138,6 +147,7 @@ beforeEach(() => {
   kv = new FakeKv();
   pending = [];
   forwarded = [];
+  writes = [];
   database = "down";
   fetchMock.mock.resetCalls();
   (globalThis as unknown as { caches: unknown }).caches = { default: cache };
@@ -319,4 +329,56 @@ test("a forged beacon is a 204 that writes nothing", async () => {
   assert.equal(res.status, 204);
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
   assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+/** A beacon path signed the way lib/vast/builder.ts signs it. */
+function beacon(event: string, extra = ""): string {
+  const { exp, sig } = signTrackToken(CID, event);
+  return `/t?cid=${CID}&e=${event}&exp=${exp}&sig=${sig}${extra}`;
+}
+
+test("a signed impression is counted as an event, not as an error", async () => {
+  const res = await call(beacon("impression"));
+  assert.equal(res.status, 204);
+  assert.deepEqual(writes, [
+    { rpc: "increment_creative_event", body: { p_creative_id: CID, p_event_type: "impression" } },
+  ]);
+});
+
+test("a signed <Error> beacon is counted under the code the player substituted", async () => {
+  const res = await call(beacon("error", "&code=303"));
+  assert.equal(res.status, 204);
+  assert.equal(res.headers.get("Cache-Control"), "no-store");
+  assert.deepEqual(writes, [
+    { rpc: "increment_creative_error", body: { p_creative_id: CID, p_code: 303 } },
+  ]);
+});
+
+test("an <Error> beacon with no usable code is counted as code 0", async () => {
+  for (const extra of ["&code=[ERRORCODE]", "&code=%5BERRORCODE%5D", "", "&code=", "&code=99", "&code=1000", "&code=040", "&code=3e2", "&code=303.0"]) {
+    writes = [];
+    await call(beacon("error", extra));
+    assert.deepEqual(
+      writes,
+      [{ rpc: "increment_creative_error", body: { p_creative_id: CID, p_code: 0 } }],
+      `code param ${JSON.stringify(extra)}`,
+    );
+  }
+});
+
+test("an <Error> beacon writes nothing when its signature is forged, expired or another event's", async () => {
+  const impression = signTrackToken(CID, "impression");
+  const expired = signTrackToken(CID, "error", -10);
+  for (const path of [
+    `/t?cid=${CID}&e=error&exp=9999999999&sig=AAAA&code=303`,
+    `/t?cid=${CID}&e=error&exp=${expired.exp}&sig=${expired.sig}&code=303`,
+    `/t?cid=${CID}&e=error&exp=${impression.exp}&sig=${impression.sig}&code=303`,
+  ]) {
+    const res = await call(path);
+    assert.equal(res.status, 204);
+  }
+  // And the error signature does not count an impression either.
+  const error = signTrackToken(CID, "error");
+  await call(`/t?cid=${CID}&e=impression&exp=${error.exp}&sig=${error.sig}`);
+  assert.deepEqual(writes, []);
 });

@@ -171,6 +171,14 @@ rename to do it.
   ever having seen a real one), not *replay* of a beacon someone actually
   captured from a live VAST response. Rate limiting per `(creative_id, event)`
   is the next layer if replay abuse is observed; not implemented yet.
+- **The `<Error>` beacon's `code` is unsigned, by necessity** (ADR-0032). The URL is
+  signed over `(creative_id, "error", exp)` and `&code=[ERRORCODE]` is appended after —
+  the player substitutes the macro, so we cannot sign its value. Anyone holding a live
+  error beacon can therefore choose **which code** a hit counts under, never which
+  creative, and only until `exp`. `parseErrorCode` (`lib/vast/error-codes.ts`) accepts
+  exactly three digits in 100–999 and maps everything else to `0`, so the distinct keys
+  per creative stay bounded at 901; the table's check constraint is the second lock. The
+  error numbers are read as player-reported, which they are either way.
 
 ## Click redirect and postbacks (`/r`, `/pb` — ADR-0023)
 
@@ -206,7 +214,8 @@ rename to do it.
   and links collected while the old one was live then fail rather than redirect to the
   newcomer's URL.
 - **Signed under the beacon key, domain-separated.** `/r` signs `r:<field>` with
-  `signTrackToken`; `/t` accepts only its three event names and `/r` only `r:<field>`, so
+  `signTrackToken`; `/t` accepts only its event names (`impression`, `viewable`, `click`,
+  `error`) and `/r` only `r:<field>`, so
   neither route accepts the other's signature. The same residual gap as the beacons
   applies, and it is sharper here: anyone who fetched a tag holds day-long signed click
   links and can replay them. That can dilute click counts and CR — bounded by

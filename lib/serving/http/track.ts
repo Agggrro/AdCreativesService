@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { verifyTrackToken } from "@/lib/track-token";
 import { UUID_RE } from "@/lib/uuid";
+import { parseErrorCode } from "@/lib/vast/error-codes";
 import type { CreativeEventType } from "@/types/database.types";
 import type { ServingPlatform } from "./platform";
 
@@ -28,6 +29,10 @@ import type { ServingPlatform } from "./platform";
 //                    never reaches it. `interaction` stays unmapped for the same
 //                    reason it always was: nothing emits it.
 //
+// `error` is not here either, but it is accepted: it is the VAST <Error> beacon,
+// counted per error code into its own table (ADR-0032) rather than as a value of
+// the event enum. See the branch below.
+//
 // `Object.hasOwn` below, not a bare index: `e=constructor` must not resolve to an
 // inherited function.
 const EVENT_MAP: Record<string, CreativeEventType> = {
@@ -44,13 +49,32 @@ function noContent(): Response {
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
 
-/** `GET /t?cid=…&e=…&exp=…&sig=…` */
+/** The <Error> beacon's event name — signed like every other one. */
+const ERROR_EVENT = "error";
+
+/**
+ * Hand a counter write to the platform. Both outcomes are handled, so the
+ * promise can never reject: a beacon is best-effort, and an unknown creative's
+ * FK error is not worth a log line per hit. `Promise.resolve` because the query
+ * builder is a PromiseLike, not a Promise.
+ */
+function record(platform: ServingPlatform, write: PromiseLike<unknown>): void {
+  platform.waitUntil(
+    Promise.resolve(write).then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+}
+
+/** `GET /t?cid=…&e=…&exp=…&sig=…` (`&code=…` on `e=error`) */
 export function handleTrack(request: Request, platform: ServingPlatform): Response {
   try {
     const url = new URL(request.url);
     const cid = url.searchParams.get("cid");
     const eventName = url.searchParams.get("e") ?? "";
     const eventType = Object.hasOwn(EVENT_MAP, eventName) ? EVENT_MAP[eventName] : undefined;
+    const isError = eventName === ERROR_EVENT;
 
     // Every beacon the VAST builder emits is signed (lib/track-token.ts) — a
     // hit with no valid signature is either forged or stale, and is dropped
@@ -59,7 +83,7 @@ export function handleTrack(request: Request, platform: ServingPlatform): Respon
     if (
       cid &&
       UUID_RE.test(cid) &&
-      eventType &&
+      (eventType || isError) &&
       verifyTrackToken(cid, eventName, url.searchParams.get("exp"), url.searchParams.get("sig"))
     ) {
       const supabase = createServiceClient();
@@ -71,22 +95,28 @@ export function handleTrack(request: Request, platform: ServingPlatform): Respon
       // beacon (ADR-0016). Done in SQL rather than read-then-write in app code,
       // because concurrent beacons for the same creative are the normal case on
       // this path and a lost update would silently undercount.
-      //
-      // Both outcomes are handled, so the promise handed over can never reject:
-      // a beacon is best-effort, and an unknown creative's FK error is not worth
-      // a log line per hit. `Promise.resolve` because the query builder is a
-      // PromiseLike, not a Promise.
-      platform.waitUntil(
-        Promise.resolve(
+      if (eventType) {
+        record(
+          platform,
           supabase.rpc("increment_creative_event", {
             p_creative_id: cid,
             p_event_type: eventType,
           }),
-        ).then(
-          () => undefined,
-          () => undefined,
-        ),
-      );
+        );
+      } else {
+        // The <Error> beacon (ADR-0032). `code` sits outside the signature —
+        // the player substitutes [ERRORCODE] after we sign — so a holder of a
+        // valid URL can choose which code it counts against, never which
+        // creative, and only until `exp`. parseErrorCode bounds it to the VAST
+        // range or 0; the table's check constraint is the second lock.
+        record(
+          platform,
+          supabase.rpc("increment_creative_error", {
+            p_creative_id: cid,
+            p_code: parseErrorCode(url.searchParams.get("code")),
+          }),
+        );
+      }
     }
   } catch {
     // never surface tracking errors to the player

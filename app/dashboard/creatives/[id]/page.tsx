@@ -22,6 +22,7 @@ import {
   REPORT_DAYS,
   type ExitLabel,
 } from "@/components/ConversionReport";
+import { VastErrorReport } from "@/components/VastErrorReport";
 import { Panel } from "@/components/ui/Field";
 import { ServingBadge } from "@/components/ui/State";
 
@@ -66,6 +67,7 @@ export default async function CreativePage({
     { data: conversions, error: conversionsError },
     { data: goals, error: goalsError },
     { data: hasPostbackKey },
+    { data: vastErrors, error: vastErrorsError },
   ] = await Promise.all([
     supabase
       .from("creatives")
@@ -88,6 +90,8 @@ export default async function CreativePage({
     // the missing-{click_id} warning, which would otherwise sit on every
     // creative of an account that never meant to track conversions.
     supabase.rpc("has_postback_key"),
+    // VAST errors per code (ADR-0032), owner-checked inside like the two above.
+    supabase.rpc("get_creative_errors", { p_creative_id: id }),
   ]);
 
   if (!creative) notFound();
@@ -267,6 +271,13 @@ export default async function CreativePage({
           </span>
         </Panel>
       </div>
+
+      <VastErrorReport
+        dict={dict}
+        locale={locale}
+        rows={vastErrors ?? []}
+        available={!vastErrorsError}
+      />
 
       <div className="flex flex-col gap-2">
         <h2 className="label-instr">{dict.dashboard.vastTag}</h2>

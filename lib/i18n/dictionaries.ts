@@ -6,6 +6,8 @@
  * `ru` is the shape of record; `en` is typed against it, so a key added to one
  * locale and forgotten in the other is a compile error.
  */
+import type { KnownVastErrorCode } from "@/lib/vast/error-codes";
+
 export const LOCALES = ["ru", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
@@ -245,6 +247,65 @@ const ru = {
       "В этих ссылках перехода нет {click_id}, поэтому партнёрка не сможет вернуть по ним конверсии. Добавьте его в настройках креатива.",
     unavailable:
       "Статистика конверсий сейчас недоступна. Обновите страницу через минуту.",
+  },
+  // VAST <Error> beacons on a creative's detail page (ADR-0032).
+  vastErrors: {
+    heading: "Ошибки VAST",
+    total: "Ошибки",
+    // Why there is no rate: an error often comes with no impression at all,
+    // and we count no ad requests to divide by (§6).
+    totalHint:
+      "Сообщает плеер через <Error>, за всё время. Ошибка часто случается до показа, поэтому доли от показов нет.",
+    code: "Код",
+    description: "Что произошло",
+    count: "Ошибки",
+    share: "Доля от ошибок",
+    none: "Плеер не сообщал об ошибках.",
+    noCode: "Плеер не передал код",
+    unknownCode: "Код вне спецификации VAST 4.2",
+    unavailable:
+      "Статистика ошибок сейчас недоступна. Обновите страницу через минуту.",
+    // IAB VAST 4.2 §2.3.6.3. Keys are the codes; lib/vast/error-codes.ts lists
+    // them, and `satisfies` makes a code without a description a compile error.
+    codes: {
+      "100": "XML-ответ не разобран",
+      "101": "Ответ не прошёл проверку схемы VAST",
+      "102": "Версия VAST не поддерживается плеером",
+      "200": "Креатив не подошёл плееру",
+      "201": "Плеер ждал другую линейность",
+      "202": "Плеер ждал другую длительность",
+      "203": "Плеер ждал другой размер",
+      "204": "Требуется категория рекламы, но её нет",
+      "205": "Категория запрещена в обёртке",
+      "206": "Рекламная пауза сокращена, реклама не показана",
+      "300": "Общая ошибка обёртки",
+      "301": "Тайм-аут запроса VAST по ссылке обёртки",
+      "302": "Превышен лимит обёрток",
+      "303": "Нет ответа VAST после обёрток",
+      "304": "Креатив не показался за отведённое время",
+      "400": "Общая ошибка линейного креатива",
+      "401": "Медиафайл не найден",
+      "402": "Тайм-аут загрузки медиафайла",
+      "403": "Нет медиафайла поддерживаемого формата",
+      "405": "Не удалось воспроизвести медиафайл",
+      "406": "Требуется мезонинный файл, но его нет",
+      "407": "Мезонинный файл ещё загружается",
+      "408": "Условная реклама отклонена",
+      "409": "Интерактивный модуль не запущен",
+      "410": "Модуль верификации не запущен",
+      "500": "Общая ошибка нелинейного креатива",
+      "501": "Нелинейный креатив не подошёл по размеру",
+      "502": "Не удалось загрузить нелинейный ресурс",
+      "503": "Нет нелинейного ресурса поддерживаемого типа",
+      "600": "Общая ошибка компаньона",
+      "601": "Компаньон не подошёл по размеру",
+      "602": "Не удалось показать обязательный компаньон",
+      "603": "Не удалось загрузить ресурс компаньона",
+      "604": "Нет ресурса компаньона поддерживаемого типа",
+      "900": "Неопределённая ошибка",
+      "901": "Общая ошибка VPAID",
+      "902": "Общая ошибка интерактивного модуля",
+    } satisfies Record<`${KnownVastErrorCode}`, string>,
   },
   // The account's postback settings page (ADR-0023).
   postback: {
@@ -818,6 +879,59 @@ const en: Dict = {
       "These click-through links have no {click_id}, so your network cannot report conversions back for them. Add it in the creative's settings.",
     unavailable:
       "Conversion numbers are unavailable right now. Refresh in a minute.",
+  },
+  vastErrors: {
+    heading: "VAST errors",
+    total: "Errors",
+    totalHint:
+      "Reported by the player through <Error>, all time. An error often happens before any impression, so there is no share of impressions.",
+    code: "Code",
+    description: "What happened",
+    count: "Errors",
+    share: "Share of errors",
+    none: "The player has reported no errors.",
+    noCode: "The player sent no code",
+    unknownCode: "Code outside the VAST 4.2 spec",
+    unavailable: "Error numbers are unavailable right now. Refresh in a minute.",
+    codes: {
+      "100": "XML response could not be parsed",
+      "101": "Response failed VAST schema validation",
+      "102": "VAST version not supported by the player",
+      "200": "Creative did not fit the player",
+      "201": "Player expected a different linearity",
+      "202": "Player expected a different duration",
+      "203": "Player expected a different size",
+      "204": "Ad category required but not provided",
+      "205": "Category blocked by the wrapper",
+      "206": "Ad break shortened, ad not served",
+      "300": "General wrapper error",
+      "301": "Timeout fetching the wrapper's VAST URI",
+      "302": "Wrapper limit reached",
+      "303": "No VAST response after the wrappers",
+      "304": "Creative failed to display within the timeout",
+      "400": "General linear error",
+      "401": "Media file not found",
+      "402": "Timeout loading the media file",
+      "403": "No media file in a supported format",
+      "405": "Media file could not be played",
+      "406": "Mezzanine file required but not provided",
+      "407": "Mezzanine file still downloading",
+      "408": "Conditional ad rejected",
+      "409": "Interactive unit was not executed",
+      "410": "Verification unit was not executed",
+      "500": "General non-linear error",
+      "501": "Non-linear creative did not fit the size",
+      "502": "Non-linear resource could not be fetched",
+      "503": "No non-linear resource of a supported type",
+      "600": "General companion error",
+      "601": "Companion did not fit the size",
+      "602": "Required companion could not be displayed",
+      "603": "Companion resource could not be fetched",
+      "604": "No companion resource of a supported type",
+      "900": "Undefined error",
+      "901": "General VPAID error",
+      "902": "General interactive unit error",
+    },
   },
   postback: {
     title: "Postback",

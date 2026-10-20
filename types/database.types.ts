@@ -213,6 +213,37 @@ export type Database = {
           },
         ];
       };
+      // ADR-0032: VAST <Error> beacons per code, counted like the events above.
+      // `increment_creative_error()` is the only writer.
+      creative_error_counters: {
+        Row: {
+          creative_id: string;
+          /** VAST error code, 100–999; 0 when the player sent none usable. */
+          code: number;
+          bucket: string;
+          count: number;
+        };
+        Insert: {
+          creative_id: string;
+          code: number;
+          bucket: string;
+          count?: number;
+        };
+        Update: {
+          creative_id?: string;
+          code?: number;
+          bucket?: string;
+          count?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "creative_error_counters_creative_id_fkey";
+            columns: ["creative_id"];
+            referencedRelation: "creatives";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       stripe_events: {
         Row: {
           id: string;
@@ -384,6 +415,15 @@ export type Database = {
           should_serve: boolean;
         }[];
       };
+      // One creative's VAST errors per code, all-time, most frequent first.
+      // Owner-checked inside: another account's id yields no rows.
+      get_creative_errors: {
+        Args: { p_creative_id: string };
+        Returns: {
+          code: number;
+          count: number;
+        }[];
+      };
       // One creative's clicks through `/r` and its conversions per (UTC day,
       // exit field). Owner-checked inside: another account's id yields no rows.
       get_creative_conversions: {
@@ -479,6 +519,11 @@ export type Database = {
           p_creative_id: string;
           p_event_type: Database["public"]["Enums"]["creative_event_type"];
         };
+        Returns: undefined;
+      };
+      // The error beacon's only write (ADR-0032). Service role only.
+      increment_creative_error: {
+        Args: { p_creative_id: string; p_code: number };
         Returns: undefined;
       };
       // Collapses hourly buckets older than N days into one per day. Called by

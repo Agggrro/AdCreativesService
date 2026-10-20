@@ -815,8 +815,10 @@ Counting rules, because a metric that lies costs more than a metric that is miss
   ([ADR-0016](decisions/0016-three-events-hourly-counters.md)): **impression**, **click**
   (fired only from the final call-to-action that opens the advertiser's URL — never from an
   intermediate interaction such as a quiz answer), and **viewable** (VPAID-only,
-  self-reported). There is still no error event and no count of ad requests, so **error rate
-  and fill rate may not appear on any screen**. CTR became derivable when click arrived and
+  self-reported) — plus, since [ADR-0032](decisions/0032-vast-error-statistics.md), the
+  player's **`<Error>` beacon, per VAST code**. There is still no count of ad requests, and an
+  error often fires before any impression, so **error rate and fill rate may not appear on
+  any screen**. CTR became derivable when click arrived and
   **is displayed, over impressions**. Two rules come with it:
   - **A derived ratio may close the delivery strip, never sit inside it.** The counts are a
     sequential set of things that happened; a ratio is a reading about them.
@@ -865,6 +867,18 @@ Counting rules, because a metric that lies costs more than a metric that is miss
     in mono, sorted by a fixed collation so the order does not change with the interface
     language; "No goal", for conversions that came without one, is copy and sorts last. No
     rail — a goal has no state.
+
+- **VAST errors are their own section, not a delivery tile**
+  ([ADR-0032](decisions/0032-vast-error-statistics.md)). An error is not a step in
+  impression → click. It is a total tile, shaped like the viewability tile, whose caption
+  says the number is player-reported and why it is not divided by impressions. Under it
+  is a 44px table: code (mono), what happened (copy), count, and **"Share of errors"**.
+  The header names the denominator, because a bare percentage there gets read as a share
+  of impressions. Rows sort by count. Neither the tile nor the table carries a rail or
+  `dead`: a code is not a state of the creative, and every creative served at scale
+  has some errors. Code `0` reads "the player sent no code". A code in range that VAST
+  4.2 does not define reads "outside the spec". Errors are not a column in the creatives
+  list: a fifth number column pushed the Russian row actions out of the 1200px container.
 
 ## 7. The player well
 
