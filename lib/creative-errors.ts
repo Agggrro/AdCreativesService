@@ -1,13 +1,14 @@
 import type { Dict } from "@/lib/i18n/dictionaries";
 
-/** Error codes the create/update actions redirect back with. */
+/** Error codes the creative actions (create, update, delete, duplicate) redirect back with. */
 export type CreativeError =
   | "format_required"
   | "template_not_found"
   | "field_required"
   | "name_too_long"
   | "save_failed"
-  | "delete_failed";
+  | "delete_failed"
+  | "duplicate_failed";
 
 /** Error code → copy, in the reader's language (§8). Shared by the create and edit pages. */
 export function creativeErrorMessage(
@@ -29,6 +30,8 @@ export function creativeErrorMessage(
       return c.errSaveFailed;
     case "delete_failed":
       return c.errDeleteFailed;
+    case "duplicate_failed":
+      return c.errDuplicateFailed;
     default:
       // An unrecognised code says nothing useful, and guessing "could not save"
       // is wrong on a page that never saves anything. Say nothing.

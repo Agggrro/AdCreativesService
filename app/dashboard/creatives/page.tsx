@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Pencil } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCdnUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
@@ -7,6 +6,7 @@ import { LOCALE_TAG } from "@/lib/i18n/dictionaries";
 import { creativeErrorMessage } from "@/lib/creative-errors";
 import { CopyButton } from "@/components/CopyButton";
 import { DeleteCreativeButton } from "@/components/DeleteCreativeButton";
+import { DuplicateCreativeButton } from "@/components/DuplicateCreativeButton";
 import { buttonClass, LinkButton } from "@/components/ui/Button";
 import { Notice, Panel } from "@/components/ui/Field";
 import { ServingBadge } from "@/components/ui/State";
@@ -29,7 +29,8 @@ export default async function MyCreativesPage({
   const supabase = await createServerSupabase();
   const { locale, dict } = await getDict();
   const sp = await searchParams;
-  const deleteError = creativeErrorMessage(dict, sp.error, undefined);
+  // Delete and duplicate both redirect back here with their error code.
+  const actionError = creativeErrorMessage(dict, sp.error, undefined);
 
   const [
     { data: creatives },
@@ -85,7 +86,7 @@ export default async function MyCreativesPage({
         <Notice tone="dead">{dict.dashboard.statsUnavailable}</Notice>
       )}
 
-      {deleteError && <Notice tone="dead">{deleteError}</Notice>}
+      {actionError && <Notice tone="dead">{actionError}</Notice>}
 
       {creatives && creatives.length > 0 ? (
         <TableFrame>
@@ -96,15 +97,26 @@ export default async function MyCreativesPage({
               `TableFrame`, not `Panel`: `Panel` is `overflow-hidden` and
               would clip the focus ring on the new edge-adjacent action
               buttons (docs/design-system.md §2). */}
-          <table className="w-full table-fixed border-collapse type-small">
+          {/* `min-w`: the fixed columns sum to 908px, more than the
+              container holds below `lg`, and a fixed layout gives the
+              leftover — nothing — to the name. Pinned at what the name
+              gets at the 1200px container, so a narrower screen scrolls
+              the table inside its frame (§5) instead of crushing it. */}
+          <table className="w-full min-w-[1100px] table-fixed border-collapse type-small">
             <colgroup>
               <col />
               <col className="w-[88px]" />
               <col className="w-[120px]" />
               <col className="w-[80px]" />
               <col className="w-[132px]" />
-              <col className="w-[190px]" />
-              <col className="w-[260px]" />
+              {/* "Копировать тег" with its icon measures 137px. */}
+              <col className="w-[176px]" />
+              {/* Edit, Duplicate, Delete: 84 + 101 + 75px in Russian, the
+                  longer locale (§10), plus two gaps and the cell inset. Words
+                  without icons — with them the column needs 376px and leaves
+                  the name ~130px at the 1200px container; §11 says the fix
+                  for a crowded action cell is narrower, never icon-only. */}
+              <col className="w-[312px]" />
             </colgroup>
             <TableHead>
                 <th className={HEAD}>{dict.dashboard.creativeName}</th>
@@ -135,7 +147,9 @@ export default async function MyCreativesPage({
                     >
                       <Link
                         href={`/dashboard/creatives/${c.id}`}
-                        className="type-small font-medium underline-offset-4 hover:underline"
+                        // A name with no spaces must wrap, not spill into
+                        // Format: the column is fixed (§5).
+                        className="type-small font-medium break-words underline-offset-4 hover:underline [overflow-wrap:anywhere]"
                       >
                         {label}
                       </Link>
@@ -181,7 +195,7 @@ export default async function MyCreativesPage({
                       </div>
                     </td>
                     <td className={`${CELL} whitespace-nowrap`}>
-                      {/* Edit and Delete keep visible words, same as Copy: a
+                      {/* Edit, Duplicate and Delete keep visible words: a
                           screenshot of the icon-only version this table
                           shipped with showed all three reduced to
                           indistinguishable specks in practice, even at a
@@ -193,9 +207,9 @@ export default async function MyCreativesPage({
                           href={`/dashboard/creatives/${c.id}/edit`}
                           className={buttonClass("secondary", "sm")}
                         >
-                          <Pencil size={14} aria-hidden />
                           {dict.dashboard.edit}
                         </Link>
+                        <DuplicateCreativeButton creativeId={c.id} />
                         <DeleteCreativeButton
                           creativeId={c.id}
                           creativeName={label}

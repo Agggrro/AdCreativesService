@@ -197,6 +197,112 @@ export async function updateCreative(formData: FormData): Promise<void> {
   redirect(`/dashboard/creatives/${creativeId}`);
 }
 
+/** What a duplicate's name ends with. The owner asked for this exact suffix, in either locale. */
+const COPY_SUFFIX = " - Copy";
+/** `creatives.name`'s check. */
+const NAME_MAX_LENGTH = 200;
+
+/**
+ * A new creative with the same template, format and config as an existing one.
+ *
+ * Only those are copied. The duplicate gets a fresh id — a new VAST tag — so
+ * impressions, clicks and conversions, all keyed by creative id, start at zero;
+ * nothing is read from them here. Uploaded media are shared by URL, not
+ * re-uploaded: `removeMedia` keeps a file any other creative of the owner's
+ * still references, so deleting either one leaves the other's tag intact.
+ *
+ * The template must still be published, as on create: the copy is a new
+ * creative, and an unpublished template is not one a buyer can start from.
+ */
+export async function duplicateCreative(formData: FormData): Promise<void> {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const creativeId = String(formData.get("creative_id") ?? "");
+  if (!UUID_RE.test(creativeId)) redirect("/dashboard/creatives");
+
+  const fail = (code: CreativeError = "duplicate_failed") =>
+    redirect(`/dashboard/creatives?error=${code}`);
+
+  // RLS (`creatives_select_own`) makes this the ownership check: a stranger's
+  // id finds nothing, and nothing of theirs is copied.
+  const { data: source } = await supabase
+    .from("creatives")
+    .select("template_id, name, selected_format, config_json")
+    .eq("id", creativeId)
+    .maybeSingle();
+  if (!source) {
+    console.error("duplicateCreative found no owned row", { creativeId });
+    fail();
+  }
+
+  const { data: template } = await supabase
+    .from("templates")
+    .select("name")
+    .eq("id", source!.template_id)
+    .eq("is_published", true)
+    .maybeSingle();
+  if (!template) {
+    // Not a retry case: the create flow's own message says what to do.
+    fail("template_not_found");
+  }
+
+  // An unnamed creative shows its template's name in the list, so that is
+  // what its copy is named after. Cut the base, not the suffix, to fit — by
+  // code point, as the check counts, so the cut never leaves half an emoji
+  // that PostgREST would refuse as invalid JSON.
+  const base = Array.from(source!.name ?? template!.name)
+    .slice(0, NAME_MAX_LENGTH - COPY_SUFFIX.length)
+    .join("");
+
+  const { data: created, error } = await supabase
+    .from("creatives")
+    .insert({
+      user_id: user.id,
+      template_id: source!.template_id,
+      name: `${base}${COPY_SUFFIX}`,
+      selected_format: source!.selected_format,
+      config_json: source!.config_json,
+      status: "active",
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error("duplicateCreative insert failed", { creativeId, error });
+    fail();
+  }
+
+  // A delete of the source that ran between our read and this insert did its
+  // media sweep without seeing the copy, and may have removed files the copy
+  // points at. Its row is gone then; ours goes too, before anything serves it.
+  // Only on a clean "no row": a read that errored says nothing about the
+  // source, and is no reason to throw away a good copy.
+  const { data: stillThere, error: recheckError } = await supabase
+    .from("creatives")
+    .select("id")
+    .eq("id", creativeId)
+    .maybeSingle();
+  if (!stillThere && !recheckError) {
+    console.error("duplicateCreative: source deleted mid-copy; copy removed", { creativeId });
+    await supabase.from("creatives").delete().eq("id", created!.id);
+    // The reconciler may have published the copy in that window.
+    await unpublishCreativeSnapshot(created!.id).catch((err: unknown) => {
+      console.error("[snapshot-stale] duplicateCreative could not remove the copy's snapshot", {
+        creativeId: created!.id,
+        err: String(err),
+      });
+    });
+    fail();
+  }
+
+  await publishOrClear(created!.id);
+
+  redirect("/dashboard/creatives");
+}
+
 /**
  * Remove a deleted creative's media, best-effort, from both stores (ADR-0028).
  * Runs after the row is gone; a failure is logged, never surfaced.

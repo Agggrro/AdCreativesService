@@ -391,6 +391,12 @@ The catalog is the single exception, specified below.
 - Status appears as `dot + mono uppercase word`. Reserve the pill/badge form for places
   where the word itself is the payload.
 - Numeric columns are mono with `tabular-nums`.
+- **Row actions are `sm` secondary buttons with words.** When a row carries three of them
+  (the creatives list: Edit, Duplicate, Delete), they drop their icons rather than their
+  words: at the 1200px container, labelled-with-icons needs 376px in Russian and leaves
+  the name column ~130px. A table whose fixed columns exceed the container below `lg`
+  sets a `min-width` so it scrolls inside its frame instead of collapsing its one fluid
+  column to nothing.
 
 ### Catalog tiles — the one grid
 
@@ -969,6 +975,10 @@ Movement is slow and few. Nothing bounces, nothing springs.
   material, not interface language. Technical status words the ad industry uses in English
   (`Live`, `SIMID 1.1`, `VPAID 2.0`) are left untranslated on purpose: translating them would
   make the dashboard harder to match against a DSP.
+- **A duplicated creative's default name ends in ` - Copy` in either locale.** The owner
+  asked for that exact suffix, and once saved it is the user's own label — data, like a
+  template name, not UI copy. The button that makes it is *Дублировать* / *Duplicate*,
+  not *Копировать*: the same row already has *Копировать тег*.
 - **The public VAST endpoint is unaffected by language.** It has no session and no UI; no
   locale logic may be added to that path (see [architecture.md](architecture.md) and
   [security.md](security.md)).

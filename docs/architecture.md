@@ -482,6 +482,14 @@ discovering that externally hosted media routinely breaks via hotlink protection
   migrated file keeps its Supabase original under the same key; a key another of the
   user's creatives still references is kept. A replaced file is left behind, because
   the live tag points at it until the form is saved.
+- **Duplicate path:** `duplicateCreative` (the creatives list's *Duplicate*) inserts a
+  new row with the source's template, format and `config_json` — media URLs included,
+  shared rather than copied, which the delete path's "still referenced" rule makes safe
+  — named `<source name> - Copy` (the template's name for an unnamed source), status
+  `active`, and publishes its snapshot. A new id is a new tag, so its impressions,
+  clicks and conversions start at zero; none of the source's are read. RLS on the
+  source read is the ownership check, and the template must still be published, as on
+  create.
 - **Downstream:** the resulting public URL is just a string written into the same
   `config_json`/`<AdParameters>` field a pasted URL would occupy — `lib/vast/builder.ts`
   and the runtime's media helpers (`adInteractMediaLayer` / `adInteractFitMedia` in

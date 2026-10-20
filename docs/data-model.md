@@ -252,7 +252,9 @@ A media URL in `config_json` is ours when `parseOwnMediaUrl()` (`lib/creative-me
 recognizes either store's prefix *and* the key is exactly `{uuid}/{uuid}.{ext}` — the
 shape `buildMediaObjectPath()` mints. `deleteCreative` removes each of its own keys from
 **both** stores (a migrated file's Supabase original shares the key), except a key another
-of the user's creatives still references. Replacing a file in the configurator does not
+of the user's creatives still references. That exception is what lets `duplicateCreative`
+share a source's media by URL instead of re-uploading them: deleting either creative keeps
+the files the other's tag still points at. Replacing a file in the configurator does not
 delete the old object: until the form is saved the live tag still points at it, so a
 replaced file stays behind as an orphan.
 
@@ -268,7 +270,7 @@ REST API. The private Vercel Blob store the documents lived in before went with 
 
 | Key | Projection of | Republished by |
 | --- | --- | --- |
-| `serving/creative/<creative_id>.json` | `private.creative_serving`, minus the two computed columns | `createCreative` / `updateCreative`; removed by `deleteCreative` **before** the row, and once more after it; the reconciler |
+| `serving/creative/<creative_id>.json` | `private.creative_serving`, minus the two computed columns | `createCreative` / `updateCreative` / `duplicateCreative`; removed by `deleteCreative` **before** the row, and once more after it; the reconciler |
 | `serving/entitlement/<user_id>.json` | that user's `subscriptions` rows, as facts (`status`, `plan_type`, `template_id`, `current_period_end`) | the Stripe webhook's `upsertSubscription`; the reconciler |
 
 The **reconciler** (`lib/serving/reconcile.ts`, `/api/cron/reconcile`, every ten minutes

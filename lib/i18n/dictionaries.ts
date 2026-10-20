@@ -199,6 +199,10 @@ const ru = {
     deleteConfirmBody:
       "Вместе с креативом безвозвратно удаляются вся его статистика — показы, клики и конверсии — и загруженные файлы. Тег перестанет отдавать интерактивный payload в течение минуты.",
     deleteConfirmAction: "Удалить",
+    // "Дублировать", not "Копировать": the same row already has "Копировать
+    // тег", and two "Копировать" buttons a column apart do different things.
+    duplicate: "Дублировать",
+    duplicateTitle: "Создать новый креатив с теми же настройками, без статистики",
     template: "Шаблон",
     description: "Описание",
     format: "Формат",
@@ -350,6 +354,8 @@ const ru = {
       "Не удалось сохранить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
     errDeleteFailed:
       "Не удалось удалить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
+    errDuplicateFailed:
+      "Не удалось дублировать креатив. Попробуйте ещё раз; если повторится — напишите нам.",
     // Under every click-destination field (ADR-0023). Macros stay literal —
     // they are what the user types, in either language.
     clickMacroHint:
@@ -760,6 +766,8 @@ const en: Dict = {
     deleteConfirmBody:
       "All of the creative's statistics — impressions, clicks and conversions — and its uploaded files are destroyed along with it, permanently. The tag stops serving the interactive payload within about a minute.",
     deleteConfirmAction: "Delete",
+    duplicate: "Duplicate",
+    duplicateTitle: "Create a new creative with the same settings and no statistics",
     template: "Template",
     description: "Description",
     format: "Format",
@@ -909,6 +917,8 @@ const en: Dict = {
       "Could not save the creative. Try again; if it keeps failing, contact us.",
     errDeleteFailed:
       "Could not delete the creative. Try again; if it keeps failing, contact us.",
+    errDuplicateFailed:
+      "Could not duplicate the creative. Try again; if it keeps failing, contact us.",
     clickMacroHint:
       "Macros: {click_id} for your network's postback, {creative_id}, {outcome}.",
     media: {
