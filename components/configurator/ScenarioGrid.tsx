@@ -84,9 +84,22 @@ export function ScenarioGrid({
   if (widest > MAX_STAGES && process.env.NODE_ENV !== "production") {
     // Still rendered — every stage keeps its hidden input, so nothing saved is
     // dropped — but past four the columns stop lining up.
-    console.warn(`scenario group has ${widest} stages; the layout is drawn for ${MAX_STAGES}`);
+    console.warn(
+      `${ordered ? "scenario" : "options"} group has ${widest} stages; the layout is drawn for ${MAX_STAGES}`,
+    );
   }
-  const n = Math.min(widest, MAX_STAGES);
+  // An options table is at least two columns wide, so a step with one clip per
+  // option gets a tile the width of its neighbours' rather than a bar across
+  // the form; the spare cell is a filler.
+  const n = Math.min(ordered ? widest : Math.max(widest, 2), MAX_STAGES);
+  if (!ordered && process.env.NODE_ENV !== "production") {
+    for (const b of blocks) {
+      for (const f of b.heads) {
+        // Dropped below, where it would run down a 10rem column (§6 "Options").
+        if (f.help) console.warn(`options group: help on row-head field "${f.name}" is not shown`);
+      }
+    }
+  }
   const stageName = (f: ConfigField, i: number) => (ordered ? `${i + 1} · ${f.label}` : f.label);
   // The header speaks for every row, so it says "required" only when every row
   // requires that column — an options group's C and D rows do not.
@@ -145,8 +158,21 @@ export function ScenarioGrid({
                 value={values[f.name] ?? ""}
                 onChange={(v) => onChange(f.name, v)}
               />
+              {/* Options columns are unordered variants: below 640px the header
+                  is rows away, and a column header cannot say which rows require
+                  it. So each tile names its column, and its own requirement. */}
+              {!ordered && (
+                <span className="label-instr mt-1 block text-fg-muted">
+                  {f.label}
+                  {f.required ? ` · ${requiredLabel}` : ""}
+                </span>
+              )}
             </div>
           ))}
+          {!ordered &&
+            Array.from({ length: Math.max(0, n - block.stages.length) }, (_, k) => (
+              <span key={`fill-${k}`} aria-hidden className="hidden sm:block" />
+            ))}
         </div>
       ))}
     </div>

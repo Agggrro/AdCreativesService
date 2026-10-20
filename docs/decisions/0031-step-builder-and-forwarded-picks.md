@@ -116,8 +116,8 @@ picks to its click link gets them through.
   clips most viewers never see.
 - **Up to 57 config fields, laid out as one compact table per step.** Each step's
   options are a `kind: "options"` group: one row per option (`A`–`D`), with the label
-  (and the value, when picks are passed on) heading the row, and the clip and its
-  option-B variant as two upload tiles beside it. It is the scenario table
+  (and the value, when picks are passed on) heading the row, and the clip (and, from step
+  2, its variant for step 1's pick B) as upload tiles beside it, each named under it. It is the scenario table
   (docs/design-system.md §6) without the play-order numbers and chevrons, because an
   option's clips are variants, not stages. A three-step xpeach creative is 18 clips, and
   every one sits in view as a tile rather than behind a collapsed row.

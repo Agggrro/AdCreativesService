@@ -670,7 +670,7 @@ it holds a VAST document, and a proportional face makes indentation unreadable.
 
 A template's `config_schema` can group its fields
 ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)), and a group renders one
-of three ways.
+of four ways.
 
 **Section** (the default) — a `<fieldset>` whose legend is the `h3` role, separated by
 `border-t border-hairline`. Deliberately not `label-instr`: that role belongs to the field
@@ -742,21 +742,30 @@ user is configuring, so the layout draws that order.
   `overflow-hidden` box; only the thumbnail's own wrapper clips.
 
 **Options** — the scenario table for media that are variants rather than stages, such as
-Step Builder's options per step, each with a clip and an option-B variant of it
-([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)). Ten or twenty clips
+Step Builder's options per step, each with a clip and, from step 2, a variant for step 1's
+pick B ([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)). Ten or twenty clips
 behind collapsed matrix rows means one row opened at a time. As tiles in view, the whole
 step can be read and filled in one pass.
 
 - **The scenario table with the order taken out.** Column headers are the field label
-  alone, with no `1 ·`, and no chevron joins the tiles. Everything else is the scenario's:
-  the tile, its states, focus, widths, and the zero accent budget.
+  alone, with no `1 ·`, and no chevron joins the tiles. The tile, its states, focus and
+  the zero accent budget are the scenario's.
+- **At least two columns.** A step with one clip per option (Step Builder's step 1) still
+  lays out two tracks and leaves the second empty, so the tile is as wide as its
+  neighbours' rather than a bar across the form.
+- **Every tile names its column under it**, in `label-instr` `fg-muted`, with `· required`
+  when that tile is required. Variants have no order to read them by: below 640px the
+  header is rows away, and a header cannot say which rows require it.
 - **A row head is short and carries no help.** The label (`A · LABEL`), and the value when
   the template needs one. Their help would run a dozen caption lines down the 10rem
   column, so it is dropped there and the schema explains them in the step's full-width
   fields.
 - **The column header says `required` only when every row requires it.** The optional
-  rows (C and D) would otherwise sit under a header that says they are required. Each
-  tile's own accessible name still carries its own requirement.
+  rows (C and D) would otherwise sit under a header that says they are required. The
+  caption under each tile, and its accessible name, carry its own requirement.
+- **Nothing the user must act on lives in the column header's help.** It is a hover
+  panel (§6, "Help tooltip"), so a limit such as a size budget goes in a visible caption
+  of the step's own fields.
 
 ### Inputs
 
