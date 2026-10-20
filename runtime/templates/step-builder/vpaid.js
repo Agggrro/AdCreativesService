@@ -162,6 +162,10 @@ var TEMPLATE = {
       motions = [],
       resumeList = [];
     var advanceTimer = null,
+      prefetchTimer = null,
+      handoffTimer = null,
+      prefetched = {},
+      shimmers = [],
       hintTimer = null,
       resizeTimer = null,
       observer = null,
@@ -310,6 +314,79 @@ var TEMPLATE = {
       return base + sep + add.join("&") + hash;
     }
 
+    /**
+     * An option's clip as of now. After step one's option B, the option's own B
+     * clip, if it has one: an uploaded file's URL has no path to put "{key}" in.
+     */
+    function optionMedia(opt) {
+      var raw = picks.length && picks[0].index === 1 && opt.mediaB ? opt.mediaB : opt.media;
+      return raw ? mediaUrl(raw) : "";
+    }
+
+    /**
+     * Start loading a step's clips before it is shown, so a slow network has
+     * the time the viewer spends on the current step. Only ever after the
+     * viewer's first tap: Chrome's heavy-ad budget meters what an ad downloads
+     * before then. Media elements rather than fetch(): the same loader, cache and
+     * `media-src` as the tiles, so a publisher's CSP cannot turn it into console
+     * noise. A URL still waiting on a later pick ("{key}") is skipped.
+     */
+    function prefetchStep(step) {
+      if (stopped || step >= steps.length) return;
+      var n = 0;
+      for (var k = 0; k < steps[step].options.length; k++) {
+        var u = optionMedia(steps[step].options[k]);
+        if (!u || prefetched[u] || /\{|%7B/i.test(u)) continue;
+        if (adInteractIsVideoUrl(u)) {
+          var v = document.createElement("video");
+          v.muted = true;
+          v.setAttribute("muted", "");
+          v.preload = "auto";
+          v.src = u;
+          prefetched[u] = v;
+        } else {
+          prefetched[u] = new Image();
+          prefetched[u].src = u;
+        }
+        n++;
+      }
+      if (n) api.debug("prefetch", { step: step + 1, files: n });
+    }
+    /** A shimmer outlives its tile otherwise: an animation does not stop with its target. */
+    function stopShimmers() {
+      for (var k = 0; k < shimmers.length; k++) {
+        try {
+          shimmers[k].cancel();
+        } catch (e) {
+          /* already gone */
+        }
+      }
+      shimmers = [];
+    }
+
+    /**
+     * Let go of the prefetching elements — all of them, or only those for URLs a
+     * shown tile now holds itself. The bytes stay in the cache either way; what
+     * goes is a media player each, which a low-end phone has few of: a step of
+     * four tiles plus four prefetched clips was eight at once.
+     */
+    function releasePrefetch(only) {
+      for (var u in prefetched) {
+        if (only && !only[u]) continue;
+        var el = prefetched[u];
+        if (el && el.tagName === "VIDEO") {
+          try {
+            el.removeAttribute("src");
+            el.load();
+          } catch (e) {
+            /* gone anyway */
+          }
+        }
+        // Kept as a marker, so the same URL is not prefetched again.
+        prefetched[u] = true;
+      }
+    }
+
     // --- the tiles of one step --------------------------------------------------------
     function makeTile(step, i) {
       var opt = steps[step].options[i];
@@ -319,11 +396,42 @@ var TEMPLATE = {
       b.style.cssText =
         "position:absolute;padding:0;overflow:hidden;background:#16141c;color:#fff;" +
         BUTTON_RESET + (still ? "" : "transition:opacity .3s ease,transform .3s ease;");
-      // After step one's option B, an option's own B clip, if it has one: an
-      // uploaded file's URL has no path to put a "{key}" in.
-      var raw = picks.length && picks[0].index === 1 && opt.mediaB ? opt.mediaB : opt.media;
-      var src = raw ? mediaUrl(raw) : "";
-      if (src) b.appendChild(adInteractFitMedia(src, api, "s" + (step + 1) + ":" + (i + 1)).el);
+      var src = optionMedia(opt);
+      var shownAt = Date.now();
+      if (src) {
+        var fit = adInteractFitMedia(src, api, "s" + (step + 1) + ":" + (i + 1));
+        b.appendChild(fit.el);
+        // Until the clip has a frame to show, a soft pulse rather than a black
+        // tile: on a slow network the labels are tappable long before then.
+        var shimmer = document.createElement("span");
+        shimmer.style.cssText =
+          FILL + "pointer-events:none;" +
+          "background:linear-gradient(160deg,#2a2633 0%,#1a1720 55%,#2a2633 100%);";
+        b.appendChild(shimmer);
+        var pulse =
+          !still && typeof shimmer.animate === "function"
+            ? shimmer.animate([{ opacity: 1 }, { opacity: 0.55 }, { opacity: 1 }], {
+                duration: 1200,
+                iterations: Infinity,
+                easing: "ease-in-out",
+              })
+            : null;
+        if (pulse) shimmers.push(pulse);
+        var ready = function () {
+          if (!shimmer.parentNode) return;
+          if (pulse) pulse.cancel();
+          shimmer.parentNode.removeChild(shimmer);
+          api.debug("ready", { step: step + 1, option: i + 1, ms: Date.now() - shownAt });
+        };
+        if (adInteractIsVideoUrl(src)) {
+          if (fit.media.readyState >= 2) ready();
+          else fit.media.addEventListener("loadeddata", ready);
+        } else {
+          var probe = new Image();
+          probe.onload = ready;
+          probe.src = src;
+        }
+      }
       var shade = document.createElement("span");
       shade.style.cssText =
         "position:absolute;left:0;right:0;bottom:0;height:42%;pointer-events:none;" +
@@ -377,6 +485,7 @@ var TEMPLATE = {
     function showStep(step) {
       current = step;
       locked = false;
+      stopShimmers();
       releaseVideos(stage);
       stage.innerHTML = "";
       tiles = [];
@@ -395,6 +504,22 @@ var TEMPLATE = {
         }),
       });
       startHint();
+      // The tiles have taken over their clips: the prefetching players go once
+      // the tiles' own requests are under way.
+      var shown = {};
+      for (var t = 0; t < tiles.length; t++) if (tiles[t].src) shown[tiles[t].src] = true;
+      clearTimeout(handoffTimer);
+      handoffTimer = setTimeout(function () {
+        releasePrefetch(shown);
+      }, 1500);
+      // From step two on, the viewer has touched the ad: the step after this one
+      // starts loading while they choose here.
+      clearTimeout(prefetchTimer);
+      if (step > 0) {
+        prefetchTimer = setTimeout(function () {
+          prefetchStep(step + 1);
+        }, 600);
+      }
     }
 
     // --- the idle hint: the tiles take turns to light up --------------------------------
@@ -444,6 +569,8 @@ var TEMPLATE = {
       }
       fill.style.transform = "scaleX(" + (step + 1) / total + ")";
       api.debug("pick", { step: step + 1, key: steps[step].key, value: opt.value });
+      // The next step's clips are known now; they load during the advance.
+      prefetchStep(step + 1);
       advanceTimer = setTimeout(function () {
         advanceTimer = null;
         if (stopped) return;
@@ -470,6 +597,8 @@ var TEMPLATE = {
       // The end screen's clip is the last pick's own, already playing in its
       // tile; a fresh element rather than the tile's, so the tile can go.
       if (last.media) endMedia.appendChild(adInteractFitMedia(last.media, api, "end").el);
+      stopShimmers();
+      releasePrefetch();
       releaseVideos(stage);
       stage.innerHTML = "";
       tiles = [];
@@ -623,6 +752,10 @@ var TEMPLATE = {
       stopped = true;
       clearInterval(hintTimer);
       clearTimeout(advanceTimer);
+      clearTimeout(prefetchTimer);
+      clearTimeout(handoffTimer);
+      stopShimmers();
+      releasePrefetch();
       clearTimeout(resizeTimer);
       for (var a = 0; a < motions.length; a++) {
         try {
