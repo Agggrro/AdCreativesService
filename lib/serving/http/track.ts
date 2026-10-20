@@ -107,8 +107,8 @@ export function handleTrack(request: Request, platform: ServingPlatform): Respon
         // The <Error> beacon (ADR-0032). `code` sits outside the signature —
         // the player substitutes [ERRORCODE] after we sign — so a holder of a
         // valid URL can choose which code it counts against, never which
-        // creative, and only until `exp`. parseErrorCode bounds it to the VAST
-        // range or 0; the table's check constraint is the second lock.
+        // creative, and only until `exp`. parseErrorCode bounds it to 100–9999
+        // or 0; the table's check constraint is the second lock.
         record(
           platform,
           supabase.rpc("increment_creative_error", {
