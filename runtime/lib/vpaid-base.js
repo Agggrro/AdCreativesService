@@ -352,8 +352,15 @@ var ADINTERACT_EXTEND_MAX = 30;
  * second more is not an extension, so a burst of taps is one event, not ten.
  */
 var ADINTERACT_EXTEND_GRACE = 15;
-/** What counts as the viewer acting on the ad. Pointer events plus their older equivalents, for a WebView without them. */
-var ADINTERACT_ENGAGE_EVENTS = ["pointerdown", "mousedown", "touchstart", "keydown"];
+/**
+ * What counts as the viewer acting on the ad. Never `touchstart`, nor a touch
+ * `pointerdown`: a finger scrolling a feed past the slot starts with both, and
+ * would extend an ad nobody touched. A scroll ends in `pointercancel` and no
+ * `click`, while a tap — and a drag on a `touch-action:none` surface, the
+ * scratch cover and the slider — ends in `pointerup`. `click` covers a WebView
+ * without pointer events.
+ */
+var ADINTERACT_ENGAGE_EVENTS = ["pointerdown", "pointerup", "click", "keydown"];
 
 function CreoSmithVpaid(template) {
   this._t = template || {};
@@ -598,6 +605,7 @@ CreoSmithVpaid.prototype._watchEngagement = function () {
   if (!slot) return;
   this._onEngage = function (e) {
     if (self._closeHost && self._closeHost.contains(e.target)) return;
+    if (e.type === "pointerdown" && e.pointerType === "touch") return;
     self._extend();
   };
   // Passive: in a same-document player the slot is in the publisher's page, and

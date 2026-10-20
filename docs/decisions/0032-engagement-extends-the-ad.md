@@ -28,9 +28,14 @@ duration. A longer fixed duration makes every disengaged viewer sit through it, 
 
 The base extends a video-less ad while the viewer acts on it:
 
-- **What counts:** `pointerdown`, `mousedown`, `touchstart` or `keydown` anywhere in the
-  slot, in the capture phase, so every template gets it with no code of its own and none
-  can swallow it. The close control is excluded: its tap ends the ad.
+- **What counts:** a mouse or pen `pointerdown`, a `pointerup`, a `click` or a `keydown`
+  anywhere in the slot, in the capture phase, so every template gets it with no code of
+  its own and none can swallow it. A finger counts when it lifts, not when it lands:
+  scrolling a feed past the slot starts with `touchstart` and a touch `pointerdown` too,
+  and ends in `pointercancel` with no `click`, so a scroll never extends an ad. A drag on
+  a `touch-action:none` surface (the scratch cover, the slider) ends in `pointerup` and
+  counts. The listeners are passive, and the close control is excluded: its tap ends the
+  ad.
 - **How much:** each action moves the end to 15 seconds from now
   (`ADINTERACT_EXTEND_GRACE`), rounded up to a whole second, never past the served
   duration plus 30 (`ADINTERACT_EXTEND_MAX`), so 60 seconds at most with the default. An

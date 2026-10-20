@@ -284,7 +284,8 @@ timer does fire `complete`, though, and many players end the ad on it.
 **`complete` means "was on screen for the injected duration, plus however long the
 viewer kept acting on it, up to 30 seconds more"** ([ADR-0032](decisions/0032-engagement-extends-the-ad.md)).
 A video-less ad that nobody touches completes at its served duration, exactly as before.
-Each action in the slot (a pointer or key press anywhere but the close control) moves
+Each action in the slot (a tap, click or key press anywhere but the close control; a
+finger scrolling past does not count) moves
 the end to 15 seconds from then, never past the served duration plus 30, and the unit
 tells the player with `AdDurationChange` and `AdRemainingTimeChange`. The trigger is the
 viewer's action, never the template's own progress, so `complete` still does not wait
