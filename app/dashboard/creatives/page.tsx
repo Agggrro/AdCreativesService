@@ -1,25 +1,9 @@
-import Link from "next/link";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getCdnUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
-import { LOCALE_TAG } from "@/lib/i18n/dictionaries";
 import { creativeErrorMessage } from "@/lib/creative-errors";
-import { CopyButton } from "@/components/CopyButton";
-import { DeleteCreativeButton } from "@/components/DeleteCreativeButton";
-import { DuplicateCreativeButton } from "@/components/DuplicateCreativeButton";
-import { buttonClass, LinkButton } from "@/components/ui/Button";
+import { LinkButton } from "@/components/ui/Button";
+import { CreativesTable } from "@/components/CreativesTable";
 import { Notice, Panel } from "@/components/ui/Field";
-import { ServingBadge } from "@/components/ui/State";
-import { Chip } from "@/components/ui/Chip";
-import {
-  CELL,
-  HEAD,
-  NUM_HEAD,
-  railCell,
-  ROW,
-  TableFrame,
-  TableHead,
-} from "@/components/ui/Table";
 
 export default async function MyCreativesPage({
   searchParams,
@@ -51,7 +35,6 @@ export default async function MyCreativesPage({
 
   const templateName = new Map((templates ?? []).map((t) => [t.id, t.name]));
   const stats = new Map((overview ?? []).map((row) => [row.creative_id, row]));
-  const number = new Intl.NumberFormat(LOCALE_TAG[locale]);
 
   // If the aggregate is unreachable (the RPC not applied yet, a permission
   // change), say so. Rendering zeros and "not serving" would be a confident
@@ -89,139 +72,22 @@ export default async function MyCreativesPage({
       {actionError && <Notice tone="dead">{actionError}</Notice>}
 
       {creatives && creatives.length > 0 ? (
-        <TableFrame>
-          {/* `table-fixed` + the colgroup below pin every column's width to
-              a constant: nothing here may resize when a cell's content
-              changes state (e.g. the copy button's icon), which is what
-              was making the whole table visibly shift underneath the user.
-              `TableFrame`, not `Panel`: `Panel` is `overflow-hidden` and
-              would clip the focus ring on the new edge-adjacent action
-              buttons (docs/design-system.md §2). */}
-          {/* `min-w`: the fixed columns sum to 908px, more than the
-              container holds below `lg`, and a fixed layout gives the
-              leftover — nothing — to the name. Pinned at what the name
-              gets at the 1200px container, so a narrower screen scrolls
-              the table inside its frame (§5) instead of crushing it. */}
-          <table className="w-full min-w-[1100px] table-fixed border-collapse type-small">
-            <colgroup>
-              <col />
-              <col className="w-[88px]" />
-              <col className="w-[120px]" />
-              <col className="w-[80px]" />
-              <col className="w-[132px]" />
-              {/* "Копировать тег" with its icon measures 137px. */}
-              <col className="w-[176px]" />
-              {/* Edit, Duplicate, Delete: 84 + 101 + 75px in Russian, the
-                  longer locale (§10), plus two gaps and the cell inset. Words
-                  without icons — with them the column needs 376px and leaves
-                  the name ~130px at the 1200px container; §11 says the fix
-                  for a crowded action cell is narrower, never icon-only. */}
-              <col className="w-[312px]" />
-            </colgroup>
-            <TableHead>
-                <th className={HEAD}>{dict.dashboard.creativeName}</th>
-                <th className={HEAD}>{dict.dashboard.format}</th>
-                {/* Impressions and clicks only. Viewability is VPAID-only, and
-                    this list mixes formats — a column that is structurally N/A
-                    for some rows would print a ragged em dash with nowhere to
-                    put the qualifier §6 requires. It lives on the detail page,
-                    in its own strip. */}
-                <th className={NUM_HEAD}>{dict.dashboard.impressions}</th>
-                <th className={NUM_HEAD}>{dict.dashboard.clicks}</th>
-                <th className={HEAD}>{dict.dashboard.status}</th>
-                <th className={HEAD}>{dict.dashboard.vastTag}</th>
-                <th className={HEAD} />
-            </TableHead>
-            <tbody>
-              {creatives.map((c) => {
-                const tag = `${getCdnUrl()}/v?creative_id=${c.id}`;
-                const row = stats.get(c.id);
-                const serving = row?.should_serve ?? false;
-                const label = c.name ?? templateName.get(c.template_id) ?? "—";
-                return (
-                  <tr key={c.id} className={ROW}>
-                    <td
-                      className={railCell(
-                        statsAvailable ? (serving ? "live" : "dead") : null,
-                      )}
-                    >
-                      <Link
-                        href={`/dashboard/creatives/${c.id}`}
-                        // A name with no spaces must wrap, not spill into
-                        // Format: the column is fixed (§5).
-                        className="type-small font-medium break-words underline-offset-4 hover:underline [overflow-wrap:anywhere]"
-                      >
-                        {label}
-                      </Link>
-                    </td>
-                    <td className={`${CELL} whitespace-nowrap`}>
-                      <Chip>{c.selected_format}</Chip>
-                    </td>
-                    {/* A zero is a real reading; the em dash appears only
-                        when the aggregate itself is unavailable (§6). */}
-                    <td className={`${CELL} data-instr text-right`}>
-                      {statsAvailable ? number.format(row?.impressions ?? 0) : "—"}
-                    </td>
-                    <td className={`${CELL} data-instr text-right`}>
-                      {statsAvailable ? number.format(row?.clicks ?? 0) : "—"}
-                    </td>
-                    <td className={`${CELL} whitespace-nowrap`}>
-                      {statsAvailable ? (
-                        <ServingBadge
-                          serving={serving}
-                          label={
-                            serving
-                              ? dict.dashboard.serving
-                              : dict.dashboard.notServing
-                          }
-                        />
-                      ) : (
-                        <span className="chip-instr text-fg-muted">
-                          —
-                        </span>
-                      )}
-                    </td>
-                    <td className={`${CELL} whitespace-nowrap`}>
-                      {/* No truncated tag preview here: at any column width
-                          that still leaves room for the rest of the row, a
-                          truncated "https://…/api/vast?creative_id=" shows
-                          only the part every row shares and cuts off before
-                          the id that actually tells rows apart — it read as
-                          a URL and nothing more. Full value is a hover away
-                          on this wrapper, and in full on the creative's own
-                          page (the row's name links there). */}
-                      <div title={tag} className="inline-flex">
-                        <CopyButton value={tag} size="sm" />
-                      </div>
-                    </td>
-                    <td className={`${CELL} whitespace-nowrap`}>
-                      {/* Edit, Duplicate and Delete keep visible words: a
-                          screenshot of the icon-only version this table
-                          shipped with showed all three reduced to
-                          indistinguishable specks in practice, even at a
-                          correctly-rendered 18px — confirmed via DevTools,
-                          not just eyeballed. No action in this row goes
-                          icon-only anymore. */}
-                      <div className="flex justify-end gap-2">
-                        <Link
-                          href={`/dashboard/creatives/${c.id}/edit`}
-                          className={buttonClass("secondary", "sm")}
-                        >
-                          {dict.dashboard.edit}
-                        </Link>
-                        <DuplicateCreativeButton creativeId={c.id} />
-                        <DeleteCreativeButton
-                          creativeId={c.id}
-                          creativeName={label}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </TableFrame>
+        <CreativesTable
+          rows={creatives.map((c) => {
+            const row = stats.get(c.id);
+            return {
+              id: c.id,
+              label: c.name ?? templateName.get(c.template_id) ?? "—",
+              format: c.selected_format,
+              impressions: row?.impressions ?? 0,
+              clicks: row?.clicks ?? 0,
+              serving: row?.should_serve ?? false,
+            };
+          })}
+          statsAvailable={statsAvailable}
+          dict={dict}
+          locale={locale}
+        />
       ) : (
         <Panel className="flex flex-col items-start gap-3 p-6">
           <p className="type-small text-fg-muted">

@@ -393,10 +393,14 @@ The catalog is the single exception, specified below.
 - Numeric columns are mono with `tabular-nums`.
 - **Row actions are `sm` secondary buttons with words.** When a row carries three of them
   (the creatives list: Edit, Duplicate, Delete), they drop their icons rather than their
-  words: at the 1200px container, labelled-with-icons needs 376px in Russian and leaves
-  the name column ~130px. A table whose fixed columns exceed the container below `lg`
-  sets a `min-width` so it scrolls inside its frame instead of collapsing its one fluid
-  column to nothing.
+  words: with icons, at the 1200px container, the name column is left about 120px in
+  Russian.
+- **Size columns to their content, not to pixels.** Every column but the one that wraps
+  (the name) is `w-px whitespace-nowrap`, and that one takes what is left. Widths pinned
+  in a colgroup from an estimate broke in production the first time the real font
+  measured wider: the actions overran their column and the table scrolled at full
+  width. A content-sized column cannot drift that way; it only needs content that keeps
+  one width across states, as the copy button's stacked labels do.
 
 ### Catalog tiles — the one grid
 
