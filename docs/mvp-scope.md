@@ -88,6 +88,10 @@ Remaining before a true end-to-end demo (needs external setup / assets):
       Duel ([ADR-0030](decisions/0030-duel-template.md)) needs the same check for an
       unmuted winner clip: it plays with sound after a tap inside IMA, falls back to
       muted when refused, and goes silent when the player mutes the ad mid-clip.
+      Step Builder ([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)) was
+      checked only in a local VPAID host, with no database behind `/dev/harness`. It
+      still needs the harness sweep, and IMA and Fluid opening the `AdClickThru` URL
+      with the picks on it.
 - [ ] **`/security-review`** on payments, auth, and the public endpoints before push.
 
 ## Out of scope (post-MVP)

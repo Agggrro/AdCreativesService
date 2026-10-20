@@ -221,6 +221,15 @@ conversion, then 302s to the configured URL with `{click_id}`, `{creative_id}` a
   (an app-store deep link) passes through as configured, untracked.
 - **Previews are not rewritten**, so the configurator's players open the destination
   directly — with any `{click_id}` left literal.
+- **A unit may add the viewer's picks to the link it was handed.** Step Builder appends
+  `key=value` to the URL it passes in `AdClickThru`, for every step whose key and value
+  match the forwarding patterns. `/r` forwards up to eight such parameters that are not
+  its own on any click link, from any template, to the destination's query string, and
+  never over a parameter the owner wrote. So the landing opens at the step the ad
+  stopped at
+  ([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)). `<ClickThrough>` is
+  built before anyone picks, so a player that opens it instead of the `AdClickThru` URL
+  lands on the plain destination.
 - **A link that is not a destination is never a `url` field.** The click-field list is
   every `url`-typed field bar `verificationScriptUrl`, so a resource the unit *loads* —
   Pick & Message's `soundUrl` — would be routed through `/r` and record a click on every

@@ -45,6 +45,15 @@ const OVERRIDES: Record<string, string> = {
   // shows the mechanic that makes it worth picking; three reads as a survey in
   // a demo well, where the visitor is scanning rather than answering.
   "quiz.stepCount": "2",
+  // Step Builder's options C and D carry no default, so the generic fallback
+  // would label them with the field's own label and draw two tiles called
+  // "Label". An empty label is how a creative leaves an option out.
+  "step-builder.step1Opt3Label": "",
+  "step-builder.step1Opt4Label": "",
+  "step-builder.step2Opt3Label": "",
+  "step-builder.step2Opt4Label": "",
+  "step-builder.step3Opt3Label": "",
+  "step-builder.step3Opt4Label": "",
   "shoppable.videoUrl":
     "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
 };

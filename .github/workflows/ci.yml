@@ -60,6 +60,7 @@ jobs:
       - run: npm run test:snapshots
       - run: npm run test:media
       - run: npm run test:postback
+      - run: npm run test:click
 
       # The ad Worker bundles: an import that only resolves under Next (or not
       # at all in a Worker) fails here, before the deploy job, not in production.

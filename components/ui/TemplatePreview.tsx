@@ -104,6 +104,24 @@ function Mechanic({ type }: { type: string }) {
         </div>
       );
 
+    case "step_builder":
+      // A part-filled progress bar over a row of three tiles, one taken — the
+      // stronger edge. Three tiles and a split bar, so it reads apart from the
+      // quiz's two options and Duel's countdown over two.
+      return (
+        <div className="absolute inset-x-3 top-3 bottom-3 flex flex-col gap-2">
+          <div className="mx-auto flex h-2 w-[56%] shrink-0">
+            <div className="h-full w-1/3 bg-fg-muted" />
+            <div className="h-full flex-1 bg-fg-disabled" />
+          </div>
+          <div className="flex min-h-0 flex-1 justify-center gap-2">
+            <div className="w-[22%] rounded-ctl border border-line bg-surface" />
+            <div className="w-[22%] rounded-ctl border-2 border-fg-muted bg-surface-2" />
+            <div className="w-[22%] rounded-ctl border border-line bg-surface" />
+          </div>
+        </div>
+      );
+
     case "age_gate":
       return (
         <div className="absolute inset-0 flex items-center justify-center">

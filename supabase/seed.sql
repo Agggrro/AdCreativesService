@@ -259,6 +259,83 @@ insert into public.templates (
      ]}'::jsonb,
     'standard',
     true
+  ),
+  -- Step Builder (ADR-0031). The first two or three steps of a "build your own"
+  -- flow, a row of tiles each; the button opens the click-through with the picks
+  -- appended, which `/r` forwards, so the landing carries on where the ad
+  -- stopped. Seeded as a draft (is_published = false) until its unit is on the
+  -- CDN and an app that knows its key is deployed — runtime/README.md, "Order
+  -- matters when shipping a template change".
+  (
+    '00000000-0000-4000-8000-000000000008',
+    'Step Builder',
+    'Two or three steps of tiles to pick from; the picks travel with the click, so the landing continues where the ad stopped.',
+    'step_builder',
+    'interactive',
+    array['vpaid'],
+    '{"vpaid":"step-builder/vpaid.js"}'::jsonb,
+    '{"groups":[
+       {"id":"sbFlow"},
+       {"id":"sbStep1"},
+       {"id":"sbStep1Options","kind":"matrix"},
+       {"id":"sbStep2"},
+       {"id":"sbStep2Options","kind":"matrix"},
+       {"id":"sbStep3"},
+       {"id":"sbStep3Options","kind":"matrix"},
+       {"id":"sbFinish"},
+       {"id":"sbClick"}
+     ],"fields":[
+       {"name":"stepCount","label":"Steps","type":"select","required":true,"default":"3","group":"sbFlow","options":[{"value":"2","label":"2 steps"},{"value":"3","label":"3 steps"}]},
+       {"name":"stepsTotal","label":"Steps on the landing","type":"range","min":2,"max":12,"default":3,"group":"sbFlow","help":"The counter''s total: how many steps the landing''s whole flow has, these included. The ad shows 1/6, 2/6… and leaves the bar part-filled, for the landing to finish. Never fewer than the ad''s own steps."},
+       {"name":"accentColor","label":"Accent color (hex)","type":"text","default":"#e11d48","group":"sbFlow","help":"The counter, the progress bar, the ring around a tile and the button."},
+       {"name":"step1Title","label":"Title","type":"text","required":true,"default":"Choose a style","group":"sbStep1","help":"Over the tiles, beside the counter. One line; a long one is cut with an ellipsis."},
+       {"name":"step1Key","label":"Parameter name","type":"text","required":true,"default":"style","group":"sbStep1","help":"The query parameter this step adds to the click-through URL, e.g. style. Latin letters, digits and _, starting with a letter, and not one the click-through URL already has; cid, f, exp and sig are taken by the click link. A name outside these rules is not passed on."},
+       {"name":"step1Opt1Label","label":"Label","type":"text","required":true,"group":"sbStep1Options","block":"A","default":"Option A","help":"Under the tile. An option without a label is left out, so options C and D are optional."},
+       {"name":"step1Opt1Value","label":"Value","type":"text","required":true,"group":"sbStep1Options","block":"A","default":"a","help":"What the parameter is set to when this option is picked: Latin letters, digits, _ and -. Anything else is not passed on."},
+       {"name":"step1Opt1Media","label":"Clip or picture","type":"image","required":true,"group":"sbStep1Options","block":"A","help":"Loops in the tile. This step loads before the viewer touches the ad, and browsers unload an ad that downloads more than 4 MB by then: keep this step''s clips under about 3.5 MB together (short, 480p H.264, no sound)."},
+       {"name":"step1Opt2Label","label":"Label","type":"text","required":true,"group":"sbStep1Options","block":"B","default":"Option B"},
+       {"name":"step1Opt2Value","label":"Value","type":"text","required":true,"group":"sbStep1Options","block":"B","default":"b"},
+       {"name":"step1Opt2Media","label":"Clip or picture","type":"image","required":true,"group":"sbStep1Options","block":"B"},
+       {"name":"step1Opt3Label","label":"Label","type":"text","required":false,"group":"sbStep1Options","block":"C"},
+       {"name":"step1Opt3Value","label":"Value","type":"text","required":false,"group":"sbStep1Options","block":"C"},
+       {"name":"step1Opt3Media","label":"Clip or picture","type":"image","required":false,"group":"sbStep1Options","block":"C"},
+       {"name":"step1Opt4Label","label":"Label","type":"text","required":false,"group":"sbStep1Options","block":"D"},
+       {"name":"step1Opt4Value","label":"Value","type":"text","required":false,"group":"sbStep1Options","block":"D"},
+       {"name":"step1Opt4Media","label":"Clip or picture","type":"image","required":false,"group":"sbStep1Options","block":"D"},
+       {"name":"step2Title","label":"Title","type":"text","required":true,"default":"Choose a look","group":"sbStep2","help":"Over the tiles, beside the counter. One line; a long one is cut with an ellipsis."},
+       {"name":"step2Key","label":"Parameter name","type":"text","required":true,"default":"look","group":"sbStep2","help":"The query parameter this step adds to the click-through URL, e.g. look. Latin letters, digits and _, starting with a letter, and not one the click-through URL already has; cid, f, exp and sig are taken by the click link. A name outside these rules is not passed on."},
+       {"name":"step2Opt1Label","label":"Label","type":"text","required":true,"group":"sbStep2Options","block":"A","default":"Option A","help":"Under the tile. An option without a label is left out, so options C and D are optional."},
+       {"name":"step2Opt1Value","label":"Value","type":"text","required":true,"group":"sbStep2Options","block":"A","default":"a","help":"What the parameter is set to when this option is picked: Latin letters, digits, _ and -. Anything else is not passed on."},
+       {"name":"step2Opt1Media","label":"Clip or picture","type":"image","required":true,"group":"sbStep2Options","block":"A","help":"Loops in the tile, and loads after the tap that reaches this step. {key} in the URL is replaced by the value picked at an earlier step, so the clips can match an earlier pick: …/{style}/asian.mp4."},
+       {"name":"step2Opt2Label","label":"Label","type":"text","required":true,"group":"sbStep2Options","block":"B","default":"Option B"},
+       {"name":"step2Opt2Value","label":"Value","type":"text","required":true,"group":"sbStep2Options","block":"B","default":"b"},
+       {"name":"step2Opt2Media","label":"Clip or picture","type":"image","required":true,"group":"sbStep2Options","block":"B"},
+       {"name":"step2Opt3Label","label":"Label","type":"text","required":false,"group":"sbStep2Options","block":"C"},
+       {"name":"step2Opt3Value","label":"Value","type":"text","required":false,"group":"sbStep2Options","block":"C"},
+       {"name":"step2Opt3Media","label":"Clip or picture","type":"image","required":false,"group":"sbStep2Options","block":"C"},
+       {"name":"step2Opt4Label","label":"Label","type":"text","required":false,"group":"sbStep2Options","block":"D"},
+       {"name":"step2Opt4Value","label":"Value","type":"text","required":false,"group":"sbStep2Options","block":"D"},
+       {"name":"step2Opt4Media","label":"Clip or picture","type":"image","required":false,"group":"sbStep2Options","block":"D"},
+       {"name":"step3Title","label":"Title","type":"text","required":true,"default":"Choose a detail","group":"sbStep3","help":"Over the tiles, beside the counter. One line; a long one is cut with an ellipsis.","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Key","label":"Parameter name","type":"text","required":true,"default":"detail","group":"sbStep3","help":"The query parameter this step adds to the click-through URL, e.g. detail. Latin letters, digits and _, starting with a letter, and not one the click-through URL already has; cid, f, exp and sig are taken by the click link. A name outside these rules is not passed on.","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt1Label","label":"Label","type":"text","required":true,"group":"sbStep3Options","block":"A","default":"Option A","help":"Under the tile. An option without a label is left out, so options C and D are optional.","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt1Value","label":"Value","type":"text","required":true,"group":"sbStep3Options","block":"A","default":"a","help":"What the parameter is set to when this option is picked: Latin letters, digits, _ and -. Anything else is not passed on.","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt1Media","label":"Clip or picture","type":"image","required":true,"group":"sbStep3Options","block":"A","help":"Loops in the tile, and loads after the tap that reaches this step. {key} in the URL is replaced by the value picked at an earlier step, so the clips can match an earlier pick: …/{style}/asian.mp4.","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt2Label","label":"Label","type":"text","required":true,"group":"sbStep3Options","block":"B","default":"Option B","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt2Value","label":"Value","type":"text","required":true,"group":"sbStep3Options","block":"B","default":"b","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt2Media","label":"Clip or picture","type":"image","required":true,"group":"sbStep3Options","block":"B","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt3Label","label":"Label","type":"text","required":false,"group":"sbStep3Options","block":"C","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt3Value","label":"Value","type":"text","required":false,"group":"sbStep3Options","block":"C","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt3Media","label":"Clip or picture","type":"image","required":false,"group":"sbStep3Options","block":"C","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt4Label","label":"Label","type":"text","required":false,"group":"sbStep3Options","block":"D","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt4Value","label":"Value","type":"text","required":false,"group":"sbStep3Options","block":"D","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"step3Opt4Media","label":"Clip or picture","type":"image","required":false,"group":"sbStep3Options","block":"D","showWhen":[{"field":"stepCount","equals":["3"]}]},
+       {"name":"finishTitle","label":"Final title","type":"text","default":"Almost there","group":"sbFinish","help":"Over the last pick, after the last step, under a line of every pick."},
+       {"name":"ctaText","label":"Button text","type":"text","default":"Continue","group":"sbFinish"},
+       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true,"group":"sbClick","help":"Where the button leads. The picks are appended to it as parameter=value pairs, never over a parameter it already has, so a landing that reads them carries on from the ad''s last step. They go into the query string, so a landing that routes in its #fragment does not see them."}
+     ]}'::jsonb,
+    'standard',
+    false
   )
 on conflict (id) do update set
   name                = excluded.name,

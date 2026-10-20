@@ -4,6 +4,7 @@ import { checkClickToken, isLikelyBot, mintClickId } from "@/lib/click-url";
 import {
   CLICK_FIELD_RE,
   TAG_CLICK_FIELD,
+  appendForwardedParams,
   expandClickMacros,
   isHttpUrl,
 } from "@/lib/click-destination";
@@ -157,13 +158,21 @@ export async function handleClick(request: Request, platform: ServingPlatform): 
   // emoji — or a `.рф` host — would make the Response constructor throw. `href`
   // is the ASCII serialization: punycode host, UTF-8 percent-encoded path and
   // query, and the same address a browser would have opened.
-  const location = new URL(
-    expandClickMacros(resolved.destination, {
-      click_id: clickId,
-      creative_id: creativeId,
-      outcome: resolved.field,
-    }),
-  ).href;
+  //
+  // Then what the viewer picked inside the ad, if the unit added any to this
+  // link: appended to the owner's destination, never over a parameter it has
+  // (ADR-0031). After `href`, so the owner's own query is sent as serialized
+  // there and nothing of it is re-encoded.
+  const location = appendForwardedParams(
+    new URL(
+      expandClickMacros(resolved.destination, {
+        click_id: clickId,
+        creative_id: creativeId,
+        outcome: resolved.field,
+      }),
+    ).href,
+    url.searchParams,
+  );
 
   if (clickId) {
     // Two-letter country from the platform; the IP address is not stored. Not

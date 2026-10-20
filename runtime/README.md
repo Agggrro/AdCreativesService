@@ -69,6 +69,7 @@ through `/c/s/:token`, which gives it the CSP it runs under and a per-request to
 | `dist/age-gate/vpaid.js` | `age-gate/vpaid.js` | VPAID 2.0 |
 | `dist/pick-message/vpaid.js` | `pick-message/vpaid.js` | VPAID 2.0 |
 | `dist/duel/vpaid.js` | `duel/vpaid.js` | VPAID 2.0 |
+| `dist/step-builder/vpaid.js` | `step-builder/vpaid.js` | VPAID 2.0 |
 
 These keys match `templates.runtime_keys` in [`../supabase/seed.sql`](../supabase/seed.sql)
 and are what `runtime/manifest.ts` maps to real CDN URLs. The **object** key on the

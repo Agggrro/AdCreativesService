@@ -21,6 +21,7 @@
     "test:entitlement": "node --test lib/serving/entitlement.test.ts",
     "test:cors": "node --import ./scripts/register-app-imports.mjs --test lib/vast/cors.test.ts",
     "test:postback": "node --import ./scripts/register-app-imports.mjs --test lib/postback.test.ts",
+    "test:click": "node --import ./scripts/register-app-imports.mjs --test lib/click-destination.test.ts",
     "test:media": "node --import ./scripts/register-app-imports.mjs --test lib/creative-media.test.ts lib/r2.test.ts",
     "test:vast": "node --import ./scripts/register-app-imports.mjs --test lib/vast/golden.test.ts",
     "test:snapshots": "node --import ./scripts/register-app-imports.mjs --test lib/serving/store-kv.test.ts",

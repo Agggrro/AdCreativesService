@@ -182,6 +182,17 @@ rename to do it.
   we mint ourselves — the click id, the creative id and the field name — each
   `encodeURIComponent`-ed, and the result is normalized through `URL` (punycode host,
   percent-encoded path), since a header carries Latin-1 only.
+- **A viewer's in-ad picks are appended, and nothing else moves.** Since
+  [ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md) the link's other query
+  parameters (not `cid`, `f`, `exp` or `sig`) are appended to the destination's query.
+  This is how Step Builder's picks reach the landing. A name the destination already has
+  (compared without case) is never added, so a crafted link cannot override the owner's affiliate id, sub-id or
+  `{click_id}`. Names must match `^[A-Za-z][A-Za-z0-9_]{0,31}$`, values
+  `^[A-Za-z0-9_-]{1,64}$`, and at most eight are kept. The pairs are appended as text
+  after the `URL` normalization, so host, path and the owner's own query are never
+  touched. Forwarding gives a crafted link little reach a direct link to the same landing
+  would not have. The residual: a parameter the owner did *not* set can arrive on a
+  click that carries a minted click id. Pinned by `npm run test:click`.
 - **But the owner's config is not trusted either — signing up is free.** Without more,
   any account could configure a phishing page and hand out `/r?cid=…` as a redirect from
   our ad domain, and a domain on a blocklist takes every customer's tag down with it. So

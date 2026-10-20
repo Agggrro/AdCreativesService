@@ -13,6 +13,7 @@ export const PREVIEW_UNIT_PATHS: Record<string, string> = {
   "age-gate": "age-gate/vpaid.js",
   "pick-message": "pick-message/vpaid.js",
   duel: "duel/vpaid.js",
+  "step-builder": "step-builder/vpaid.js",
   shoppable: "shoppable/vpaid/unit.js",
 };
 

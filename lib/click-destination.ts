@@ -72,3 +72,60 @@ export function expandClickMacros(destination: string, values: ClickMacroValues)
 export function hasClickIdMacro(destination: string): boolean {
   return /\{click_id\}|%7Bclick_id%7D/i.test(destination);
 }
+
+/**
+ * The query parameters a click link carries for `/r` itself
+ * (lib/click-url.ts, clickUrl). Never forwarded to the destination.
+ */
+const CLICK_LINK_PARAMS = new Set(["cid", "f", "exp", "sig"]);
+
+/** A parameter name `/r` forwards — the shape of a query key a landing reads. */
+export const FORWARD_KEY_RE = /^[A-Za-z][A-Za-z0-9_]{0,31}$/;
+/** A value `/r` forwards: a picked option's id, never free text or a URL. */
+// No `.`: an option id needs none, and without it a value cannot be a hostname
+// for a landing's own redirect parameter to follow.
+export const FORWARD_VALUE_RE = /^[A-Za-z0-9_-]{1,64}$/;
+/** At most this many are forwarded per click; the rest are dropped. */
+export const MAX_FORWARDED_PARAMS = 8;
+
+/**
+ * The destination with what the viewer picked inside the ad appended
+ * (ADR-0031). A template such as Step Builder adds its picks to the click link
+ * as ordinary query parameters; `/r` carries them on, so the landing opens at
+ * the step the ad stopped at instead of the start.
+ *
+ * The destination stays the owner's: the link still names only a field, and
+ * this appends to the URL that field holds — host, path and every parameter the
+ * owner wrote are untouched. A parameter the destination already has is never
+ * added again, so a crafted link cannot override an affiliate id, a sub-id or
+ * the `{click_id}` the network attributes by. Names and values are held to a
+ * narrow pattern and a small count, which keeps out anything but an option id.
+ *
+ * Appended as text rather than through `URLSearchParams`, which would
+ * re-serialize the owner's whole query (`%20` becoming `+`, and so on) and send
+ * the viewer to a URL the owner never wrote. Nothing appended needs encoding.
+ */
+export function appendForwardedParams(destination: string, link: URLSearchParams): string {
+  // Compared without case: some servers read `AFF` as `aff`, and a crafted
+  // link must not reach the owner's parameter that way either.
+  let have: Set<string>;
+  try {
+    have = new Set([...new URL(destination).searchParams.keys()].map((k) => k.toLowerCase()));
+  } catch {
+    return destination;
+  }
+  const add: string[] = [];
+  for (const [key, value] of link) {
+    if (add.length >= MAX_FORWARDED_PARAMS) break;
+    if (CLICK_LINK_PARAMS.has(key.toLowerCase()) || have.has(key.toLowerCase())) continue;
+    if (!FORWARD_KEY_RE.test(key) || !FORWARD_VALUE_RE.test(value)) continue;
+    have.add(key.toLowerCase());
+    add.push(`${key}=${value}`);
+  }
+  if (add.length === 0) return destination;
+  const cut = destination.indexOf("#");
+  const base = cut < 0 ? destination : destination.slice(0, cut);
+  const hash = cut < 0 ? "" : destination.slice(cut);
+  const sep = !base.includes("?") ? "?" : /[?&]$/.test(base) ? "" : "&";
+  return `${base}${sep}${add.join("&")}${hash}`;
+}

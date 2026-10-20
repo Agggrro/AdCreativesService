@@ -131,6 +131,9 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
 - After any Supabase migration, query, or RLS change → **`supabase-rls-auditor`** subagent.
 - After changing the postback parser (`lib/postback.ts`, the trust boundary for what a
   partner network sends `/pb`) → `npm run test:postback`. See [ADR-0027](docs/decisions/0027-conversion-goals.md).
+- After changing what the click redirect `/r` forwards (`appendForwardedParams` in
+  `lib/click-destination.ts`) → `npm run test:click`. It must never override a parameter
+  the owner's destination has. See [ADR-0031](docs/decisions/0031-step-builder-and-forwarded-picks.md).
 - After changing media URL parsing or the R2 layer (`lib/creative-media.ts`, `lib/r2.ts` —
   in R2, which has no RLS, they are the guard against a cross-tenant delete) →
   `npm run test:media`. See [ADR-0028](docs/decisions/0028-creative-media-on-r2.md).

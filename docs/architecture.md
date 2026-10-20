@@ -224,7 +224,11 @@ Conversion attribution, the way trackers do it
   through `record_click()` in `waitUntil` (capped per creative per minute, and logged when
   it does not land), and 302s with `{click_id}`, `{creative_id}` and `{outcome}` filled in
   and the result normalized through `URL`. A stale link, a HEAD or a crawler gets the same
-  302 with no id. A field that no longer resolves falls back to `clickThroughUrl`; an
+  302 with no id. The link's other query parameters, which is how a unit sends a
+  viewer's in-ad picks (Step Builder), are appended to the destination. A name the
+  destination already has is never added, and only short option ids are carried
+  (`appendForwardedParams`, [ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)).
+  A field that no longer resolves falls back to `clickThroughUrl`; an
   unreadable database is a `503`; everything is `no-store`. There is no entitlement read:
   only a served tag can have produced a genuine signature.
 - **`/pb` (`app/api/postback/route.ts`)** is called by a partner network's server with the
