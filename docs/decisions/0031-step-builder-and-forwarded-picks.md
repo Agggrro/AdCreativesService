@@ -37,12 +37,19 @@ destination.
   control. A tap rings the tile, dims the others, and the next step replaces the row.
   After the last pick, that pick's clip takes the slot, under a line of every pick, the
   advertiser's title and a button.
-- **Each step names a query parameter (`step<N>Key`), and each option a value.** The
-  button opens the click-through with the picks appended as `key=value`. A parameter the
-  URL already carries is never repeated.
+- **Passing the picks on is the advertiser's switch** (`passPicks`, off by default).
+  Only a landing built to read them gains from it. With it on, each step names a query
+  parameter (`step<N>Key`) and each option a value, and the button opens the
+  click-through with the picks appended as `key=value`. A parameter the URL already
+  carries is never repeated. With it off, the name and value fields are hidden and the
+  click-through is opened as written.
 - **`{key}` in a media URL is an earlier pick.** `…/{style}/asian.mp4` resolves after
   the style step, so a later step can show the clips that match an earlier choice. The
   landing works the same way.
+- **An uploaded clip has a second slot for step one's option B** (`step<N>Opt<I>MediaB`,
+  steps 2–3). An upload's URL is `{owner}/{uuid}.mp4` (ADR-0028). It has no path to put
+  `{key}` in, so a flow whose later clips depend on a two-way first pick (realistic or
+  anime) names both clips outright. A pick of C or D at step one uses the plain clip.
 - **The counter is the advertiser's count of their own flow** (`stepsTotal`, at least the
   ad's own steps). The ad's last screen shows `3/6` and a part-filled bar, and the
   landing's own stepper then shows step three. That is true of the flow as it exists, not
@@ -107,11 +114,13 @@ picks to its click link gets them through.
 - **Clips are loaded per step, not preloaded.** A later step's tiles appear with their
   labels and fill in as their clips arrive. Preloading would spend the heavy-ad budget on
   clips most viewers never see.
-- **Up to 48 config fields.** Each step's options are a `kind: "matrix"` group, one
-  collapsible row per option (`A`–`D`, each its label, value and clip), so the form reads
-  as a list of options with a filled/empty rail, not a wall. Options are variants of one
-  thing, which is what the matrix is for (docs/design-system.md §6). A scenario has an
-  order of play, and an option has none.
+- **Up to 57 config fields, laid out as one compact table per step.** Each step's
+  options are a `kind: "options"` group: one row per option (`A`–`D`), with the label
+  (and the value, when picks are passed on) heading the row, and the clip and its
+  option-B variant as two upload tiles beside it. It is the scenario table
+  (docs/design-system.md §6) without the play-order numbers and chevrons, because an
+  option's clips are variants, not stages. A three-step xpeach creative is 18 clips, and
+  every one sits in view as a tile rather than behind a collapsed row.
 - **Picks reach only the real query string.** The unit and `/r` both insert them before
   `#`, so a landing that routes in its fragment (`/#/create?style=…`) does not see them.
 - **A key or value outside the patterns is dropped, not refused.** The configurator has

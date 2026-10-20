@@ -741,6 +741,23 @@ user is configuring, so the layout draws that order.
   with the 380px preview. The tile's focusable controls are never inside an
   `overflow-hidden` box; only the thumbnail's own wrapper clips.
 
+**Options** — the scenario table for media that are variants rather than stages, such as
+Step Builder's options per step, each with a clip and an option-B variant of it
+([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)). Ten or twenty clips
+behind collapsed matrix rows means one row opened at a time. As tiles in view, the whole
+step can be read and filled in one pass.
+
+- **The scenario table with the order taken out.** Column headers are the field label
+  alone, with no `1 ·`, and no chevron joins the tiles. Everything else is the scenario's:
+  the tile, its states, focus, widths, and the zero accent budget.
+- **A row head is short and carries no help.** The label (`A · LABEL`), and the value when
+  the template needs one. Their help would run a dozen caption lines down the 10rem
+  column, so it is dropped there and the schema explains them in the step's full-width
+  fields.
+- **The column header says `required` only when every row requires it.** The optional
+  rows (C and D) would otherwise sit under a header that says they are required. Each
+  tile's own accessible name still carries its own requirement.
+
 ### Inputs
 
 44px high (32px in a dense table context), 1px `line` border, `--radius-ctl`, **mono 13px**,

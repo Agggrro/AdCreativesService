@@ -265,8 +265,10 @@ export function ConfiguratorForm({
 
           return (
             <FieldSection key={run.key} heading={groupLabel(dict, run.group)}>
-              {kinds.get(run.group) === "scenario" ? (
+              {kinds.get(run.group) === "scenario" ||
+              kinds.get(run.group) === "options" ? (
                 <ScenarioGrid
+                  ordered={kinds.get(run.group) === "scenario"}
                   fields={run.fields}
                   values={values}
                   onChange={setValue}

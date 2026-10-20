@@ -5,9 +5,9 @@
  * three steps, each a row of two to four tiles (a looping clip or a picture
  * with a label). The viewer taps one per step; after the last, the last pick
  * takes the slot under a summary of every pick, a progress counter and a
- * button. The button opens the click-through with the picks appended as query
- * parameters, so a landing that reads them carries on from where the ad
- * stopped instead of starting over (ADR-0031).
+ * button, which opens the click-through. With `passPicks` on, the picks are
+ * appended to it as query parameters, so a landing built to read them carries
+ * on from where the ad stopped instead of starting over (ADR-0031).
  *
  * Inside ADR-0005's deception boundary: every word on screen is the
  * advertiser's copy, the progress counter is the advertiser's own count of
@@ -16,6 +16,8 @@
  *
  * Config (AdParameters):
  *   stepCount  "2" | "3"                         (absent => 3)
+ *   passPicks  "on" | "off"                      append the picks to the
+ *                       click-through (absent => off)
  *   step<N>Title                                  the line over step N's tiles
  *   step<N>Key                                    the query parameter step N sets
  *   step<N>Opt<I>Label, step<N>Opt<I>Value,
@@ -24,6 +26,9 @@
  *                       URL is the value picked at the earlier step whose key
  *                       it names, so a later step can show clips that match an
  *                       earlier pick ("…/{style}/blonde.mp4").
+ *   step<N>Opt<I>MediaB                           steps 2–3: the option's clip when
+ *                       step one's option B was picked (absent => its Media).
+ *                       For uploads, whose URLs have no path to template.
  *   stepsTotal                                    the counter's total, at least
  *                       the ad's own steps: the landing's whole flow (absent =>
  *                       the ad's steps)
@@ -105,6 +110,7 @@ var TEMPLATE = {
 
     // --- the flow, from the config ------------------------------------------------
     var stepCount = params.stepCount === "2" ? 2 : MAX_STEPS;
+    var passPicks = params.passPicks === "on";
     var steps = [];
     for (var s = 1; s <= stepCount; s++) {
       var options = [];
@@ -116,6 +122,7 @@ var TEMPLATE = {
           label: label,
           value: str(p + "Value", label),
           media: str(p + "Media", ""),
+          mediaB: s > 1 ? str(p + "MediaB", "") : "",
         });
       }
       // A step with nothing to pick from is skipped rather than shown empty.
@@ -270,7 +277,7 @@ var TEMPLATE = {
      * that is `/r`'s own, and on a plain destination the advertiser's.
      */
     function withPicks(base) {
-      if (!base) return "";
+      if (!base || !passPicks) return base;
       var hash = "";
       var cut = base.indexOf("#");
       if (cut >= 0) {
@@ -312,7 +319,10 @@ var TEMPLATE = {
       b.style.cssText =
         "position:absolute;padding:0;overflow:hidden;background:#16141c;color:#fff;" +
         BUTTON_RESET + (still ? "" : "transition:opacity .3s ease,transform .3s ease;");
-      var src = opt.media ? mediaUrl(opt.media) : "";
+      // After step one's option B, an option's own B clip, if it has one: an
+      // uploaded file's URL has no path to put a "{key}" in.
+      var raw = picks.length && picks[0].index === 1 && opt.mediaB ? opt.mediaB : opt.media;
+      var src = raw ? mediaUrl(raw) : "";
       if (src) b.appendChild(adInteractFitMedia(src, api, "s" + (step + 1) + ":" + (i + 1)).el);
       var shade = document.createElement("span");
       shade.style.cssText =
@@ -417,7 +427,13 @@ var TEMPLATE = {
       locked = true;
       stopHint();
       var opt = steps[step].options[i];
-      picks.push({ key: steps[step].key, value: opt.value, label: opt.label, media: tiles[i].src });
+      picks.push({
+        key: steps[step].key,
+        value: opt.value,
+        label: opt.label,
+        media: tiles[i].src,
+        index: i,
+      });
       for (var k = 0; k < tiles.length; k++) {
         if (k === i) {
           tiles[k].ring.style.opacity = "1";
@@ -673,6 +689,7 @@ var TEMPLATE = {
       h: wrap.clientHeight,
       steps: steps.length,
       total: total,
+      passPicks: passPicks,
       options: steps.map(function (st) {
         return st.options.length;
       }),
