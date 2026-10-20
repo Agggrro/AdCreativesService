@@ -114,8 +114,11 @@ picks to its click link gets them through.
 - **The next step loads while the viewer chooses** (amended 2026-10-20, after testing on
   emulated phones on 3G):
   - Once step one's clips are showing, step two's clips for either pick are warmed to
-    their first frame (`preload="metadata"`). That is a few KB each before the first tap,
-    so the next step shows pictures at once.
+    their first frame (`preload="metadata"`), so the next step shows pictures at once.
+    Only on a connection the browser reports as 3G or slower, and never under Save-Data.
+    On 4G Chrome read the short clips almost whole even at `metadata`: 0.9 MB more
+    before the tap, for a step that loads in 0.3 s after it anyway. Safari reports no
+    connection type and gets no warm-up.
   - At the tap, the chosen pick's clips are upgraded to a full load during the 550 ms
     advance, and the others are dropped.
   - From step two on, the step after the current one loads in full 600 ms into it.

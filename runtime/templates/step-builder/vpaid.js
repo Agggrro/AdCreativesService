@@ -237,6 +237,7 @@ var TEMPLATE = {
     endTitle.textContent = str("finishTitle", "Almost there");
     endTitle.style.cssText =
       "max-width:100%;font-weight:800;line-height:1.15;text-shadow:0 2px 6px rgba(0,0,0,.7);" +
+      "text-wrap:balance;" +
       "display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;";
     panel.appendChild(endTitle);
     var ctaBox = document.createElement("div");
@@ -371,13 +372,22 @@ var TEMPLATE = {
     /**
      * While the viewer looks at step one, the start of every step-two clip it
      * can lead to, for either pick: a first frame each, so the next step shows
-     * pictures at once even on 3G. Only once step one's own clips are showing,
-     * so they never compete with it. It is a few KB per clip against Chrome's
-     * 4 MB heavy-ad budget, and the clips the viewer did not lead to are
+     * pictures at once on 3G. Only once step one's own clips are showing, so
+     * they never compete with it, and the clips the viewer did not lead to are
      * dropped at the tap.
+     *
+     * Only on a connection the browser reports as 3G or slower, and never under
+     * Save-Data. On a fast one Chrome reads a short clip almost whole even at
+     * `metadata` — 0.9 MB more before the tap in testing, for a step that loads
+     * in 0.3 s after it anyway — and a browser that reports nothing (Safari)
+     * is not guessed at.
      */
+    function slowConnection() {
+      var c = view.navigator && view.navigator.connection;
+      return !!c && !c.saveData && /^(slow-2g|2g|3g)$/.test(c.effectiveType || "");
+    }
     function warmSecondStep() {
-      if (stopped || steps.length < 2 || picks.length) return;
+      if (stopped || steps.length < 2 || picks.length || !slowConnection()) return;
       var n = 0;
       var opts = steps[1].options;
       for (var k = 0; k < opts.length; k++) {
