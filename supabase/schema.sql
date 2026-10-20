@@ -18,10 +18,13 @@
 
 begin;
 
--- Default-closed for anything created later in this file (and by anyone after
--- it): `create function` otherwise grants EXECUTE to PUBLIC, which briefly
--- exposes every SECURITY DEFINER function to anon before its explicit revoke.
-alter default privileges in schema public revoke execute on functions from public;
+-- Default-closed for anything created later in this file (and by this role
+-- after it): `create function` otherwise grants EXECUTE to PUBLIC, which
+-- exposes every SECURITY DEFINER function to anon until its explicit revoke.
+-- Global, not `in schema public`: PUBLIC's EXECUTE is a built-in global
+-- default, and Postgres cannot revoke a global default per schema — the
+-- per-schema form of this line was a silent no-op.
+alter default privileges revoke execute on functions from public;
 
 -- PUBLIC is not the only grantee. A Supabase project's default privileges also
 -- grant EXECUTE on every new public function **directly** to `anon`,
@@ -32,8 +35,8 @@ alter default privileges in schema public revoke execute on functions from publi
 --   * future functions start closed to both API roles (this line), and
 --   * every function below revokes from `public, anon, authenticated` by name,
 --     then grants back exactly the role that calls it — `service_role` for the
---     ingest, serving and cron paths, `authenticated` for the dashboard reads
---     (which keep `authenticated` and drop `anon`).
+--     ingest, serving and cron paths, `authenticated` for the dashboard reads,
+--     nothing for the trigger functions.
 -- Named revokes rather than this default alone: default privileges only shape
 -- objects created after them, and every function here already exists.
 alter default privileges in schema public revoke execute on functions from anon, authenticated;
@@ -1243,7 +1246,8 @@ as $$
   where creative_id = p_creative_id;
 $$;
 
--- Only the service role may call it (revoking from PUBLIC also covers anon/authenticated).
+-- Only the service role may call it: PUBLIC and both API roles are revoked by
+-- name (see the file header — a revoke from PUBLIC alone does not cover them).
 revoke all on function public.get_creative_serving(uuid) from public, anon, authenticated;
 grant execute on function public.get_creative_serving(uuid) to service_role;
 
@@ -1333,7 +1337,7 @@ set local check_function_bodies = on;
 comment on function public.get_creative_overview() is
   'Per-creative delivery counts + entitlement for the signed-in owner. The only read path into creative_event_counters.';
 
-revoke all on function public.get_creative_overview() from public, anon;
+revoke all on function public.get_creative_overview() from public, anon, authenticated;
 grant execute on function public.get_creative_overview() to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1367,7 +1371,7 @@ $$;
 comment on function public.get_creative_errors(uuid) is
   'VAST error beacon counts per error code for one creative the caller owns (ADR-0033).';
 
-revoke all on function public.get_creative_errors(uuid) from public, anon;
+revoke all on function public.get_creative_errors(uuid) from public, anon, authenticated;
 grant execute on function public.get_creative_errors(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1453,7 +1457,7 @@ $$;
 comment on function public.get_creative_conversions(uuid, int) is
   'Clicks through /r and postback conversions per day and exit for one creative the caller owns (ADR-0023).';
 
-revoke all on function public.get_creative_conversions(uuid, int) from public, anon;
+revoke all on function public.get_creative_conversions(uuid, int) from public, anon, authenticated;
 grant execute on function public.get_creative_conversions(uuid, int) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1519,7 +1523,7 @@ $$;
 comment on function public.get_creative_conversion_goals(uuid, int) is
   'Postback conversions per goal for one creative the caller owns, over the same window as get_creative_conversions() (ADR-0027).';
 
-revoke all on function public.get_creative_conversion_goals(uuid, int) from public, anon;
+revoke all on function public.get_creative_conversion_goals(uuid, int) from public, anon, authenticated;
 grant execute on function public.get_creative_conversion_goals(uuid, int) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1611,10 +1615,10 @@ as $$
    limit least(greatest(coalesce(p_limit, 50), 1), 200);
 $$;
 
-revoke all on function public.ensure_postback_key() from public, anon;
-revoke all on function public.rotate_postback_key() from public, anon;
-revoke all on function public.has_postback_key() from public, anon;
-revoke all on function public.get_postback_log(int) from public, anon;
+revoke all on function public.ensure_postback_key() from public, anon, authenticated;
+revoke all on function public.rotate_postback_key() from public, anon, authenticated;
+revoke all on function public.has_postback_key() from public, anon, authenticated;
+revoke all on function public.get_postback_log(int) from public, anon, authenticated;
 grant execute on function public.ensure_postback_key() to authenticated;
 grant execute on function public.rotate_postback_key() to authenticated;
 grant execute on function public.has_postback_key() to authenticated;

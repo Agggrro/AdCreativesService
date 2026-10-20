@@ -496,17 +496,23 @@ Until 2026-10-20, every function in `supabase/schema.sql` was closed with
 `revoke … from public` alone. A Supabase project's default privileges also grant
 EXECUTE on new public functions **directly** to `anon`, `authenticated` and
 `service_role`, and a revoke from PUBLIC leaves a direct grant in place. On a database
-with Supabase's default ACL emulated, the anon key could call all sixteen functions:
-- `increment_creative_event`: forged impressions and clicks for any creative id, which
-  is printed in every tag URL, past `/t`'s signature;
+with Supabase's default ACL emulated, the anon key could call every function that RPC
+can reach, fifteen of them. Only the trigger functions could not be called directly:
+- `increment_creative_event` and `increment_creative_error`: forged impressions,
+  clicks and VAST error counts for any creative id, which is printed in every tag URL,
+  past `/t`'s signature;
 - `record_click` and `record_postback`: clicks and conversions past `/r` and `/pb`;
 - `rollup_creative_events` and `purge_tracking_data`: cross-account rewrites and deletes;
 - `get_creative_serving`: any creative's serving record, `user_id` and config included,
   past the entitlement gate.
 
 The rule now, stated once in the file header:
-- `alter default privileges in schema public revoke execute on functions from anon, authenticated`,
-  so a new function starts closed;
+- two default-privilege lines, so a new function starts closed. The global
+  `alter default privileges revoke execute on functions from public` is needed because a
+  per-schema revoke cannot touch PUBLIC's built-in global default, and the earlier
+  `in schema public` form was a no-op. `… in schema public revoke execute on functions
+  from anon, authenticated` removes Supabase's direct grants. Both apply to the role
+  that runs the file (`postgres`, through `DATABASE_URL`);
 - every function revokes from `public, anon, authenticated` **by name**. Default
   privileges only shape objects created after them;
 - every function then grants back only the role that calls it:
@@ -525,7 +531,11 @@ select p.proname,
 `anon` must be false everywhere. `authenticated` must be true only for
 `get_creative_overview`, `get_creative_errors`, `get_creative_conversions`,
 `get_creative_conversion_goals`, `ensure_postback_key`, `rotate_postback_key`,
-`has_postback_key` and `get_postback_log`.
+`has_postback_key` and `get_postback_log`. The query covers `public` only.
+`private.is_entitled` sits behind the `private` schema's USAGE revoke. `service_role`
+keeps Supabase's default EXECUTE everywhere, which is harmless: it is the server's own
+key. A function an extension installs into `public` would show up here, and it needs
+its own decision.
 
 Counts written through the open RPCs before the fix cannot be told apart from real ones:
 the counters keep no per-hit record.
