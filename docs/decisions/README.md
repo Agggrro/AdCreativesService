@@ -46,6 +46,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0029](0029-off-vercel-onto-cloudflare-workers.md) | Off Vercel: the ad path and the app on Cloudflare Workers | Accepted |
 | [0030](0030-duel-template.md) | Duel: one round of a two-way vote, and a winner clip with its own sound | Accepted |
 | [0031](0031-step-builder-and-forwarded-picks.md) | Step Builder: the first steps of a landing's flow, and picks that travel with the click | Accepted |
+| [0032](0032-engagement-extends-the-ad.md) | An ad the viewer is engaging with runs longer, up to 30 seconds more | Accepted |
 
 ## Template
 

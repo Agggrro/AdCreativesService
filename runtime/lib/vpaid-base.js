@@ -9,6 +9,9 @@
  * field is fitted by (adInteractFitMedia: height-fitted, blurred sides —
  * ADR-0025), and the mandatory close control (ADR-0009).
  *
+ * A video-less ad runs `durationSeconds` (30 by default) and is extended while the
+ * viewer engages with it, by up to ADINTERACT_EXTEND_MAX seconds (ADR-0032).
+ *
  * `api` given to onStart: { params, slot, videoSlot, clickThrough(url?), emit(e,a),
  * stop(), debug(name, data), volume(), onStop(fn), onPause(fn), onResume(fn) }
  * Config arrives via VAST <AdParameters> (creativeData.AdParameters). ADR-0005.
@@ -335,6 +338,23 @@ function adInteractCloneable(value) {
   }
 }
 
+/**
+ * How much longer than its own duration an ad may run for a viewer who is
+ * engaging with it, seconds (ADR-0032). A multi-step mechanic — Step Builder's
+ * three picks, the quiz's questions — does not fit 30s for a viewer who starts
+ * late, and players end the ad on AdVideoComplete, so the timer that fires it
+ * has to move. Capped, so an engaged ad still ends.
+ */
+var ADINTERACT_EXTEND_MAX = 30;
+/**
+ * Time left on the clock after each action, seconds: enough to see the next
+ * step load and make the next pick. An action that would buy less than a
+ * second more is not an extension, so a burst of taps is one event, not ten.
+ */
+var ADINTERACT_EXTEND_GRACE = 15;
+/** What counts as the viewer acting on the ad. Pointer events plus their older equivalents, for a WebView without them. */
+var ADINTERACT_ENGAGE_EVENTS = ["pointerdown", "mousedown", "touchstart", "keydown"];
+
 function CreoSmithVpaid(template) {
   this._t = template || {};
   // Start of this run, and an id for it. Only ever one unit is live per page —
@@ -361,6 +381,10 @@ function CreoSmithVpaid(template) {
   this._cb = {};
   this._timer = null;
   this._startedAt = 0;
+  // The duration the ad was served with, before any extension (ADR-0032).
+  this._baseDuration = 15;
+  this._onEngage = null;
+  this._closeHost = null;
   this._closed = false;
   // Set by every terminal path (_teardown). After it the ad is over, whatever a
   // host leaves on screen, and the template's own cleanups have run.
@@ -405,6 +429,7 @@ CreoSmithVpaid.prototype.initAd = function (
   var d = Number(this._params.durationSeconds) || this._t.duration || 15;
   this._attributes.duration = d;
   this._attributes.remainingTime = d;
+  this._baseDuration = d;
 
   if (this._params.videoUrl && this._videoSlot) this._setupVideo();
   this._emit("AdLoaded");
@@ -536,6 +561,7 @@ CreoSmithVpaid.prototype.startAd = function () {
     if (p && p.catch) p.catch(function () {});
   } else {
     this._startTimer();
+    this._watchEngagement();
   }
 };
 
@@ -545,15 +571,60 @@ CreoSmithVpaid.prototype._startTimer = function () {
   this._timer = setInterval(function () {
     // Paused (pauseAd): the clock stands still, as a video's would.
     if (self._pausedAt) return;
-    var pct =
-      (Date.now() - self._startedAt) / 1000 / self._attributes.duration;
-    self._attributes.remainingTime = Math.max(
-      0,
-      self._attributes.duration * (1 - pct),
-    );
-    self._progress(pct);
-    if (pct >= 1) self._complete();
+    // Read every tick rather than fixed at start: an extension (_extend)
+    // moves the end, and the quartiles follow it.
+    var elapsed = self._elapsed();
+    var d = self._attributes.duration;
+    self._attributes.remainingTime = Math.max(0, d - elapsed);
+    self._progress(elapsed / d);
+    if (elapsed >= d) self._complete();
   }, 250);
+};
+
+/** Seconds of ad time so far on the timer-driven clock; a paused stretch is not counted. */
+CreoSmithVpaid.prototype._elapsed = function () {
+  return ((this._pausedAt || Date.now()) - this._startedAt) / 1000;
+};
+
+/**
+ * Extend a video-less ad while the viewer acts on it (ADR-0032). Bound on the
+ * slot, in the capture phase, so every template gets it without doing anything
+ * and a template that stops propagation cannot opt out. The close control is
+ * not engagement: its tap ends the ad.
+ */
+CreoSmithVpaid.prototype._watchEngagement = function () {
+  var self = this;
+  var slot = this._slot;
+  if (!slot) return;
+  this._onEngage = function (e) {
+    if (self._closeHost && self._closeHost.contains(e.target)) return;
+    self._extend();
+  };
+  for (var i = 0; i < ADINTERACT_ENGAGE_EVENTS.length; i++) {
+    slot.addEventListener(ADINTERACT_ENGAGE_EVENTS[i], this._onEngage, true);
+  }
+};
+
+/**
+ * Move the end to ADINTERACT_EXTEND_GRACE seconds from now, never past the
+ * served duration plus ADINTERACT_EXTEND_MAX, and tell the player: VPAID 2.0's
+ * AdDurationChange, plus AdRemainingTimeChange for a VPAID 1 host — both say
+ * "read getAdDuration/getAdRemainingTime again". Only while the clock runs: a
+ * completed ad stays completed, and a video-driven one is paced by its video.
+ */
+CreoSmithVpaid.prototype._extend = function () {
+  if (!this._timer || this._q.done || this._stopped) return;
+  var elapsed = this._elapsed();
+  var end = Math.min(
+    this._baseDuration + ADINTERACT_EXTEND_MAX,
+    Math.ceil(elapsed + ADINTERACT_EXTEND_GRACE),
+  );
+  if (end - this._attributes.duration < 1) return;
+  this._attributes.duration = end;
+  this._attributes.remainingTime = Math.max(0, end - elapsed);
+  this._report("extend", { at: Math.round(elapsed * 10) / 10, duration: end });
+  this._emit("AdDurationChange");
+  this._emit("AdRemainingTimeChange");
 };
 
 CreoSmithVpaid.prototype._onVideoTime = function () {
@@ -665,6 +736,12 @@ CreoSmithVpaid.prototype._teardown = function () {
   if (this._timer) {
     clearInterval(this._timer);
     this._timer = null;
+  }
+  if (this._onEngage && this._slot) {
+    for (var k = 0; k < ADINTERACT_ENGAGE_EVENTS.length; k++) {
+      this._slot.removeEventListener(ADINTERACT_ENGAGE_EVENTS[k], this._onEngage, true);
+    }
+    this._onEngage = null;
   }
   this._stopViewabilityObserver();
   // Taken before running, so a second terminal call (stopAd after skipAd) runs
@@ -804,6 +881,7 @@ CreoSmithVpaid.prototype._mountCloseControl = function () {
   host.appendChild(btn);
 
   slot.appendChild(host);
+  this._closeHost = host;
 
   // Force layout before flipping the target value, so the browser has
   // committed the ring's initial (full) offset before the transition starts.

@@ -278,18 +278,25 @@ mark centred by geometry on every device, font stack, and DPR.
 This is also why a creative has **no fixed watch duration** anymore: the internal
 `durationSeconds` (VAST `<Duration>`, quartile timer pacing) is still injected with a
 default via `lib/vast/builder.ts`, but it is no longer a configurator field — nothing
-auto-completes or auto-removes the creative on a timer; only the viewer's own close
-click does.
+auto-removes the creative on a timer; only the viewer's own close click does. The
+timer does fire `complete`, though, and many players end the ad on it.
 
-A consequence worth naming, now that a quiz can run three questions: **`complete` means
-"was on screen for the injected duration", not "finished the interaction".** Time the player
-holds the ad paused (`pauseAd` until `resumeAd`) does not count toward it: the timer that
-paces a video-less ad stands still while paused, as a video's playhead would
-([ADR-0030](decisions/0030-duel-template.md)). A viewer
-still on question two when the 30s quartile timer expires fires `complete` anyway. This
-was always true of every template; multi-step just makes the gap visible. Do not defer
-`complete` until the mechanic ends — that would make the metric incomparable across
-creatives and would break players that gate their own teardown on it. SIMID does not get this yet (it runs in a sandboxed iframe over a
+**`complete` means "was on screen for the injected duration, plus however long the
+viewer kept acting on it, up to 30 seconds more"** ([ADR-0032](decisions/0032-engagement-extends-the-ad.md)).
+A video-less ad that nobody touches completes at its served duration, exactly as before.
+Each action in the slot (a pointer or key press anywhere but the close control) moves
+the end to 15 seconds from then, never past the served duration plus 30, and the unit
+tells the player with `AdDurationChange` and `AdRemainingTimeChange`. The trigger is the
+viewer's action, never the template's own progress, so `complete` still does not wait
+for the mechanic to finish, and a viewer still on step two when the extended timer runs
+out fires `complete` anyway. Time the player holds the ad paused (`pauseAd` until
+`resumeAd`) does not count toward it: the timer that paces a video-less ad stands still
+while paused, as a video's playhead would ([ADR-0030](decisions/0030-duel-template.md)).
+The VAST `<Duration>` stays the served value, and a player that enforces it rather than
+`AdDurationChange` still ends the ad there. An engaged viewer's `complete` comes later
+and is lost if they leave first, so the completion rate is not the measure of
+engagement; clicks and the `tpl:*` records are. A creative paced by a base video is never
+extended. SIMID does not get this yet (it runs in a sandboxed iframe over a
 different, postMessage-based runtime, not the VPAID base) — a known gap, not a design
 decision.
 
