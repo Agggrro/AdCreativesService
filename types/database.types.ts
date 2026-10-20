@@ -218,7 +218,7 @@ export type Database = {
       creative_error_counters: {
         Row: {
           creative_id: string;
-          /** VAST error code, 100–999; 0 when the player sent none usable. */
+          /** VAST or vendor error code, 100–9999; 0 when the player sent none usable. */
           code: number;
           bucket: string;
           count: number;

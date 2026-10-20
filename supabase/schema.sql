@@ -337,12 +337,13 @@ grant execute on function public.increment_creative_event(uuid, creative_event_t
 -- reading with its code, and carrying a code column on every impression and
 -- click counter would widen that table's key for no reading of it.
 --
--- `code` is 100–999, the VAST 4.2 range, or 0 for a beacon whose [ERRORCODE]
--- the player left literal, empty or malformed. The handler maps anything else
--- to 0 before it gets here; the check is the second lock.
+-- `code` is 100–9999 — VAST's three-digit codes, or a vendor's four-digit one —
+-- or 0 for a beacon whose [ERRORCODE] the player left literal, empty or
+-- malformed. The handler maps anything else to 0 before it gets here; the
+-- check is the second lock.
 create table if not exists public.creative_error_counters (
   creative_id uuid not null references public.creatives(id) on delete cascade,
-  code        smallint not null check (code = 0 or code between 100 and 999),
+  code        smallint not null check (code = 0 or code between 100 and 9999),
   -- date_trunc('hour', …), rolled into midnight after 30 days by the same cron.
   bucket      timestamptz not null,
   count       bigint not null default 0,

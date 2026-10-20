@@ -114,7 +114,7 @@ The `<Error>` beacon, counted the way `creative_event_counters` counts events: o
 | Field | Notes |
 | --- | --- |
 | `creative_id` | FK, `on delete cascade`. Part of the PK |
-| `code` | smallint, `0` or 100–999 (check constraint). The code the player substituted for `[ERRORCODE]`; **`0` means it sent none usable** — the macro left literal, empty, or malformed. **Not covered by the beacon's signature** (the player fills it in after we sign), so it is player-reported in the full sense: see [security.md](security.md) |
+| `code` | smallint, `0` or 100–9999 (check constraint): VAST's three-digit codes or a vendor's four-digit one. The code the player substituted for `[ERRORCODE]`; **`0` means it sent none usable** — the macro left literal, empty, or malformed. **Not covered by the beacon's signature** (the player fills it in after we sign), so it is player-reported in the full sense: see [security.md](security.md) |
 | `bucket` | `date_trunc('hour', now())`; rolled into midnight after 30 days by `rollup_creative_events()`, alongside the event counters |
 | `count` | bigint, incremented in place |
 
@@ -124,7 +124,8 @@ a hit with `e=error` and a valid signature for event `error` calls
 parsed by [`lib/vast/error-codes.ts`](../lib/vast/error-codes.ts). Read only through
 `public.get_creative_errors(creative_id)` — `SECURITY DEFINER`, the `owned` check inside,
 granted to `authenticated` — which returns all-time counts per code for the creative
-page's error section. **No error rate exists anywhere**: an error often fires before any
+page's error section, which names each code from the validator's IAB table
+(`lib/vast-inspect/errors-iab.ts`). **No error rate exists anywhere**: an error often fires before any
 impression, and ad requests are not counted.
 
 ### Conversion tracking ([ADR-0023](decisions/0023-conversion-postbacks.md))

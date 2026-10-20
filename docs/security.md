@@ -176,8 +176,8 @@ rename to do it.
   the player substitutes the macro, so we cannot sign its value. Anyone holding a live
   error beacon can therefore choose **which code** a hit counts under, never which
   creative, and only until `exp`. `parseErrorCode` (`lib/vast/error-codes.ts`) accepts
-  exactly three digits in 100–999 and maps everything else to `0`, so the distinct keys
-  per creative stay bounded at 901; the table's check constraint is the second lock. The
+  three or four digits, 100–9999, and maps everything else to `0`, so the distinct keys
+  per creative stay bounded at 9,901; the table's check constraint is the second lock. The
   error numbers are read as player-reported, which they are either way.
 
 ## Click redirect and postbacks (`/r`, `/pb` — ADR-0023)

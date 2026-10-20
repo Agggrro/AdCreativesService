@@ -354,8 +354,15 @@ test("a signed <Error> beacon is counted under the code the player substituted",
   ]);
 });
 
+test("a vendor's four-digit code is counted as itself", async () => {
+  await call(beacon("error", "&code=1005"));
+  assert.deepEqual(writes, [
+    { rpc: "increment_creative_error", body: { p_creative_id: CID, p_code: 1005 } },
+  ]);
+});
+
 test("an <Error> beacon with no usable code is counted as code 0", async () => {
-  for (const extra of ["&code=[ERRORCODE]", "&code=%5BERRORCODE%5D", "", "&code=", "&code=99", "&code=1000", "&code=040", "&code=3e2", "&code=303.0"]) {
+  for (const extra of ["&code=[ERRORCODE]", "&code=%5BERRORCODE%5D", "", "&code=", "&code=99", "&code=10000", "&code=040", "&code=3e2", "&code=303.0"]) {
     writes = [];
     await call(beacon("error", extra));
     assert.deepEqual(

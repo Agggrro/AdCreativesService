@@ -27,25 +27,27 @@ creative. Until now, nobody could see it.
 - **`/t` accepts `e=error`** when the signature is valid for event `error`. Nothing changes
   for the other three events.
 - **`code` is unsigned, and that is unavoidable.** The player substitutes `[ERRORCODE]`
-  after we sign. So `lib/vast/error-codes.ts` is its entire validation: exactly three
-  digits in 100–999, or `0`. A holder of a live error beacon can choose which code a hit
-  counts under, never which creative, and only until `exp`. Keys stay bounded at 901 per
+  after we sign. So `lib/vast/error-codes.ts` is its entire validation: three or four
+  digits, 100–9999, or `0`. A holder of a live error beacon can choose which code a hit
+  counts under, never which creative, and only until `exp`. Keys stay bounded at 9,901 per
   creative. A check constraint repeats the range in the table.
 - **`0` means "the player sent no usable code".** That covers a literal `[ERRORCODE]`, an
   empty value, or junk. Many players do not substitute the macro at all, and dropping
   those hits would undercount exactly the players worth knowing about. **A code in range
-  but not defined by VAST 4.2 is kept as itself.** It is labelled "outside the spec"
-  instead of being folded into `0`, because a vendor's private code is still
-  information.
+  but not defined by VAST is kept as itself.** That includes a vendor's four-digit code,
+  such as IMA's 1005. It is labelled "outside the spec" instead of being folded into
+  `0`, because a vendor's private code is still information.
 - **Read model.** `get_creative_errors(creative_id)` returns all-time counts per code, with
   the `owned` check that `get_creative_conversions()` uses. The creative page shows a total
-  and a table of code, description (RU + EN, for every VAST 4.2 code), count, and share
-  of errors.
+  and a table of code, description, count, and share of errors. The descriptions come
+  from the validator's IAB table (`lib/vast-inspect/errors-iab.ts`), not a second copy,
+  so the two surfaces cannot drift on a code.
 
 ## Consequences
 
 - **No error rate, anywhere.** An error often fires before any impression, for example
-  302 (wrapper limit), 303 (no ad) or 401 (file not found). Ad requests are not counted,
+  401 (file not found), 402 (media timeout), 403 (no supported media) or 409 (the
+  interactive unit did not run). Ad requests are not counted,
   so there is no honest denominator. The share column is a share **of errors**, and its
   header says so (design-system §6). The total's caption explains why nothing is divided
   by impressions.
@@ -56,6 +58,10 @@ creative. Until now, nobody could see it.
 - **No rail and no alarm colour.** A code is not a state of the creative. Every creative
   served at scale collects some errors, and a red row on each would be the decorative
   rail that §6 forbids.
+- **Some codes should not reach this beacon.** Our `<Error>` sits inside our `<InLine>`.
+  100 (unparseable XML) and 301–303 (wrapper failures) belong to a wrapper's or the
+  document root's `<Error>`, so a count under them here points to a non-conformant player
+  or a hand-made hit, not to "no ad".
 - Deleting a creative cascades to its error counters, like every other statistic.
 - **Deploy order:** apply the schema before deploying the Worker. In the other order,
   `increment_creative_error` does not exist yet. The write fails, `/t` swallows the

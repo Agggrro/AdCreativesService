@@ -574,7 +574,8 @@ report's by-day table. The report's by-exit table is not: an exit is something t
 configured, so it keeps 44px. Nor is its by-goal table
 ([ADR-0027](decisions/0027-conversion-goals.md)): a goal comes from the network rather than
 from the user, but it is a handful of rows read against the network's own report, not a
-stream, so it keeps the default 44px beside the by-exit table.
+stream, so it keeps the default 44px beside the by-exit table. The creative page's VAST
+errors table ([ADR-0032](decisions/0032-vast-error-statistics.md)) is the same case.
 
 - Row height **32px** — `px-3 py-1.5` on `data` 13/20 type, which the cell class sets
   itself rather than leaving to each call site. The rail stays 3px, so the left padding
@@ -811,12 +812,12 @@ Counting rules, because a metric that lies costs more than a metric that is miss
   for others does not belong inside the closed delivery-funnel strip: give it its own
   labelled strip.
 - **No derived ratio without the counts it comes from**, and none at all where the underlying
-  event is not ingested. Today the product records exactly three
+  event is not ingested. Today the product records three delivery events
   ([ADR-0016](decisions/0016-three-events-hourly-counters.md)): **impression**, **click**
   (fired only from the final call-to-action that opens the advertiser's URL — never from an
   intermediate interaction such as a quiz answer), and **viewable** (VPAID-only,
-  self-reported) — plus, since [ADR-0032](decisions/0032-vast-error-statistics.md), the
-  player's **`<Error>` beacon, per VAST code**. There is still no count of ad requests, and an
+  self-reported). Since [ADR-0032](decisions/0032-vast-error-statistics.md) it also counts
+  the player's **`<Error>` beacon, per VAST code**. There is still no count of ad requests, and an
   error often fires before any impression, so **error rate and fill rate may not appear on
   any screen**. CTR became derivable when click arrived and
   **is displayed, over impressions**. Two rules come with it:
@@ -876,9 +877,17 @@ Counting rules, because a metric that lies costs more than a metric that is miss
   The header names the denominator, because a bare percentage there gets read as a share
   of impressions. Rows sort by count. Neither the tile nor the table carries a rail or
   `dead`: a code is not a state of the creative, and every creative served at scale
-  has some errors. Code `0` reads "the player sent no code". A code in range that VAST
-  4.2 does not define reads "outside the spec". Errors are not a column in the creatives
-  list: a fifth number column pushed the Russian row actions out of the 1200px container.
+  has some errors. Code `0` reads "no code, or one we could not read". A code that VAST
+  does not define reads "outside the spec". Code names come from the validator's IAB
+  table. A share too small for one decimal prints `<0.1%`, never a `0` beside a non-zero
+  count.
+  - **The empty and outage states.** With no errors, the tile prints a real `0` and a
+    sentence takes the table's place. A failed read follows the conversion report: the
+    transient em dash in the tile, a `dead` notice, and no table. The notice is about our
+    read failing, not about the creative, so it does not contradict the no-`dead` rule
+    above.
+  - **Not a column in the creatives list.** A fifth number column pushed the Russian row
+    actions out of the 1200px container.
 
 ## 7. The player well
 
@@ -1055,7 +1064,7 @@ Movement is slow and few. Nothing bounces, nothing springs.
 | ✕ | Warm red for errors. The alarm is cold `#EE8089`, or it stops being an alarm. |
 | ✕ | Card grids where a table belongs. The catalog is the one grid, and only because a template has no state. |
 | ✕ | A live creative running anywhere but a player well, or more than one live unit on a page. The VPAID host is a single global — the second unit overwrites the first. |
-| ✕ | Derived-ratio metrics without the counts they come from. VTR and fill rate are barred outright — their events are not ingested. CTR is permitted since ADR-0016 made click a real count, but only with its denominator stated (§6). |
+| ✕ | Derived-ratio metrics without the counts they come from. VTR and fill rate are barred outright — their events are not ingested — and so is error rate: errors are counted, but ad requests are not, and an error often fires before any impression (ADR-0032). CTR is permitted since ADR-0016 made click a real count, but only with its denominator stated (§6). |
 | ✕ | Raw Tailwind palette colours (`gray-200`, `green-100`, `blue-600`, …), or any literal hex, in `app/` or `components/`. Tokens only. §8 exempts `runtime/templates/**` and nothing else. |
 | ✕ | Arbitrary type sizes (`text-[13px]`) on content. Roles from §4, as utilities. The one place a literal size is correct is **inside a shared primitive that defines a documented control size** — `ui/Button.tsx`'s three label sizes, the top bar's brand and nav sizes. A control's size is part of its specification (§6), not a call site's opinion; a page reaching for a literal size is the defect this bans. |
 | ✕ | Rounded pills as a default shape. The radius scale in §2; `50%` only for the status dot and the two circles §2 names as circles by nature (the brand stage's halo, a drag knob). |
