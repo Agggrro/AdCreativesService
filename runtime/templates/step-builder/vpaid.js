@@ -164,6 +164,7 @@ var TEMPLATE = {
     var advanceTimer = null,
       prefetchTimer = null,
       handoffTimer = null,
+      firstReady = 0,
       prefetched = {},
       shimmers = [],
       hintTimer = null,
@@ -335,22 +336,68 @@ var TEMPLATE = {
       if (stopped || step >= steps.length) return;
       var n = 0;
       for (var k = 0; k < steps[step].options.length; k++) {
-        var u = optionMedia(steps[step].options[k]);
-        if (!u || prefetched[u] || /\{|%7B/i.test(u)) continue;
-        if (adInteractIsVideoUrl(u)) {
-          var v = document.createElement("video");
-          v.muted = true;
-          v.setAttribute("muted", "");
-          v.preload = "auto";
-          v.src = u;
-          prefetched[u] = v;
-        } else {
-          prefetched[u] = new Image();
-          prefetched[u].src = u;
-        }
-        n++;
+        if (prefetchUrl(optionMedia(steps[step].options[k]), "auto")) n++;
       }
       if (n) api.debug("prefetch", { step: step + 1, files: n });
+    }
+    /**
+     * One URL, at `auto` (the whole clip) or `metadata` (its first frame or so).
+     * A clip already warming at `metadata` is upgraded in place. True when this
+     * started or upgraded a load.
+     */
+    function prefetchUrl(u, level) {
+      if (!u || /\{|%7B/i.test(u)) return false;
+      var have = prefetched[u];
+      if (have) {
+        if (level !== "auto" || !have.tagName || have.tagName !== "VIDEO" || have.preload === "auto") {
+          return false;
+        }
+        have.preload = "auto";
+        return true;
+      }
+      if (adInteractIsVideoUrl(u)) {
+        var v = document.createElement("video");
+        v.muted = true;
+        v.setAttribute("muted", "");
+        v.preload = level;
+        v.src = u;
+        prefetched[u] = v;
+      } else {
+        prefetched[u] = new Image();
+        prefetched[u].src = u;
+      }
+      return true;
+    }
+    /**
+     * While the viewer looks at step one, the start of every step-two clip it
+     * can lead to, for either pick: a first frame each, so the next step shows
+     * pictures at once even on 3G. Only once step one's own clips are showing,
+     * so they never compete with it. It is a few KB per clip against Chrome's
+     * 4 MB heavy-ad budget, and the clips the viewer did not lead to are
+     * dropped at the tap.
+     */
+    function warmSecondStep() {
+      if (stopped || steps.length < 2 || picks.length) return;
+      var n = 0;
+      var opts = steps[1].options;
+      for (var k = 0; k < opts.length; k++) {
+        var urls = [opts[k].media, opts[k].mediaB];
+        for (var j = 0; j < urls.length; j++) {
+          if (urls[j] && prefetchUrl(mediaUrl(urls[j]), "metadata")) n++;
+        }
+      }
+      if (n) api.debug("prefetch", { step: 2, files: n, level: "metadata" });
+    }
+    /** Release the prefetching elements for any URL the given step will not show. */
+    function dropUnneeded(step) {
+      if (step >= steps.length) return;
+      var keep = {};
+      for (var k = 0; k < steps[step].options.length; k++) {
+        keep[optionMedia(steps[step].options[k])] = true;
+      }
+      var drop = {};
+      for (var u in prefetched) if (!keep[u]) drop[u] = true;
+      releasePrefetch(drop);
     }
     /** A shimmer outlives its tile otherwise: an animation does not stop with its target. */
     function stopShimmers() {
@@ -422,6 +469,7 @@ var TEMPLATE = {
           if (pulse) pulse.cancel();
           shimmer.parentNode.removeChild(shimmer);
           api.debug("ready", { step: step + 1, option: i + 1, ms: Date.now() - shownAt });
+          if (step === 0 && ++firstReady === steps[0].options.length) warmSecondStep();
         };
         if (adInteractIsVideoUrl(src)) {
           if (fit.media.readyState >= 2) ready();
@@ -569,7 +617,9 @@ var TEMPLATE = {
       }
       fill.style.transform = "scaleX(" + (step + 1) / total + ")";
       api.debug("pick", { step: step + 1, key: steps[step].key, value: opt.value });
-      // The next step's clips are known now; they load during the advance.
+      // The next step's clips are known now; they load during the advance. The
+      // other pick's warmed clips are no longer wanted.
+      if (step === 0) dropUnneeded(1);
       prefetchStep(step + 1);
       advanceTimer = setTimeout(function () {
         advanceTimer = null;

@@ -106,14 +106,29 @@ picks to its click link gets them through.
   chooses the names and values to match. A landing that ignores them still gets a normal
   visit, with harmless extra parameters.
 - **Chrome's heavy-ad intervention meters step one.** It unloads an ad that downloads
-  more than 4 MB before the viewer interacts with it. Only step one's tiles load at mount.
-  Each later step loads after the tap that reached it, which Chrome no longer meters. The
-  field help asks for step one's clips under about 3.5 MB together. The reference
+  more than 4 MB before the viewer interacts with it. Only step one's tiles load fully
+  before the first tap. The step title's caption asks for step one's clips under about
+  3.5 MB together. The reference
   landing's two style clips are 1.0 and 1.2 MB, and a four-tile first step of its
   ethnicity clips (≈ 4 MB) would not fit.
-- **Clips are loaded per step, not preloaded.** A later step's tiles appear with their
-  labels and fill in as their clips arrive. Preloading would spend the heavy-ad budget on
-  clips most viewers never see.
+- **The next step loads while the viewer chooses** (amended 2026-10-20, after testing on
+  emulated phones on 3G):
+  - Once step one's clips are showing, step two's clips for either pick are warmed to
+    their first frame (`preload="metadata"`). That is a few KB each before the first tap,
+    so the next step shows pictures at once.
+  - At the tap, the chosen pick's clips are upgraded to a full load during the 550 ms
+    advance, and the others are dropped.
+  - From step two on, the step after the current one loads in full 600 ms into it.
+  - A prefetching player is released 1.5 s after its step is shown. The bytes stay in
+    the cache, and a low-end phone does not hold two steps' players at once.
+  - Media elements, not `fetch()`: the same cache and `media-src` as the tiles, so a
+    publisher's `connect-src` CSP cannot print errors on its page.
+  - Until a clip has a frame, its tile pulses (opacity only) under its label, which is
+    tappable throughout.
+- **Clips for a phone are small.** The reference creative's clips were re-encoded for it:
+  360×532, 24 fps, H.264 Main, a 5 s seamless loop, no sound, `faststart`. That is
+  80–155 KB each, 2.1 MB for all 18, against 13.8 MB as the landing serves them. On an
+  emulated phone (CPU 4×) on Fast 3G, step one shows in about 1.2 s.
 - **Up to 57 config fields, laid out as one compact table per step.** Each step's
   options are a `kind: "options"` group: one row per option (`A`–`D`), with the label
   (and the value, when picks are passed on) heading the row, and the clip (and, from step
