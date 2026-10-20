@@ -23,6 +23,21 @@ begin;
 -- exposes every SECURITY DEFINER function to anon before its explicit revoke.
 alter default privileges in schema public revoke execute on functions from public;
 
+-- PUBLIC is not the only grantee. A Supabase project's default privileges also
+-- grant EXECUTE on every new public function **directly** to `anon`,
+-- `authenticated` and `service_role`, and a revoke from PUBLIC leaves a direct
+-- grant in place. Every function in this file was once callable with the anon
+-- key, which ships in the client bundle: forged impressions, clicks and
+-- postbacks past the signed routes, a rollup or purge run by anyone. So:
+--   * future functions start closed to both API roles (this line), and
+--   * every function below revokes from `public, anon, authenticated` by name,
+--     then grants back exactly the role that calls it — `service_role` for the
+--     ingest, serving and cron paths, `authenticated` for the dashboard reads
+--     (which keep `authenticated` and drop `anon`).
+-- Named revokes rather than this default alone: default privileges only shape
+-- objects created after them, and every function here already exists.
+alter default privileges in schema public revoke execute on functions from anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Enums
 -- ---------------------------------------------------------------------------
@@ -69,6 +84,9 @@ begin
   return new;
 end;
 $$;
+-- Trigger functions: EXECUTE is checked when a trigger is created, never when it
+-- fires, so no caller needs it (see the header).
+revoke all on function public.set_updated_at() from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- profiles  (app-level data for an auth user)
@@ -104,6 +122,8 @@ begin
   return new;
 end;
 $$;
+
+revoke all on function public.handle_new_user() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -204,6 +224,7 @@ begin
   return new;
 end;
 $$;
+revoke all on function public.validate_creative_format() from public, anon, authenticated;
 
 drop trigger if exists creatives_validate_format on public.creatives;
 create trigger creatives_validate_format
@@ -325,7 +346,7 @@ as $$
   do update set count = public.creative_event_counters.count + 1;
 $$;
 
-revoke all on function public.increment_creative_event(uuid, creative_event_type) from public;
+revoke all on function public.increment_creative_event(uuid, creative_event_type) from public, anon, authenticated;
 grant execute on function public.increment_creative_event(uuid, creative_event_type) to service_role;
 
 -- ---------------------------------------------------------------------------
@@ -372,11 +393,6 @@ as $$
   do update set count = public.creative_error_counters.count + 1;
 $$;
 
--- `anon` and `authenticated` named, not only `public`: a Supabase project's
--- default privileges grant EXECUTE on new functions to those roles directly,
--- and a revoke from PUBLIC does not touch a direct grant. The anon key ships
--- in the client bundle and every creative_id is in a public tag URL, so
--- leaving it would let anyone write any creative's error counts past /t.
 revoke all on function public.increment_creative_error(uuid, integer) from public, anon, authenticated;
 grant execute on function public.increment_creative_error(uuid, integer) to service_role;
 
@@ -435,8 +451,6 @@ begin
 end;
 $$;
 
--- Named roles for the reason given at increment_creative_error: a negative
--- argument would collapse every account's recent hourly buckets.
 revoke all on function public.rollup_creative_events(int) from public, anon, authenticated;
 grant execute on function public.rollup_creative_events(int) to service_role;
 
@@ -658,7 +672,7 @@ as $$
   select exists (select 1 from ins);
 $$;
 
-revoke all on function public.record_click(text, uuid, text, text, int) from public;
+revoke all on function public.record_click(text, uuid, text, text, int) from public, anon, authenticated;
 grant execute on function public.record_click(text, uuid, text, text, int) to service_role;
 
 -- ---------------------------------------------------------------------------
@@ -828,7 +842,7 @@ begin
 end;
 $$;
 
-revoke all on function public.record_postback(text, text, text, numeric, text, text, text, jsonb, text) from public;
+revoke all on function public.record_postback(text, text, text, numeric, text, text, text, jsonb, text) from public, anon, authenticated;
 grant execute on function public.record_postback(text, text, text, numeric, text, text, text, jsonb, text) to service_role;
 
 -- The pre-ADR-0027 identity, dropped only after record_postback() stops
@@ -888,7 +902,7 @@ begin
 end;
 $$;
 
-revoke all on function public.purge_tracking_data(int, int) from public;
+revoke all on function public.purge_tracking_data(int, int) from public, anon, authenticated;
 grant execute on function public.purge_tracking_data(int, int) to service_role;
 
 -- ---------------------------------------------------------------------------
@@ -1124,7 +1138,7 @@ $$;
 comment on function private.is_entitled(uuid, uuid) is
   'The single definition of subscription entitlement. Callers are private.creative_serving and public.get_creative_overview.';
 
-revoke all on function private.is_entitled(uuid, uuid) from public;
+revoke all on function private.is_entitled(uuid, uuid) from public, anon, authenticated;
 
 -- The two RPCs reach it as their owner, but a plain view checks function EXECUTE
 -- against the *invoking* role — so a direct service-role read of
@@ -1230,7 +1244,7 @@ as $$
 $$;
 
 -- Only the service role may call it (revoking from PUBLIC also covers anon/authenticated).
-revoke all on function public.get_creative_serving(uuid) from public;
+revoke all on function public.get_creative_serving(uuid) from public, anon, authenticated;
 grant execute on function public.get_creative_serving(uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
@@ -1319,7 +1333,7 @@ set local check_function_bodies = on;
 comment on function public.get_creative_overview() is
   'Per-creative delivery counts + entitlement for the signed-in owner. The only read path into creative_event_counters.';
 
-revoke all on function public.get_creative_overview() from public;
+revoke all on function public.get_creative_overview() from public, anon;
 grant execute on function public.get_creative_overview() to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1353,8 +1367,6 @@ $$;
 comment on function public.get_creative_errors(uuid) is
   'VAST error beacon counts per error code for one creative the caller owns (ADR-0033).';
 
--- `anon` named for the reason given at increment_creative_error. Harmless
--- here (auth.uid() is null, so no rows), but there is no reason to hold it.
 revoke all on function public.get_creative_errors(uuid) from public, anon;
 grant execute on function public.get_creative_errors(uuid) to authenticated;
 
@@ -1441,7 +1453,7 @@ $$;
 comment on function public.get_creative_conversions(uuid, int) is
   'Clicks through /r and postback conversions per day and exit for one creative the caller owns (ADR-0023).';
 
-revoke all on function public.get_creative_conversions(uuid, int) from public;
+revoke all on function public.get_creative_conversions(uuid, int) from public, anon;
 grant execute on function public.get_creative_conversions(uuid, int) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1507,7 +1519,7 @@ $$;
 comment on function public.get_creative_conversion_goals(uuid, int) is
   'Postback conversions per goal for one creative the caller owns, over the same window as get_creative_conversions() (ADR-0027).';
 
-revoke all on function public.get_creative_conversion_goals(uuid, int) from public;
+revoke all on function public.get_creative_conversion_goals(uuid, int) from public, anon;
 grant execute on function public.get_creative_conversion_goals(uuid, int) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1599,10 +1611,10 @@ as $$
    limit least(greatest(coalesce(p_limit, 50), 1), 200);
 $$;
 
-revoke all on function public.ensure_postback_key() from public;
-revoke all on function public.rotate_postback_key() from public;
-revoke all on function public.has_postback_key() from public;
-revoke all on function public.get_postback_log(int) from public;
+revoke all on function public.ensure_postback_key() from public, anon;
+revoke all on function public.rotate_postback_key() from public, anon;
+revoke all on function public.has_postback_key() from public, anon;
+revoke all on function public.get_postback_log(int) from public, anon;
 grant execute on function public.ensure_postback_key() to authenticated;
 grant execute on function public.rotate_postback_key() to authenticated;
 grant execute on function public.has_postback_key() to authenticated;

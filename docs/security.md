@@ -485,6 +485,51 @@ strict: `requestMediaUpload` mints every key itself (the browser never names one
 `{uuid}/{uuid}.{ext}`, nothing a URL parser could normalize — under the caller's own
 `{userId}/` prefix. A looser parse there is a cross-tenant delete.
 
+### Function EXECUTE: revoke by role name, not only from PUBLIC
+
+A `SECURITY DEFINER` function runs as its owner, so **who may call it is the whole
+access control**. RLS does not apply inside it. And PostgREST exposes every function
+in `public` at `/rest/v1/rpc/<name>` to whichever key the caller holds, including the
+anon key that ships in the client bundle.
+
+Until 2026-10-20, every function in `supabase/schema.sql` was closed with
+`revoke … from public` alone. A Supabase project's default privileges also grant
+EXECUTE on new public functions **directly** to `anon`, `authenticated` and
+`service_role`, and a revoke from PUBLIC leaves a direct grant in place. On a database
+with Supabase's default ACL emulated, the anon key could call all sixteen functions:
+- `increment_creative_event`: forged impressions and clicks for any creative id, which
+  is printed in every tag URL, past `/t`'s signature;
+- `record_click` and `record_postback`: clicks and conversions past `/r` and `/pb`;
+- `rollup_creative_events` and `purge_tracking_data`: cross-account rewrites and deletes;
+- `get_creative_serving`: any creative's serving record, `user_id` and config included,
+  past the entitlement gate.
+
+The rule now, stated once in the file header:
+- `alter default privileges in schema public revoke execute on functions from anon, authenticated`,
+  so a new function starts closed;
+- every function revokes from `public, anon, authenticated` **by name**. Default
+  privileges only shape objects created after them;
+- every function then grants back only the role that calls it:
+  - `service_role` for ingest, serving and cron;
+  - `authenticated` for the eight owner-scoped dashboard reads;
+  - nothing for the trigger functions. EXECUTE on a trigger function is checked when
+    the trigger is created, never when it fires.
+
+**Check the live project after `npm run db:schema`:**
+```sql
+select p.proname,
+       has_function_privilege('anon', p.oid, 'execute')          as anon,
+       has_function_privilege('authenticated', p.oid, 'execute') as authenticated
+  from pg_proc p where p.pronamespace = 'public'::regnamespace order by 1;
+```
+`anon` must be false everywhere. `authenticated` must be true only for
+`get_creative_overview`, `get_creative_errors`, `get_creative_conversions`,
+`get_creative_conversion_goals`, `ensure_postback_key`, `rotate_postback_key`,
+`has_postback_key` and `get_postback_log`.
+
+Counts written through the open RPCs before the fix cannot be told apart from real ones:
+the counters keep no per-hit record.
+
 ## Developer-only surfaces (`isDevOnlyEnabled()`)
 
 Three routes exist for local creative work and **must not be reachable anywhere else**:
@@ -621,6 +666,8 @@ third-party script our own pages load. Where it may run, and what it is allowed 
 - [ ] Webhook verifies signature against raw body.
 - [ ] VAST path validates input and fails closed.
 - [ ] RLS policies cover new tables/columns (or explicit, documented exception).
+- [ ] A new function revokes EXECUTE from `public, anon, authenticated` by name and
+      grants back only its caller's role (see "Function EXECUTE" above).
 - [ ] Any new outbound fetch of a user-supplied URL goes through
       `lib/vast-inspect/fetch-tag.ts` — not a bare `fetch()`.
 - [ ] Any new developer-only route is behind `isDevOnlyEnabled()` and answers 404.

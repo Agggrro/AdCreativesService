@@ -337,3 +337,9 @@ public VAST path, which uses a narrowly scoped service-role read.
 reliably across projects/key formats — without them every role hits
 `permission denied`. The grant is the table-level privilege; **RLS is still the
 row-level gate** (a grant without a matching policy yields zero rows).
+
+Functions are the other way round: closed by default, opened by name. Every function
+revokes EXECUTE from `public, anon, authenticated` and grants back only its caller's
+role: `service_role` for ingest, serving and cron, and `authenticated` for the
+owner-scoped dashboard reads. A revoke from PUBLIC alone left Supabase's direct
+default grants to `anon` in place; see security.md, "Function EXECUTE".
