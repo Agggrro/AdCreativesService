@@ -7,7 +7,7 @@ import { CELL, HEAD, NUM_HEAD, ROW, TableFrame, TableHead } from "@/components/u
 import type { Database } from "@/types/database.types";
 
 /**
- * A creative's VAST errors (ADR-0032): what players reported through the
+ * A creative's VAST errors (ADR-0033): what players reported through the
  * `<Error>` beacon, per error code, all-time — the same window as the delivery
  * strip above it.
  *

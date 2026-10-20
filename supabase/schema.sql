@@ -329,7 +329,7 @@ revoke all on function public.increment_creative_event(uuid, creative_event_type
 grant execute on function public.increment_creative_event(uuid, creative_event_type) to service_role;
 
 -- ---------------------------------------------------------------------------
--- creative_error_counters  (VAST <Error> beacons — ADR-0032)
+-- creative_error_counters  (VAST <Error> beacons — ADR-0033)
 -- ---------------------------------------------------------------------------
 -- The same (creative, hour) counting as creative_event_counters, keyed by the
 -- VAST error code the player substitutes for [ERRORCODE]. A separate table
@@ -349,7 +349,7 @@ create table if not exists public.creative_error_counters (
   count       bigint not null default 0,
   primary key (creative_id, code, bucket)
 );
-comment on table public.creative_error_counters is 'VAST error beacons per code (ADR-0032). Written via increment_creative_error(); read only through get_creative_errors().';
+comment on table public.creative_error_counters is 'VAST error beacons per code (ADR-0033). Written via increment_creative_error(); read only through get_creative_errors().';
 
 -- No secondary index, for the reason creative_event_counters has none: every
 -- read scans by the creative_id prefix of the primary key.
@@ -413,7 +413,7 @@ begin
   )
   select count(*) into v_rolled from merged;
 
-  -- The error counters (ADR-0032), folded the same way so the two tables age
+  -- The error counters (ADR-0033), folded the same way so the two tables age
   -- identically. The return value stays the event counters' alone: the cron
   -- logs it, and changing what it counts would silently change that log.
   with collapsed as (
@@ -979,7 +979,7 @@ create policy subscriptions_select_own on public.subscriptions
 -- creative_event_counters: no direct client access. RLS enabled with no policy =>
 -- the anon/authenticated roles are denied. Writes go through the service role
 -- (increment_creative_event); reads go through get_creative_overview().
--- creative_error_counters: the same (ADR-0032) — written by increment_creative_error,
+-- creative_error_counters: the same (ADR-0033) — written by increment_creative_error,
 -- read only through get_creative_errors().
 
 -- creative_clicks, conversions, postback_keys, postback_log: the same shape
@@ -1067,7 +1067,7 @@ grant all on all sequences in schema public to anon, authenticated, service_role
 -- not stop it. SECURITY DEFINER functions are unaffected: they are checked
 -- against their owner, not the caller.
 revoke all on public.creative_event_counters, public.stripe_events from anon, authenticated;
--- creative_error_counters (ADR-0032) has no client contract either.
+-- creative_error_counters (ADR-0033) has no client contract either.
 revoke all on public.creative_error_counters from anon, authenticated;
 -- The same for the conversion-tracking tables (ADR-0023): no client contract,
 -- so no table privilege for a missing policy to be the only thing guarding.
@@ -1323,7 +1323,7 @@ revoke all on function public.get_creative_overview() from public;
 grant execute on function public.get_creative_overview() to authenticated;
 
 -- ---------------------------------------------------------------------------
--- VAST errors by code for one creative (ADR-0032)
+-- VAST errors by code for one creative (ADR-0033)
 -- ---------------------------------------------------------------------------
 -- All-time, like the overview's counts.
 -- The `owned` CTE is the ownership check, as in get_creative_conversions(): a
@@ -1351,7 +1351,7 @@ as $$
 $$;
 
 comment on function public.get_creative_errors(uuid) is
-  'VAST error beacon counts per error code for one creative the caller owns (ADR-0032).';
+  'VAST error beacon counts per error code for one creative the caller owns (ADR-0033).';
 
 -- `anon` named for the reason given at increment_creative_error. Harmless
 -- here (auth.uid() is null, so no rows), but there is no reason to hold it.

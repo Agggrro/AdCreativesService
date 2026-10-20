@@ -171,7 +171,7 @@ rename to do it.
   ever having seen a real one), not *replay* of a beacon someone actually
   captured from a live VAST response. Rate limiting per `(creative_id, event)`
   is the next layer if replay abuse is observed; not implemented yet.
-- **The `<Error>` beacon's `code` is unsigned, by necessity** (ADR-0032). The URL is
+- **The `<Error>` beacon's `code` is unsigned, by necessity** (ADR-0033). The URL is
   signed over `(creative_id, "error", exp)` and `&code=[ERRORCODE]` is appended after —
   the player substitutes the macro, so we cannot sign its value. Anyone holding a live
   error beacon can therefore choose **which code** a hit counts under, never which

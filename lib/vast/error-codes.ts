@@ -1,6 +1,6 @@
 /**
  * The `code` parameter of our `<Error>` beacon — the value a player substitutes
- * for `[ERRORCODE]` — as the key `/t?e=error` counts under (ADR-0032).
+ * for `[ERRORCODE]` — as the key `/t?e=error` counts under (ADR-0033).
  *
  * Dependency-free on purpose: the ad path (`lib/serving/http/track.ts`) imports
  * it. What a code *means* is not here: the dashboard names codes through the

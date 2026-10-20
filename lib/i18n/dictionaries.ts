@@ -246,7 +246,7 @@ const ru = {
     unavailable:
       "Статистика конверсий сейчас недоступна. Обновите страницу через минуту.",
   },
-  // VAST <Error> beacons on a creative's detail page (ADR-0032).
+  // VAST <Error> beacons on a creative's detail page (ADR-0033).
   vastErrors: {
     heading: "Ошибки VAST",
     total: "Ошибки",

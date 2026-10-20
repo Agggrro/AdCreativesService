@@ -30,7 +30,7 @@ import type { ServingPlatform } from "./platform";
 //                    reason it always was: nothing emits it.
 //
 // `error` is not here either, but it is accepted: it is the VAST <Error> beacon,
-// counted per error code into its own table (ADR-0032) rather than as a value of
+// counted per error code into its own table (ADR-0033) rather than as a value of
 // the event enum. See the branch below.
 //
 // `Object.hasOwn` below, not a bare index: `e=constructor` must not resolve to an
@@ -104,7 +104,7 @@ export function handleTrack(request: Request, platform: ServingPlatform): Respon
           }),
         );
       } else {
-        // The <Error> beacon (ADR-0032). `code` sits outside the signature —
+        // The <Error> beacon (ADR-0033). `code` sits outside the signature —
         // the player substitutes [ERRORCODE] after we sign — so a holder of a
         // valid URL can choose which code it counts against, never which
         // creative, and only until `exp`. parseErrorCode bounds it to 100–9999

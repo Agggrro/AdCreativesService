@@ -24,7 +24,10 @@ through `/c/s/:token`, which gives it the CSP it runs under and a per-request to
   in `api.onPause(fn)` / `api.onResume(fn)`, run from the player's `pauseAd` / `resumeAd`
   ([ADR-0030](../docs/decisions/0030-duel-template.md)). The base itself pauses the timer
   that drives a video-less ad's quartiles, and touches the player's video slot only when
-  the creative plays its base video there.
+  the creative plays its base video there. It also extends that timer while the viewer
+  acts in the slot, up to 30 seconds past the served duration
+  ([ADR-0032](../docs/decisions/0032-engagement-extends-the-ad.md)); a template needs no
+  code for it, and must not count on the ad ending at `durationSeconds`.
   An animation that runs until the viewer acts sticks to `transform` and `opacity`;
   one that moves layout or repaints on every frame (`top`/`left`, `clip-path` — the
   slider's swing) runs a bounded number of times, because Chrome's heavy-ad

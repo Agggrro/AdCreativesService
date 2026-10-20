@@ -213,7 +213,7 @@ export type Database = {
           },
         ];
       };
-      // ADR-0032: VAST <Error> beacons per code, counted like the events above.
+      // ADR-0033: VAST <Error> beacons per code, counted like the events above.
       // `increment_creative_error()` is the only writer.
       creative_error_counters: {
         Row: {
@@ -521,7 +521,7 @@ export type Database = {
         };
         Returns: undefined;
       };
-      // The error beacon's only write (ADR-0032). Service role only.
+      // The error beacon's only write (ADR-0033). Service role only.
       increment_creative_error: {
         Args: { p_creative_id: string; p_code: number };
         Returns: undefined;

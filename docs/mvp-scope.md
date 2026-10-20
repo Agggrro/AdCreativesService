@@ -31,7 +31,7 @@ product thesis is validated.
    proves the analytics foundation, rich dashboard is post-MVP). Quartiles were part of
    this line until they were removed for costing a beacon each to duplicate a number the
    buyer's DSP already reports. VAST `<Error>` beacons are counted per code alongside
-   them ([ADR-0032](decisions/0032-vast-error-statistics.md)).
+   them ([ADR-0033](decisions/0033-vast-error-statistics.md)).
 10. **Conversion postbacks** — added after the MVP line was drawn, because a media buyer
     running CPA offers cannot judge a creative without them
     ([ADR-0023](decisions/0023-conversion-postbacks.md)). Click destinations go through

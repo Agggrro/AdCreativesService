@@ -202,7 +202,7 @@ Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
 - **No database write on the beacon path.** `/t` hands its counter upsert to
   `waitUntil` and returns 204 immediately. That includes the `<Error>` beacon, which is
   counted per VAST code into `creative_error_counters`
-  ([ADR-0032](decisions/0032-vast-error-statistics.md)).
+  ([ADR-0033](decisions/0033-vast-error-statistics.md)).
 
 ### Click redirect `GET /r` and postbacks `GET|POST /pb`
 

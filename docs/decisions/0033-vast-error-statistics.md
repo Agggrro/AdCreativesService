@@ -1,4 +1,4 @@
-# 0032. VAST errors, counted per code
+# 0033. VAST errors, counted per code
 
 - Status: Accepted
 - Date: 2026-10-20

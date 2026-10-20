@@ -90,7 +90,7 @@ export default async function CreativePage({
     // the missing-{click_id} warning, which would otherwise sit on every
     // creative of an account that never meant to track conversions.
     supabase.rpc("has_postback_key"),
-    // VAST errors per code (ADR-0032), owner-checked inside like the two above.
+    // VAST errors per code (ADR-0033), owner-checked inside like the two above.
     supabase.rpc("get_creative_errors", { p_creative_id: id }),
   ]);
 

@@ -106,7 +106,7 @@ badge and the state rail depend on them. It works because the function owner is 
 from RLS; running `alter table public.creative_event_counters force row level security`
 would make it silently return zeros.
 
-### `creative_error_counters` (VAST errors — [ADR-0032](decisions/0032-vast-error-statistics.md))
+### `creative_error_counters` (VAST errors — [ADR-0033](decisions/0033-vast-error-statistics.md))
 The `<Error>` beacon, counted the way `creative_event_counters` counts events: one row per
 (creative, VAST error code, hour). A separate table rather than an `error` value of
 `creative_event_type`, because an error is only worth reading with its code.
@@ -324,7 +324,7 @@ was missed or delayed.
 | `creatives` | owner can CRUD own rows only |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
 | `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
-| `creative_error_counters` | the same: RLS on, zero policies, table privileges revoked from `anon`/`authenticated`; written by `increment_creative_error()` (service role), read only through the owner-checked `public.get_creative_errors()` ([ADR-0032](decisions/0032-vast-error-statistics.md)) |
+| `creative_error_counters` | the same: RLS on, zero policies, table privileges revoked from `anon`/`authenticated`; written by `increment_creative_error()` (service role), read only through the owner-checked `public.get_creative_errors()` ([ADR-0033](decisions/0033-vast-error-statistics.md)) |
 | `creative_clicks`, `conversions`, `postback_keys`, `postback_log` | **no direct client access** (RLS on, zero policies, table and identity-sequence privileges revoked from `anon`/`authenticated`); clicks written by `record_click()` and conversions + log by `record_postback()`, both service role only; the owner reads through `get_creative_conversions()`, `ensure_postback_key()`, `has_postback_key()` and `get_postback_log()`, each scoped to `auth.uid()` ([ADR-0023](decisions/0023-conversion-postbacks.md)) |
 | `stripe_events` | **no direct client access**; written only by the webhook (service role) |
 | `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent. Since [ADR-0028](decisions/0028-creative-media-on-r2.md) new uploads go to R2, which has no RLS: there the same prefix rule is enforced in code (`requestMediaUpload` mints the key; `deleteCreative` deletes only keys under the caller's prefix) |
