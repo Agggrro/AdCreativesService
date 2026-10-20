@@ -295,7 +295,9 @@ while paused, as a video's playhead would ([ADR-0030](decisions/0030-duel-templa
 The VAST `<Duration>` stays the served value, and a player that enforces it rather than
 `AdDurationChange` still ends the ad there. An engaged viewer's `complete` comes later
 and is lost if they leave first, so the completion rate is not the measure of
-engagement; clicks and the `tpl:*` records are. A creative paced by a base video is never
+engagement; clicks and the `tpl:*` records are. A quartile that fired before an
+extension stays where it fired, so with the default duration only the third quartile and
+`complete` can move. A creative paced by a base video is never
 extended. SIMID does not get this yet (it runs in a sandboxed iframe over a
 different, postMessage-based runtime, not the VPAID base) — a known gap, not a design
 decision.

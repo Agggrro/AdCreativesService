@@ -600,9 +600,23 @@ CreoSmithVpaid.prototype._watchEngagement = function () {
     if (self._closeHost && self._closeHost.contains(e.target)) return;
     self._extend();
   };
+  // Passive: in a same-document player the slot is in the publisher's page, and
+  // a non-passive touchstart there blocks scrolling. Nothing here prevents defaults.
   for (var i = 0; i < ADINTERACT_ENGAGE_EVENTS.length; i++) {
-    slot.addEventListener(ADINTERACT_ENGAGE_EVENTS[i], this._onEngage, true);
+    slot.addEventListener(ADINTERACT_ENGAGE_EVENTS[i], this._onEngage, {
+      capture: true,
+      passive: true,
+    });
   }
+};
+
+/** Drop the engagement listeners: at complete, and on every terminal path. */
+CreoSmithVpaid.prototype._unwatchEngagement = function () {
+  if (!this._onEngage || !this._slot) return;
+  for (var i = 0; i < ADINTERACT_ENGAGE_EVENTS.length; i++) {
+    this._slot.removeEventListener(ADINTERACT_ENGAGE_EVENTS[i], this._onEngage, true);
+  }
+  this._onEngage = null;
 };
 
 /**
@@ -656,6 +670,8 @@ CreoSmithVpaid.prototype._complete = function () {
     clearInterval(this._timer);
     this._timer = null;
   }
+  // A host may never call stopAd after this; nothing is left to extend.
+  this._unwatchEngagement();
   this._emit("AdVideoComplete");
 };
 
@@ -737,12 +753,7 @@ CreoSmithVpaid.prototype._teardown = function () {
     clearInterval(this._timer);
     this._timer = null;
   }
-  if (this._onEngage && this._slot) {
-    for (var k = 0; k < ADINTERACT_ENGAGE_EVENTS.length; k++) {
-      this._slot.removeEventListener(ADINTERACT_ENGAGE_EVENTS[k], this._onEngage, true);
-    }
-    this._onEngage = null;
-  }
+  this._unwatchEngagement();
   this._stopViewabilityObserver();
   // Taken before running, so a second terminal call (stopAd after skipAd) runs
   // nothing twice, and one throwing cleanup cannot stop the rest — nor the

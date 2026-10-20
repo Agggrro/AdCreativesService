@@ -45,8 +45,14 @@ The base extends a video-less ad while the viewer acts on it:
   paced by a base video (Shoppable with `videoUrl`) is never extended: its video is its
   clock.
 
-The quartiles follow the moving end: each is computed against the current duration on
-every tick and still fires once, in order.
+The quartiles follow the moving end only until they fire: each is computed against the
+current duration on every tick and fires once, in order, but one that has fired stays
+where it was measured. With the default 30 seconds an extension can only begin after
+15 seconds (its end has to pass 30), so the first quartile and the midpoint always fire
+against the served duration, and only the third quartile and `complete` can move: a
+third quartile at 22.5s followed by an extension to 40s sits at about 56% of the ad's
+real run. Read third-quartile and completion rates of interactive creatives as "reached
+that point of the served duration", not as shares of the actual runtime.
 
 ## Consequences
 
@@ -61,6 +67,10 @@ every tick and still fires once, in order.
   `AdDurationChange` and enforces the VAST `<Duration>` itself ends the ad at 30 seconds
   as before. Which players honour it has to be observed, not assumed: AdPlayer.Pro's and
   IMA's test pages are the first two to check after a deploy.
+- A buyer may care about the real runtime even though the declared one fits: an
+  engaged ad can run up to 60 seconds in a slot sold as 30 (OpenRTB `maxduration`,
+  exchange slot rules). Only an engaged viewer causes it, and only by acting on the ad,
+  but an advertiser on strict 30-second inventory should know.
 - Duel's pacing is unaffected: it reads `durationSeconds` once, at start, and ends its
   vote at least 5 seconds before that. An extension only gives its winner more time.
 - The two constants are not creative settings. Making either one configurable is a
