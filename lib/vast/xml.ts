@@ -12,7 +12,12 @@
  * closing the whole VAST document over it.
  */
 function stripIllegalXmlChars(value: string): string {
-  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+  // The same production also excludes U+FFFE and U+FFFF, and a lone surrogate
+  // encodes no character at all: libxml2 rejects a document carrying either.
+  return value.replace(
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+    "",
+  );
 }
 
 /** Escape a string for safe use in an XML attribute or text node. */
@@ -33,11 +38,38 @@ export function cdata(value: string): string {
   return `<![CDATA[${stripIllegalXmlChars(value).replace(/]]>/g, "]]]]><![CDATA[>")}]]>`;
 }
 
-/** Indent every non-empty line of a block by `spaces`. */
+/**
+ * A fragment's lines for re-indenting, where a line break inside a CDATA
+ * section belongs to the value, not to the layout: such a line stays joined to
+ * the one its section opened on. Splitting there would push indentation into an
+ * advertiser's VerificationParameters, which ADR-0012 passes through opaque.
+ */
+export function xmlLines(fragment: string): string[] {
+  const lines: string[] = [];
+  let pending: string | null = null;
+  let inCdata = false;
+  for (const line of fragment.split("\n")) {
+    pending = pending === null ? line : `${pending}\n${line}`;
+    for (let at = 0; ; ) {
+      const marker = inCdata ? "]]>" : "<![CDATA[";
+      const found = line.indexOf(marker, at);
+      if (found < 0) break;
+      inCdata = !inCdata;
+      at = found + marker.length;
+    }
+    if (!inCdata) {
+      lines.push(pending);
+      pending = null;
+    }
+  }
+  if (pending !== null) lines.push(pending);
+  return lines;
+}
+
+/** Indent every non-empty line of a block by `spaces`, leaving CDATA content as it is. */
 export function indent(block: string, spaces: number): string {
   const pad = " ".repeat(spaces);
-  return block
-    .split("\n")
+  return xmlLines(block)
     .map((line) => (line.length ? pad + line : line))
     .join("\n");
 }

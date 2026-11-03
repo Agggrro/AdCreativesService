@@ -15,20 +15,19 @@
       </AdVerifications>
       <Creatives>
         <Creative id="11111111-2222-4333-8444-555555555555" sequence="1">
-          <UniversalAdId idRegistry="creosmith">11111111-2222-4333-8444-555555555555</UniversalAdId>
           <Linear>
-            <Duration>00:00:30</Duration>
             <AdParameters><![CDATA[{"videoUrl":"https://media.smithcdn.net/u/clip.webm","clickThroughUrl":"https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=_UMLd-aEP3ZH1JmRigG3veNhfJJzUDT3JwuzHwFUA6M","productName":"Shoes","productImageUrl":"https://media.smithcdn.net/u/p.png","verificationVendor":"dv.example-omid","verificationScriptUrl":"https://cdn.dv.example/omid.js","verificationParameters":"a=b&c]]]]><![CDATA[>d","durationSeconds":30}]]></AdParameters>
+            <Duration>00:00:30</Duration>
             <MediaFiles>
               <MediaFile delivery="progressive" type="video/webm" width="640" height="360"><![CDATA[https://media.smithcdn.net/u/clip.webm]]></MediaFile>
               <InteractiveCreativeFile apiFramework="SIMID" type="text/html"><![CDATA[https://smithcdn.net/c/s/eyJwYXRoIjoic2hvcHBhYmxlL3NpbWlkL2luZGV4Lmh0bWwiLCJleHAiOjE3OTEwMjk0MDB9.YCB__JsIR7KYkefY8sH3Cr3o_zzu_KDSI7FmA-X4zU8]]></InteractiveCreativeFile>
             </MediaFiles>
             <VideoClicks>
-              <ClickThrough><![CDATA[https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=_UMLd-aEP3ZH1JmRigG3veNhfJJzUDT3JwuzHwFUA6M]]></ClickThrough>
               <ClickTracking><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=click&exp=1791032400&sig=UkADMYRzgEBgKIs72YYWrQGsHBsgo_SgxGgX8xCMlH0]]></ClickTracking>
+              <ClickThrough><![CDATA[https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=_UMLd-aEP3ZH1JmRigG3veNhfJJzUDT3JwuzHwFUA6M]]></ClickThrough>
             </VideoClicks>
-
           </Linear>
+          <UniversalAdId idRegistry="creosmith">11111111-2222-4333-8444-555555555555</UniversalAdId>
         </Creative>
       </Creatives>
     </InLine>

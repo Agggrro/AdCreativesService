@@ -22,6 +22,16 @@ export function getCdnUrl(): string {
 }
 
 /**
+ * The VAST tag a buyer pastes into their DSP, for a creative of any kind. One
+ * builder instead of the literal at every place that shows or copies a tag: the
+ * list, the creative's page and the VAST generator (ADR-0035) must never
+ * disagree about the URL a live campaign points at.
+ */
+export function vastTagUrl(creativeId: string): string {
+  return `${getCdnUrl()}/v?creative_id=${creativeId}`;
+}
+
+/**
  * Bare hostname of the ad domain, or null when it is not configured. Used to
  * recognise a request that arrived on it — see middleware.ts, which must never
  * set a cookie there.

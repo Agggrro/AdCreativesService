@@ -16,9 +16,10 @@ import type { ServingPlatform } from "./platform";
 // value the enum carries. Accepting a name we never emit would only let a third
 // party write event types we cannot produce, into numbers a customer reads.
 //
-// ADR-0016 cut this to three. `start` and the quartiles are gone: the player
-// fired one beacon each, seven per impression, for numbers the buyer's own DSP
-// already reports. What is left is what only we can report:
+// For an interactive creative ADR-0016 cut this to three: `start` and the
+// quartiles went, because the player fired one beacon each, seven per
+// impression, for numbers the buyer's own DSP already reports. What was left is
+// what only we can report:
 //   * `impression` — the one number that must reconcile with the DSP.
 //   * `viewable`   — self-reported, VPAID-only (ADR-0012); fired by the unit's
 //                    own IntersectionObserver, not by the host player.
@@ -33,12 +34,25 @@ import type { ServingPlatform } from "./platform";
 // counted per error code into its own table (ADR-0033) rather than as a value of
 // the event enum. See the branch below.
 //
+// ADR-0035 brings `start`, the three quartiles and `complete` back — for VAST
+// video creatives only, the one kind whose document carries <TrackingEvents>
+// (lib/vast-gen). Nothing here checks the kind, and nothing needs to: the
+// signature binds (creative, event), and those beacon URLs are minted only into
+// a video creative's document, so for an interactive creative a valid `q25`
+// signature does not exist. A video creative's `viewable` is reported by the
+// player through <ViewableImpression> rather than by a VPAID unit.
+//
 // `Object.hasOwn` below, not a bare index: `e=constructor` must not resolve to an
 // inherited function.
 const EVENT_MAP: Record<string, CreativeEventType> = {
   impression: "impression",
   viewable: "viewable",
   click: "click",
+  start: "start",
+  q25: "q25",
+  q50: "q50",
+  q75: "q75",
+  complete: "complete",
 };
 
 /**

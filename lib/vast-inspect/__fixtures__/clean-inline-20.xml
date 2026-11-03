@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A deliberately correct VAST 2.0 InLine. Zero errors and zero warnings, or the
+  validator is crying wolf on a good tag.
+
+  2.0's InLine is one flat xs:sequence (vast_2.0.1.xsd), and it is NOT the 4.x
+  order: AdTitle comes straight after AdSystem, and Error and Impression close
+  the list before Creatives.
+
+    AdSystem → AdTitle → Description → Error → Impression → Creatives
+
+  Until ADR-0035 the ordering rule measured every version by the 4.2 sequence
+  and warned on exactly this document. No [ERRORCODE] in <Error>: the code list
+  and its macro are 3.0.
+-->
+<VAST version="2.0">
+  <Ad id="ad-20">
+    <InLine>
+      <AdSystem version="1.0">CreoSmith Fixtures</AdSystem>
+      <AdTitle>Clean linear preroll, 2.0</AdTitle>
+      <Description>A plain linear video with tracking</Description>
+      <Error><![CDATA[https://tracking.example.com/error]]></Error>
+      <Impression><![CDATA[https://tracking.example.com/impression?cb=[CACHEBUSTING]]]></Impression>
+      <Creatives>
+        <Creative id="creative-20" sequence="1">
+          <Linear>
+            <Duration>00:00:15</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracking.example.com/start]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://tracking.example.com/q1]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://tracking.example.com/q2]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://tracking.example.com/q3]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://tracking.example.com/complete]]></Tracking>
+              <Tracking event="mute"><![CDATA[https://tracking.example.com/mute]]></Tracking>
+              <Tracking event="fullscreen"><![CDATA[https://tracking.example.com/fullscreen]]></Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://www.example.com/landing]]></ClickThrough>
+              <ClickTracking><![CDATA[https://tracking.example.com/click]]></ClickTracking>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360" bitrate="800"><![CDATA[https://cdn.example.com/creative-640.mp4]]></MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+        <Creative id="companion-20" sequence="1">
+          <CompanionAds>
+            <Companion width="300" height="250">
+              <StaticResource creativeType="image/png"><![CDATA[https://cdn.example.com/banner-300x250.png]]></StaticResource>
+              <TrackingEvents>
+                <Tracking event="creativeView"><![CDATA[https://tracking.example.com/companion-view]]></Tracking>
+              </TrackingEvents>
+              <CompanionClickThrough><![CDATA[https://www.example.com/landing]]></CompanionClickThrough>
+              <AltText>Example banner</AltText>
+            </Companion>
+          </CompanionAds>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

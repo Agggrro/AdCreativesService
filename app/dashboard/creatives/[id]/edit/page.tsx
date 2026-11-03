@@ -7,6 +7,15 @@ import { parseConfigSchema } from "@/lib/config-schema";
 import { getDict } from "@/lib/i18n/server";
 import { ConfiguratorForm } from "@/components/ConfiguratorForm";
 import { Notice } from "@/components/ui/Field";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { withNext } from "@/lib/safe-next";
+import { UUID_RE } from "@/lib/uuid";
+import { VideoTagGenerator } from "@/components/vast-gen/VideoTagGenerator";
+import { configToDraft } from "@/components/vast-gen/draft";
+import { updateVideoCreative } from "@/app/dashboard/creatives/video-actions";
+import { getCdnUrl } from "@/lib/site";
+import { VIDEO_FORMAT } from "@/lib/vast-gen/kind";
+import { parseVideoConfig } from "@/lib/vast-gen/validate";
 
 export default async function EditCreativePage({
   params,
@@ -16,6 +25,7 @@ export default async function EditCreativePage({
   searchParams: Promise<{ error?: string; field?: string }>;
 }) {
   const { id } = await params;
+  if (!UUID_RE.test(id)) notFound();
   const sp = await searchParams;
   const supabase = await createServerSupabase();
   const { dict } = await getDict();
@@ -28,11 +38,62 @@ export default async function EditCreativePage({
     .maybeSingle();
   if (!creative) notFound();
 
+  // A VAST video creative (ADR-0035) is edited in the generator's own form, not
+  // in the schema-driven one: its system template's config_schema names only
+  // its two click fields.
+  if (creative.selected_format === VIDEO_FORMAT) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    // `serve` mode, as the ad path reads it: an optional part a hand-edited
+    // config broke is dropped here as it is on air, rather than shown as an
+    // error the form has no field for. The strict reading beside it counts
+    // what that dropped, because saving this form makes the drop permanent.
+    const parsed = parseVideoConfig(creative.config_json, { mode: "serve", ownerId: user?.id });
+    if (!parsed.ok) {
+      return (
+        <div className="flex flex-col gap-3">
+          <Notice tone="dead">{dict.vastGen.errStoredConfig}</Notice>
+          <Link
+            href={`/dashboard/creatives/${creative.id}`}
+            className="type-small font-medium text-fg underline underline-offset-4"
+          >
+            {dict.vastGen.backToCreative}
+          </Link>
+        </div>
+      );
+    }
+    const strict = parseVideoConfig(creative.config_json, { mode: "save", ownerId: user?.id });
+    const droppedCount = strict.ok ? 0 : strict.issues.length;
+    return (
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title={`${dict.vastGen.editTitle}: ${creative.name ?? parsed.config.adTitle}`}
+          subtitle={dict.vastGen.subtitle}
+        />
+        {droppedCount > 0 && (
+          <Notice tone="warn">{dict.vastGen.editDroppedNotice.replace("{n}", String(droppedCount))}</Notice>
+        )}
+        <VideoTagGenerator
+          mode="edit"
+          signedIn
+          cdnUrl={getCdnUrl()}
+          signInHref={withNext("/login", `/dashboard/creatives/${creative.id}/edit`)}
+          action={updateVideoCreative}
+          creativeId={creative.id}
+          initialDraft={configToDraft(parsed.config, creative.name)}
+          cancelHref={`/dashboard/creatives/${creative.id}`}
+        />
+      </div>
+    );
+  }
+
   const { data: template } = await supabase
     .from("templates")
     .select("id, name, supported_standards, config_schema")
     .eq("id", creative.template_id)
     .eq("is_published", true)
+    .eq("in_catalog", true)
     .maybeSingle();
 
   if (!template) {

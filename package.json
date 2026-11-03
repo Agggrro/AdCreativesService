@@ -14,6 +14,7 @@
     "db:schema": "node --env-file=.env.local scripts/db-apply.mjs supabase/schema.sql",
     "db:seed": "node --env-file=.env.local scripts/db-apply.mjs supabase/seed.sql",
     "check:vast": "node scripts/check-vast-fixtures.mjs",
+    "check:vast-xsd": "node scripts/check-vast-xsd.mjs",
     "check:entitlement": "node --env-file-if-exists=.env.local scripts/check-entitlement.mjs",
     "snapshot:backfill": "node --env-file=.env.local --import ./scripts/register-app-imports.mjs scripts/snapshot-backfill.mjs",
     "check:snapshots": "node --env-file-if-exists=.env.local --import ./scripts/register-app-imports.mjs scripts/check-snapshots.mjs",
@@ -22,8 +23,9 @@
     "test:cors": "node --import ./scripts/register-app-imports.mjs --test lib/vast/cors.test.ts",
     "test:postback": "node --import ./scripts/register-app-imports.mjs --test lib/postback.test.ts",
     "test:click": "node --import ./scripts/register-app-imports.mjs --test lib/click-destination.test.ts",
+    "test:auth": "node --import ./scripts/register-app-imports.mjs --test lib/safe-next.test.ts lib/auth-errors.test.ts",
     "test:media": "node --import ./scripts/register-app-imports.mjs --test lib/creative-media.test.ts lib/r2.test.ts",
-    "test:vast": "node --import ./scripts/register-app-imports.mjs --test lib/vast/golden.test.ts",
+    "test:vast": "node --import ./scripts/register-app-imports.mjs --test lib/vast/golden.test.ts lib/vast-gen/validate.test.ts lib/vast-gen/build.test.ts",
     "test:snapshots": "node --import ./scripts/register-app-imports.mjs --test lib/serving/store-kv.test.ts",
     "test:ads": "node --import ./scripts/register-app-imports.mjs --test workers/ads/src/index.test.ts"
   },
@@ -50,6 +52,7 @@
     "tailwindcss": "^4",
     "terser": "^5.49.2",
     "typescript": "^5",
-    "wrangler": "^4.147.0"
+    "wrangler": "^4.147.0",
+    "xmllint-wasm": "5.3.0"
   }
 }

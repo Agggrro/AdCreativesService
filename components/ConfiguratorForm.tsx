@@ -314,7 +314,9 @@ export function ConfiguratorForm({
         </div>
       </form>
 
-      <div className="lg:sticky lg:top-6">
+      {/* `top-32` clears the sticky header, closed-beta strip included, as
+          Section's `scroll-mt-32` does. */}
+      <div className="lg:sticky lg:top-32">
         <PreviewPanel templateId={template.id} format={format} fields={values} />
       </div>
     </div>

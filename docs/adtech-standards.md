@@ -7,7 +7,7 @@
 
 | Standard | What it is | Our stance |
 | --- | --- | --- |
-| **VAST 4.x** | XML envelope describing a video ad (media files, tracking, companions). The *transport*. | **Core.** We emit VAST 4.2 wrappers/inline for every creative. |
+| **VAST 2.0–4.3** | XML envelope describing a video ad (media files, tracking, companions). The *transport*. | **Core.** We emit VAST 4.2 `InLine` documents for every interactive creative, and a linear video `InLine` at the version its owner picks, 2.0 to 4.3, for a VAST video creative ([ADR-0035](decisions/0035-vast-video-creatives.md)). Never a `<Wrapper>`: a wrapper around a third-party tag is deferred. |
 | **SIMID 1.1** | IAB's modern interactivity layer. Creative runs in an isolated iframe, talks to the player via `postMessage`. Replaces VPAID. | **Primary interactive standard.** Better security/perf model. |
 | **VPAID 2.0** | Legacy interactivity. Runs arbitrary JS in the player's context. Deprecated by IAB; dropped/limited by many DSPs/SSPs (incl. Google Ad Manager). | **Supported as a chosen format** for reach with legacy DSPs — never the only path, and flagged as legacy in the UI. |
 | **MRAID** | Rich-media API for **in-app display** ads inside app webviews. Not video, not VAST. | **Out of scope for v1.** Possible separate product line later. Do not conflate with the video pipeline. |
@@ -24,6 +24,9 @@ single standard. See [ADR-0002](decisions/0002-multi-format-creative-delivery.md
   declares `supported_standards`.
 - A **creative** (a user's configured instance) stores the user's **selected
   format(s)**. The VAST endpoint emits the matching variant via the format adapter.
+  A VAST video creative is the one exception: a document kind of its own beside the
+  adapters, since it is not interactive at all
+  ([ADR-0035](decisions/0035-vast-video-creatives.md), below).
 - Adding a future standard = a new adapter + a new template variant. The DB, the
   endpoint contract, and the dashboard format-picker are all designed to be open to
   new formats without migration pain.
@@ -48,8 +51,10 @@ single standard. See [ADR-0002](decisions/0002-multi-format-creative-delivery.md
   ingest parsers validate it here. The order is the XSD's `xs:sequence` —
   `AdSystem, Error, Impression, AdServingId, AdTitle, AdVerifications, Creatives` — which
   reads inverted because `Inline_type` extends `AdDefinitionBase_type` and the base's
-  children come first. `lib/vast/builder.ts` and the inspector's
-  `lib/vast-inspect/rules/ordering.ts` hold the same sequence; change both or neither.
+  children come first. `lib/vast/builder.ts` and the inspector's table in
+  `lib/vast-inspect/spec.ts` (`childOrder`) hold the same sequence; change both or neither.
+  The per-version sequences themselves live in `lib/vast-inspect/spec.ts`
+  ([ADR-0035](decisions/0035-vast-video-creatives.md)), read out of IAB's XSDs.
 
 The adapter layer hides these differences from the endpoint. Each adapter is
 responsible for spec-conformant output — validate with the **`vast-spec-reviewer`**
@@ -82,6 +87,60 @@ route that answers a player with VAST takes its headers from `lib/vast/cors.ts`,
 [`runtime/shoppable/`](../runtime); per-creative config reaches them via
 `<AdParameters>` at serve time (never baked in — ADR-0003).
 
+### VAST video creatives: one document per version
+
+The generator at `/tools/vast-generator` makes the one creative that is not interactive:
+a linear video with our trackers and the buyer's, served by the same `/v` as every other
+creative and gated the same way ([ADR-0035](decisions/0035-vast-video-creatives.md),
+which holds the feature-by-version matrix the form offers). It is **not** an adapter —
+an adapter fills the interactive InLine's `<MediaFiles>`, and this document differs per
+version all the way down. [`lib/vast-gen/`](../lib/vast-gen) owns it: `validate.ts`
+(the config, at save and again at serve), `build.ts` (the document), `spec.ts` (which
+version carries what).
+
+What changes between versions is order as much as content, because every container is an
+`xs:sequence` and 4.x reorders by deriving each type from a base:
+
+| Container | 2.0 | 3.0 | 4.x |
+| --- | --- | --- | --- |
+| `Linear` | `Duration, TrackingEvents, AdParameters, VideoClicks, MediaFiles` | `Icons, CreativeExtensions`, then as 2.0 | `Icons, TrackingEvents, AdParameters, Duration, MediaFiles, VideoClicks` |
+| `VideoClicks` | `ClickThrough, ClickTracking` | as 2.0 | `ClickTracking, ClickThrough` (valid in every 4.x schema) |
+| `Companion` | `StaticResource, TrackingEvents, CompanionClickThrough, AltText` | `CreativeExtensions` after the resource | `StaticResource, AdParameters, AltText, CompanionClickThrough, CompanionClickTracking, CreativeExtensions, TrackingEvents` |
+| `IconClicks` | — | `IconClickTracking, IconClickThrough` | `IconClickThrough, IconClickTracking` |
+
+And the differences that are content, not order:
+
+- **`<Duration>`** is `HH:MM:SS` in 2.0 (its documentation defines no fraction; the
+  2.0.1 XSD types it as plain `xs:time`) and
+  `HH:MM:SS.mmm` from 3.0; the same goes for `skipoffset` and an icon's offset.
+- **One `<Error>` before 4.0.** 2.0 and 3.0 declare it `maxOccurs="1"`, so the slot is
+  ours and the buyer's error pixels are a 4.0 feature; `[ERRORCODE]` is a 3.0 macro.
+- **`<UniversalAdId>`** is 4.0+ and changed shape: 4.0 takes `idRegistry` and `idValue`
+  attributes, 4.1 moved the value into the element's text. It is the last child of
+  `<Creative>`, after `<Linear>`.
+- **`<TrackingEvents>`** names only the events that version's XSD enumerates — `skip` is
+  3.0, `creativeView` in a Linear is every version, the 4.x set dropped `fullscreen` and
+  `expand`. The form offers exactly that set.
+- **`<AdServingId>` and `<AdVerifications>`** at InLine level are 4.1.
+- **Macros are IAB's list, by where a player substitutes them** (`vast4macros/data/
+  macros-data.json` in IAB's repository, valid for every version): most in every tracking
+  pixel, `[ERRORCODE]` in `<Error>` only, `[CLICKPOS]` in click tracking only, and a set
+  in the *request* URI only. The generator holds a buyer's pixel to its kind. The
+  validator reads a third-party tag leniently on placement and flags only a `[TOKEN]` no
+  player substitutes anywhere — and only inside a URL, since a player fills in nothing in
+  an `<AdTitle>`.
+
+**`<TrackingEvents>` exist only in this kind of document.** Our start, quartile and
+complete beacons are signed for a video creative alone, and the interactive builder's
+goldens still carry none — SIMID and VPAID creatives report through their own runtime.
+
+The proof is not our validator, which by design leaves these orders unchecked (below):
+it is `npm run check:vast-xsd`, which validates every golden — the generator's per
+version, and the interactive SIMID and VPAID documents, which follow the 4.2 XSD's order
+too — against IAB's XSD for its version, in CI. Our validator is the other half: every generated document is held to zero
+errors and zero warnings by it, at every version, in `npm run test:vast` and again on
+save.
+
 ## Reading VAST — the inspection engine
 
 Everything above is about *emitting* VAST. [`lib/vast-inspect/`](../lib/vast-inspect)
@@ -89,7 +148,8 @@ does the opposite, for the public validator
 ([ADR-0014](decisions/0014-vast-inspection-engine.md)).
 
 It validates against the **prose** of the specifications, not against an XSD.
-There is no published XSD for VAST 4.3 at all, and XSD cannot express most of what
+There is no usable XSD for VAST 4.3 (IAB's repository carries a `schemas/vast_4.3.xsd`
+that is an empty file), and XSD cannot express most of what
 actually breaks a player: an `http` tracker on an `https` page, a `MediaFile`
 declaring `video/mp4` for a `.webm` URL, an `AdVerifications` block left inside
 `<Extensions>` where VAST 4.0 put it. Rules are gated on the version the document
@@ -129,13 +189,19 @@ delivery hygiene.
 
 **Child order is checked for `InLine` and `Wrapper` only**, and the restriction is
 deliberate. The schema models its containers with `xs:sequence`, so order is
-normative — and because `Inline_type` extends `AdDefinitionBase_type`, the correct
-order is base-then-derived, putting `<Error>` and `<Pricing>` *before* `<AdTitle>`.
+normative — and from 4.0, because `Inline_type` extends `AdDefinitionBase_type`, the
+correct order is base-then-derived, putting `<Error>` and `<Pricing>` *before*
+`<AdTitle>`. 2.0 and 3.0 are flat sequences that open `AdSystem → AdTitle` and close
+`Error → Impression → Creatives`, and **each document is judged by the sequence of the
+version it declares** ([ADR-0035](decisions/0035-vast-video-creatives.md)) — measured by
+the 4.x order, every conformant 2.0/3.0 tag used to draw a warning, and a 3.0 tag in the
+4.x order is now the one that does.
 That looks wrong and is not: IAB's own published sample is authored that way. But
 the same schema orders `ClosedCaptionFiles` before `MediaFile`, and `Linear`
-before `UniversalAdId`, which contradicts both the 4.3 prose and IAB's sample —
-so `MediaFiles`, `Creative` and `Linear` are left unchecked rather than warned on
-wrongly. Re-deriving any of them means checking the schema *and* real tags. Findings carry a severity, an XPath, a spec citation, both
+before `UniversalAdId`, which IAB's 4.1 sample and Google Ad Manager's own output
+contradict — so in a third-party tag `MediaFiles`, `Creative` and `Linear` are left
+unchecked rather than warned on in working tags. Our own documents follow the XSD
+there, and `npm run check:vast-xsd` holds them to it. Re-deriving any of them means checking the schema *and* real tags. Findings carry a severity, an XPath, a spec citation, both
 locales of the message and its fix, and the IAB error code a player would report.
 The interactive and verification groups mirror the invariants
 [`.claude/agents/vast-spec-reviewer.md`](../.claude/agents/vast-spec-reviewer.md)
@@ -396,7 +462,8 @@ Full rationale: [ADR-0003](decisions/0003-access-control-over-code-hiding.md).
 - **`<AdVerifications>`** — VAST 4.1+ element carrying an OMID verification
   vendor's script + parameters. We emit it for SIMID as a pass-through
   (ADR-0012); we never populate it ourselves as a vendor.
-- **Viewable / `viewable` event** — VPAID-only, self-reported (not
-  OMID-accredited): the ad slot was ≥50% on-screen for a continuous 2s (the
-  MRC video threshold), fired by `runtime/lib/vpaid-base.js`'s
-  `IntersectionObserver`. See ADR-0012.
+- **Viewable / `viewable` event** — never OMID-accredited. For VPAID,
+  self-reported: the ad slot was ≥50% on-screen for a continuous 2s (the MRC
+  video threshold), fired by `runtime/lib/vpaid-base.js`'s
+  `IntersectionObserver` (ADR-0012). For a VAST video creative from 4.0, the
+  player's own verdict through `<ViewableImpression>` (ADR-0035).

@@ -20,6 +20,8 @@ export default async function CatalogPage() {
     .from("templates")
     .select("id, name, description, type, supported_standards")
     .eq("is_published", true)
+    // A system template (ADR-0035) is published but is not a tile.
+    .eq("in_catalog", true)
     .order("name");
 
   return (

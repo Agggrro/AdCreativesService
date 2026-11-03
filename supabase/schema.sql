@@ -18,6 +18,14 @@
 
 begin;
 
+-- The file is applied to a live database, before the deploy that needs it
+-- (ADR-0035). Every `alter table` takes its table's exclusive lock and holds
+-- it to the commit; queued behind one long-running query, it would stall
+-- every dashboard read behind itself. Waiting at most this long and aborting
+-- is the safe failure: the transaction rolls back whole and the apply is
+-- simply run again.
+set local lock_timeout = '5s';
+
 -- Default-closed for anything created later in this file (and by this role
 -- after it): `create function` otherwise grants EXECUTE to PUBLIC, which
 -- exposes every SECURITY DEFINER function to anon until its explicit revoke.
@@ -153,6 +161,18 @@ create table if not exists public.templates (
   updated_at           timestamptz not null default now()
 );
 comment on table public.templates is 'Interactive ad templates; optimized into one variant per supported standard.';
+
+-- Whether the template is offered in the catalog (ADR-0035). A *system* template
+-- — today only `vast_video`, the VAST generator's plain video creative — is not:
+-- it is created from /tools/vast-generator rather than from a tile, and has no
+-- runtime unit to demo. It still has to be published, because
+-- validate_creative_format() reads the template under the caller's RLS and
+-- templates_select_published shows published rows only; so hiding it needs a
+-- column of its own, and every catalog surface filters on it.
+-- For databases created before ADR-0035 (this file is re-runnable, not migrated).
+alter table public.templates add column if not exists in_catalog boolean not null default true;
+comment on column public.templates.in_catalog is
+  'False for system templates (ADR-0035): published so creatives can reference them, but never listed in the catalog, the landing gallery or the sitemap.';
 
 -- The public catalog URL is `/catalog/<type hyphenated>` (ADR-0008), so `type`
 -- must identify exactly one template. If two templates of one type ever become a
@@ -342,7 +362,7 @@ create table if not exists public.creative_event_counters (
   count       bigint not null default 0,
   primary key (creative_id, event_type, bucket)
 );
-comment on table public.creative_event_counters is 'Aggregated ad telemetry (ADR-0016). Written by the ingest layer via increment_creative_event(); read only through get_creative_overview().';
+comment on table public.creative_event_counters is 'Aggregated ad telemetry (ADR-0016). Written by the ingest layer via increment_creative_event(); read only through get_creative_overview() and get_creative_video_funnel().';
 
 -- No secondary index on purpose: the primary key is (creative_id, …), which is
 -- exactly the prefix every read scans by. The old table carried an index on
@@ -1004,7 +1024,8 @@ create policy subscriptions_select_own on public.subscriptions
 
 -- creative_event_counters: no direct client access. RLS enabled with no policy =>
 -- the anon/authenticated roles are denied. Writes go through the service role
--- (increment_creative_event); reads go through get_creative_overview().
+-- (increment_creative_event); reads go through get_creative_overview() and,
+-- for one VAST video creative, get_creative_video_funnel() (ADR-0035).
 -- creative_error_counters: the same (ADR-0033) — written by increment_creative_error,
 -- read only through get_creative_errors().
 
@@ -1087,7 +1108,7 @@ grant all on all sequences in schema public to anon, authenticated, service_role
 
 -- `creative_event_counters` has no client contract at all: it is written by the
 -- ingest beacon with the service role and read only through
--- public.get_creative_overview(). Take the
+-- public.get_creative_overview() and public.get_creative_video_funnel(). Take the
 -- table-level privileges away rather than relying on RLS alone — TRUNCATE is a
 -- table privilege that **no policy can gate**, and "RLS on, zero policies" does
 -- not stop it. SECURITY DEFINER functions are unaffected: they are checked
@@ -1099,6 +1120,23 @@ revoke all on public.creative_event_counters from anon, authenticated;
 -- this closes a privilege, not a reachable path — closed all the same.
 revoke truncate on public.profiles, public.templates, public.creatives, public.subscriptions
   from anon, authenticated;
+-- creatives: a client writes exactly the columns the app's actions write, and no
+-- other (ADR-0035). RLS decides *which rows*; these decide *which columns*.
+--   * `id` is not insertable, so the default always mints it. A chosen id was a
+--     tag takeover: a deleted creative's tag stays pasted in its old owner's DSP,
+--     `/v` falls back to Postgres on the missing snapshot, and whoever re-inserted
+--     that id was served on those placements.
+--   * `template_id` and `user_id` are fixed at creation. Re-pointing a row at
+--     another template would hand one builder the other kind's config — a VAST
+--     video creative's at the interactive one, or the reverse — and carry its
+--     counters across.
+-- The table-level revoke also drops any column grant, so a re-apply always lands
+-- on exactly these lists. A new client-written column has to be added here.
+revoke insert, update on public.creatives from anon, authenticated;
+grant insert (user_id, template_id, name, selected_format, config_json, status)
+  on public.creatives to authenticated;
+grant update (name, selected_format, config_json)
+  on public.creatives to authenticated;
 -- creative_error_counters (ADR-0033) has no client contract either.
 revoke all on public.creative_error_counters from anon, authenticated;
 -- The same for the conversion-tracking tables (ADR-0023): no client contract,
@@ -1273,7 +1311,9 @@ grant execute on function public.get_creative_serving(uuid) to service_role;
 -- client reads zero rows and must stay that way: opening it with an owner policy
 -- would expose per-hour buckets forever in exchange for three integers, and
 -- PostgREST cannot aggregate, so counting would cost a round trip per creative.
--- This function is the whole dashboard analytics surface.
+-- This function is the whole dashboard analytics surface, with one exception:
+-- get_creative_video_funnel() below, for the progress events only a VAST video
+-- creative produces (ADR-0035).
 --
 -- It takes NO parameter on purpose: the only rows it can ever return are the
 -- caller's own. A p_creative_id argument is the shape that eventually ships
@@ -1350,7 +1390,7 @@ $$;
 set local check_function_bodies = on;
 
 comment on function public.get_creative_overview() is
-  'Per-creative delivery counts + entitlement for the signed-in owner. The only read path into creative_event_counters.';
+  'Per-creative delivery counts + entitlement for the signed-in owner. With get_creative_video_funnel(), the only read path into creative_event_counters.';
 
 revoke all on function public.get_creative_overview() from public, anon, authenticated;
 grant execute on function public.get_creative_overview() to authenticated;
@@ -1388,6 +1428,65 @@ comment on function public.get_creative_errors(uuid) is
 
 revoke all on function public.get_creative_errors(uuid) from public, anon, authenticated;
 grant execute on function public.get_creative_errors(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Video funnel for one creative (ADR-0035)
+-- ---------------------------------------------------------------------------
+-- A VAST video creative (format `video`) carries <Tracking> for start, the three
+-- quartiles and complete, signed like every other beacon, and they are counted
+-- into creative_event_counters — the one kind for which ADR-0016's cut is
+-- reversed. Interactive creatives never mint those beacon URLs, so for them the
+-- progress columns stay 0 by construction.
+--
+-- All-time, like get_creative_overview(), so a ratio of two columns here is a
+-- ratio over the same window. The `owned` CTE is the ownership check, as in
+-- get_creative_errors(): a creative the caller does not own yields no row.
+create or replace function public.get_creative_video_funnel(p_creative_id uuid)
+returns table (
+  impressions bigint,
+  starts      bigint,
+  q25         bigint,
+  q50         bigint,
+  q75         bigint,
+  completes   bigint,
+  clicks      bigint,
+  -- Player-reported through VAST 4.0+ <ViewableImpression> for this kind, not
+  -- the VPAID unit's self-report (ADR-0012). 0 when the player does not measure.
+  viewable    bigint
+)
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  with owned as (
+    select c.id from public.creatives c
+     where c.id = p_creative_id
+       and c.user_id = (select auth.uid())
+  )
+  -- Compared as text, not as enum literals: this body is checked when the file is
+  -- applied, and on a database whose enum predates ADR-0012 `viewable` is added
+  -- earlier in this same transaction — casting the literal to the enum would
+  -- abort the whole apply with "unsafe use of new value".
+  select
+    coalesce(sum(e.count) filter (where e.event_type::text = 'impression'), 0)::bigint,
+    coalesce(sum(e.count) filter (where e.event_type::text = 'start'), 0)::bigint,
+    coalesce(sum(e.count) filter (where e.event_type::text = 'q25'), 0)::bigint,
+    coalesce(sum(e.count) filter (where e.event_type::text = 'q50'), 0)::bigint,
+    coalesce(sum(e.count) filter (where e.event_type::text = 'q75'), 0)::bigint,
+    coalesce(sum(e.count) filter (where e.event_type::text = 'complete'), 0)::bigint,
+    coalesce(sum(e.count) filter (where e.event_type::text = 'click'), 0)::bigint,
+    coalesce(sum(e.count) filter (where e.event_type::text = 'viewable'), 0)::bigint
+  from owned o
+  left join public.creative_event_counters e on e.creative_id = o.id
+  group by o.id;
+$$;
+
+comment on function public.get_creative_video_funnel(uuid) is
+  'Impression, start, quartile, complete, click and viewable counts for one VAST video creative the caller owns (ADR-0035).';
+
+revoke all on function public.get_creative_video_funnel(uuid) from public, anon, authenticated;
+grant execute on function public.get_creative_video_funnel(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Conversion report for one creative (ADR-0023)

@@ -41,8 +41,10 @@ bug even if the code "works". Details in [docs/adtech-standards.md](docs/adtech-
 
 1. **Multi-format by design.** Never hardcode a single interactive standard. A
    template is optimized into multiple variants (SIMID, VPAID, …) and the user
-   picks the format in the UI. All VAST generation goes through a **format adapter**
-   layer. See [ADR-0002](docs/decisions/0002-multi-format-creative-delivery.md).
+   picks the format in the UI. All interactive VAST generation goes through a
+   **format adapter** layer. See [ADR-0002](docs/decisions/0002-multi-format-creative-delivery.md).
+   A plain VAST video creative is a document kind of its own beside the adapters, built
+   per version by `lib/vast-gen` ([ADR-0035](docs/decisions/0035-vast-video-creatives.md)).
 2. **We do access control, not code hiding.** Client-executed creative JS is always
    inspectable. We never claim the code is "impossible to access". Our real levers:
    dynamic VAST kill-switch, short-TTL signed URLs, server-side config injection,
@@ -83,7 +85,7 @@ binding on every page, component, state, and user-visible string. The short vers
    `tabular-nums`; prose is Onest; display headings are Prata at 32px and up.
 5. **Elevation, not shadows.** Radius scale 8/12/16/20, 8pt grid, 44px table rows, lists
    are tables with a semantic state rail — not card grids.
-6. **Every surface is responsive**, checked at 390 / 768 / 1280 / 1920 / 2560. Page
+6. **Every surface is responsive**, checked at 360 / 390 / 768 / 1280 / 1920 / 2560. Page
    shells go through `ui/Container.tsx` inside `ui/Section.tsx` — a hand-typed
    `max-w-[…]` is a defect. Full-bleed colour with contained prose is what owns a wide
    monitor.
@@ -117,9 +119,21 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
   `config_schema`, or the runtime build — run the **`creative-check`** skill. It is
   mandatory: a template is verified by running it in `/dev/harness`, never by reasoning
   that it should work.
-- After writing/changing VAST/SIMID/VPAID output → **`vast-spec-reviewer`** subagent, and
-  `npm run test:vast` — the golden documents and signatures in `lib/vast/__golden__/`.
-  Rewrite them (`UPDATE_GOLDEN=1`) only for a change you meant, after reading the diff.
+- After writing/changing VAST/SIMID/VPAID output → **`vast-spec-reviewer`** subagent,
+  `npm run test:vast` — the golden documents and signatures in `lib/vast/__golden__/` —
+  and `npm run check:vast-xsd`, which validates every golden against IAB's XSD for its
+  version. Rewrite goldens (`UPDATE_GOLDEN=1`) only for a change you meant, after reading
+  the diff.
+- After changing the VAST video generator (`lib/vast-gen/`, or the version tables in
+  `lib/vast-inspect/spec.ts` it reads) → `npm run test:vast`, which holds every version's
+  document to zero findings from our own validator, and `npm run check:vast-xsd` — the
+  only check of the orders below `InLine`. `validate.ts` runs on every serve, so a rule there is a rule on
+  the ad path. See [ADR-0035](docs/decisions/0035-vast-video-creatives.md).
+- After changing where sign-in may return to (`lib/safe-next.ts`, the `next` hops in
+  `app/auth/`, `/login`, `/signup`), or what those pages say went wrong
+  (`lib/auth-errors.ts`) → `npm run test:auth`. It is the open-redirect guard
+  ([ADR-0036](docs/decisions/0036-public-tool-that-saves.md)), and it pins that the pages
+  echo no query text.
 - After changing the ad path's handlers (`lib/serving/http/`) or the ad Worker
   (`workers/ads`) → `npm run test:vast`, `npm run test:ads` (the Worker's cache, last-good
   copy, forwards and headers, against fakes), `npm run test:cors`, and a dry-run bundle
@@ -146,8 +160,9 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
   `supabase/schema.sql` or `lib/serving/entitlement.ts` — change the other in the same
   commit and run `npm run check:entitlement` (compares Postgres's own verdict against the
   TypeScript port) plus `npm run test:entitlement`. See [ADR-0015](docs/decisions/0015-serving-snapshots-on-cdn.md).
-- After changing anything a serving snapshot projects (creative writers, the admin's
-  grant, `templates` via `npm run db:seed`) → run `npm run snapshot:backfill`.
+- After changing anything a serving snapshot projects (creative writers — the video
+  actions in `app/dashboard/creatives/video-actions.ts` included — the admin's grant,
+  `templates` via `npm run db:seed`) → run `npm run snapshot:backfill`.
 - Before **and** after any UI/UX work — new page, component, state, or user-visible
   string → run the **`design-check`** skill, then the **`design-system-reviewer`** subagent.
 - Before pushing anything touching payments, auth, or the public VAST endpoint →

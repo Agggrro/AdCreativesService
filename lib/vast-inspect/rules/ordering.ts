@@ -1,32 +1,38 @@
+import { childOrder, type OrderedContainer } from "../spec";
 import { type VNode } from "../xml-tree";
 import { hit, vast, type Rule, type RuleHit } from "./kit";
 
 /**
  * Child-element order, for the two containers where it is safe to enforce.
  *
- * The VAST 4.2 XSD models its containers with `xs:sequence`, so order is
+ * The VAST XSDs model these containers with `xs:sequence`, so order is
  * normative rather than stylistic, and it is the one class of fault that is
  * invisible without a rule: a strict parser rejects the document outright, a
  * lenient one accepts it, and the tag therefore breaks on some players and not
  * others — the hardest kind of bug to diagnose from a delivery report.
  *
- * The sequences below are read out of the XSD, base type first: `Inline_type`
+ * The sequences are read out of each version's XSD and live in `../spec.ts`,
+ * where the VAST generator reads them too (ADR-0035). From 4.0, `Inline_type`
  * and `Wrapper_type` both extend `AdDefinitionBase_type`, and an `xs:extension`
  * appends the derived sequence *after* the base's. That produces the
  * counter-intuitive but correct result that `<Error>` and `<Pricing>` precede
  * `<AdTitle>` — and IAB's own published sample
  * (VAST_Samples/VAST 4.1 Samples/Inline_Simple.xml) is authored in exactly that
- * order, which is what makes the rule safe to ship.
+ * order. 2.0 and 3.0 are flat sequences that open with `<AdSystem>` and
+ * `<AdTitle>`, and are judged by their own: measuring them by the 4.x order was
+ * a false positive on every conformant 2.0/3.0 tag until ADR-0035.
  *
  * **Three containers are deliberately NOT checked.** The XSD's sequence for them
- * contradicts real-world practice including IAB's own sample, so enforcing it
- * would manufacture warnings on conformant tags:
+ * contradicts real-world practice, so enforcing it would manufacture warnings on
+ * working tags — Google Ad Manager's own output among them. (Our own documents
+ * follow the XSD there; `npm run check:vast-xsd` proves it.)
  *
  *   · `MediaFiles`  — the XSD orders `ClosedCaptionFiles, MediaFile, Mezzanine,
  *                     InteractiveCreativeFile`, putting captions first; the VAST
  *                     4.3 prose and every tag in the wild put `MediaFile` first.
- *   · `Creative`    — the XSD orders `Linear` before `UniversalAdId`; the IAB
- *                     sample does the opposite.
+ *   · `Creative`    — the XSD orders `Linear` before `UniversalAdId`; IAB's 4.1
+ *                     sample and Google Ad Manager do the opposite (IAB's 4.2
+ *                     sample follows the schema).
  *   · `Linear`      — inherits `TrackingEvents` from its base, so the XSD wants
  *                     it before `Duration`. Most real tags put `Duration` first,
  *                     and warning on the majority of correct tags is worse than
@@ -41,48 +47,7 @@ import { hit, vast, type Rule, type RuleHit } from "./kit";
  * reader will experience. But "works in the player you happened to test" is
  * exactly what this tool exists to expose.
  */
-
-/**
- * Verified against the VAST 4.2 XSD (`AdDefinitionBase_type` then the derived
- * type) and against IAB's own sample.
- */
-const SEQUENCES: ReadonlyArray<{ parent: string; order: readonly string[] }> = [
-  {
-    parent: "InLine",
-    order: [
-      "AdSystem",
-      "Error",
-      "Extensions",
-      "Impression",
-      "Pricing",
-      "ViewableImpression",
-      "AdServingId",
-      "AdTitle",
-      "AdVerifications",
-      "Advertiser",
-      "Category",
-      "Creatives",
-      "Description",
-      "Expires",
-      "Survey",
-    ],
-  },
-  {
-    parent: "Wrapper",
-    order: [
-      "AdSystem",
-      "Error",
-      "Extensions",
-      "Impression",
-      "Pricing",
-      "ViewableImpression",
-      "AdVerifications",
-      "BlockedAdCategories",
-      "Creatives",
-      "VASTAdTagURI",
-    ],
-  },
-];
+const CONTAINERS: readonly OrderedContainer[] = ["InLine", "Wrapper"];
 
 /**
  * The first child that appears earlier than one which should precede it, or
@@ -122,13 +87,14 @@ function containersFor(root: VNode, parent: string): VNode[] {
   return found;
 }
 
-export const orderingRules: Rule[] = SEQUENCES.map(({ parent, order }) => ({
+export const orderingRules: Rule[] = CONTAINERS.map((parent) => ({
   id: `VAST-child-order-${parent.toLowerCase()}`,
   group: "document" as const,
   severity: "warning" as const,
   spec: vast(`§3 ${parent} (xs:sequence)`),
   iabErrorCode: 101,
   check: (ctx): RuleHit[] => {
+    const order = childOrder(parent, ctx.declared);
     const hits: RuleHit[] = [];
     for (const container of containersFor(ctx.root, parent)) {
       const problem = firstOutOfOrder(container, order);
@@ -141,8 +107,8 @@ export const orderingRules: Rule[] = SEQUENCES.map(({ parent, order }) => ({
             en: `<${problem.node.name}> is out of order inside <${parent}>.`,
           },
           {
-            ru: `Схема VAST задаёт для <${parent}> строгую последовательность, поэтому порядок здесь — часть спецификации, а не оформление. Строгий парсер отвергнет документ целиком, мягкий примет: тег сломается у части плееров и будет работать у остальных. Порядок по схеме: ${order.join(" → ")}.`,
-            en: `The VAST schema declares a strict sequence for <${parent}>, so order here is part of the specification rather than formatting. A strict parser rejects the document outright while a lenient one accepts it, so the tag breaks on some players and works on others. Schema order: ${order.join(" → ")}.`,
+            ru: `Схема VAST задаёт для <${parent}> строгую последовательность, поэтому порядок здесь — часть спецификации, а не оформление. Строгий парсер отвергнет документ целиком, мягкий примет: тег сломается у части плееров и будет работать у остальных. Порядок по схеме этой версии: ${order.join(" → ")}.`,
+            en: `The VAST schema declares a strict sequence for <${parent}>, so order here is part of the specification rather than formatting. A strict parser rejects the document outright while a lenient one accepts it, so the tag breaks on some players and works on others. This version's schema order: ${order.join(" → ")}.`,
           },
           `<${problem.node.name}> after <${problem.shouldFollow}>`,
         ),

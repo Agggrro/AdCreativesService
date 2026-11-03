@@ -17,7 +17,7 @@ export function TopNav({ items }: { items: TopBarLink[] }) {
   const pathname = usePathname();
 
   return (
-    <nav className="hidden items-center gap-1 sm:flex">
+    <nav className="hidden items-center gap-1 lg:flex">
       {items.map((item) => {
         if (item.tools) {
           return <ToolsNavMenu key={item.href} label={item.label} items={item.tools} />;

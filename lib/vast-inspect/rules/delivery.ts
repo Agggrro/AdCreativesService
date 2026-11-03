@@ -1,3 +1,4 @@
+import { PLAYER_SUBSTITUTED_MACROS } from "../spec";
 import { descendants, walkAll } from "../xml-tree";
 import { checkUrl, hit, looksLikeCdata, macrosIn, vast, type Rule } from "./kit";
 
@@ -34,6 +35,7 @@ const URL_ELEMENTS = [
   "IconViewTracking",
   "IconClickTracking",
 ];
+const URL_ELEMENT_SET: ReadonlySet<string> = new Set(URL_ELEMENTS);
 
 export const deliveryRules: Rule[] = [
   {
@@ -92,61 +94,16 @@ export const deliveryRules: Rule[] = [
     severity: "warning",
     spec: vast("§6 Macros"),
     check: (ctx) => {
-      // Macros the player is supposed to substitute at request time are fine
-      // wherever they appear. Anything else in [BRACKETS] is a template the
-      // ad server forgot to fill in before it shipped.
-      const PLAYER_SUBSTITUTED = new Set([
-        "ERRORCODE",
-        "CACHEBUSTING",
-        "CONTENTPLAYHEAD",
-        "ADPLAYHEAD",
-        "MEDIAPLAYHEAD",
-        "ASSETURI",
-        "TIMESTAMP",
-        "PLAYERCAPABILITIES",
-        "CLICKPOS",
-        "ADCATEGORIES",
-        "ADCOUNT",
-        "ADSERVINGID",
-        "ADTYPE",
-        "APPBUNDLE",
-        "BREAKMAXADS",
-        "BREAKMAXDURATION",
-        "BREAKMINADDURATION",
-        "BREAKPOSITION",
-        "CLIENTUA",
-        "CONTENTID",
-        "CONTENTURI",
-        "DEVICEIP",
-        "DEVICEUA",
-        "DOMAIN",
-        "GDPRCONSENT",
-        "IFA",
-        "IFATYPE",
-        "INVENTORYSTATE",
-        "LATLONG",
-        "LIMITADTRACKING",
-        "MEDIAMIME",
-        "OMIDPARTNER",
-        "PAGEURL",
-        "PLACEMENTTYPE",
-        "PLAYERSIZE",
-        "PLAYERSTATE",
-        "PODSEQUENCE",
-        "REGULATIONS",
-        "SERVERSIDE",
-        "SERVERUA",
-        "TRANSACTIONID",
-        "UNIVERSALADID",
-        "US_PRIVACY",
-        "VASTVERSIONS",
-        "VERIFICATIONVENDORS",
-      ]);
-
+      // Macros a player substitutes are fine in any URL. Anything else in
+      // [BRACKETS] is a template the ad server forgot to fill in before it
+      // shipped. URLs only: a player substitutes nothing in an AdTitle, so
+      // "Big [SALE]" there is a title, not an unfilled template. The list
+      // lives in ../spec.ts (ADR-0035), from IAB's own macro data.
       const offenders = new Map<string, { path: string; line?: number }>();
       for (const node of walkAll(ctx.root)) {
+        if (!URL_ELEMENT_SET.has(node.name)) continue;
         for (const macro of macrosIn(node.text)) {
-          if (!PLAYER_SUBSTITUTED.has(macro) && !offenders.has(macro)) {
+          if (!PLAYER_SUBSTITUTED_MACROS.has(macro) && !offenders.has(macro)) {
             offenders.set(macro, { path: node.path, line: node.line });
           }
         }

@@ -5,8 +5,15 @@ import { TEXT, TINT } from "@/components/ui/State";
  * macros, and timecodes, where every character matters (docs/design-system.md §4).
  * No `outline-none`: the focus ring is the one thing a control may never lose.
  */
-export const inputClass =
-  "w-full min-h-11 rounded-ctl border border-line bg-surface px-2.5 py-1.5 type-data text-fg placeholder:text-fg-muted";
+export const inputBaseClass =
+  "min-h-11 rounded-ctl border border-line bg-surface px-2.5 py-1.5 type-data text-fg placeholder:text-fg-muted";
+
+/**
+ * Full width, the default. A control that needs another width takes
+ * `inputBaseClass` and its own: Tailwind orders `w-*` utilities by name, not by
+ * their place in the attribute, so `w-full` here would beat a `w-28` after it.
+ */
+export const inputClass = `w-full ${inputBaseClass}`;
 
 export function Field({
   label,

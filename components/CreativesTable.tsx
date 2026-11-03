@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCdnUrl } from "@/lib/site";
+import { vastTagUrl } from "@/lib/site";
 import { LOCALE_TAG, type Dict, type Locale } from "@/lib/i18n/dictionaries";
 import { CopyButton } from "@/components/CopyButton";
 import { DeleteCreativeButton } from "@/components/DeleteCreativeButton";
@@ -58,11 +58,11 @@ export function CreativesTable({
         <TableHead>
           <th className={HEAD}>{dict.dashboard.creativeName}</th>
           <th className={`${HEAD} w-px`}>{dict.dashboard.format}</th>
-          {/* Impressions and clicks only. Viewability is VPAID-only, and
-              this list mixes formats — a column that is structurally N/A
-              for some rows would print a ragged em dash with nowhere to
-              put the qualifier §6 requires. It lives on the detail page,
-              in its own strip. */}
+          {/* Impressions and clicks only. Viewability exists for VPAID and
+              for a VAST video creative from 4.0, and this list mixes formats
+              — a column that is structurally N/A for some rows would print a
+              ragged em dash with nowhere to put the qualifier §6 requires. It
+              lives on the detail page, in its own strip. */}
           <th className={`${NUM_HEAD} w-px`}>{dict.dashboard.impressions}</th>
           <th className={`${NUM_HEAD} w-px`}>{dict.dashboard.clicks}</th>
           <th className={`${HEAD} w-px`}>{dict.dashboard.status}</th>
@@ -71,7 +71,7 @@ export function CreativesTable({
         </TableHead>
         <tbody>
           {rows.map((r) => {
-            const tag = `${getCdnUrl()}/v?creative_id=${r.id}`;
+            const tag = vastTagUrl(r.id);
             return (
               <tr key={r.id} className={ROW}>
                 <td

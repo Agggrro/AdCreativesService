@@ -131,6 +131,34 @@ const EXPECTATIONS = [
     rules: ["VAST-child-order-inline"],
   },
   {
+    // 2.0 and 3.0 are judged by their own XSD's sequence (ADR-0035). Before
+    // that, both of these correct tags drew VAST-child-order-inline for opening
+    // AdSystem → AdTitle, which is exactly what their schemas require — and the
+    // VAST generator, which emits 2.0 and 3.0, would have failed its own
+    // validator on every one.
+    file: "clean-inline-20.xml",
+    verdict: "pass",
+    maxErrors: 0,
+    maxWarnings: 0,
+    absent: ["VAST-child-order-inline"],
+  },
+  {
+    file: "clean-inline-30.xml",
+    verdict: "pass",
+    maxErrors: 0,
+    maxWarnings: 0,
+    absent: ["VAST-child-order-inline"],
+  },
+  {
+    // The other side of the same rule: a 3.0 tag in the 4.x order is out of
+    // order *for 3.0*, and a strict 3.0 parser rejects it.
+    file: "order-30-in-4x.xml",
+    verdict: "warn",
+    maxErrors: 0,
+    maxWarnings: 1,
+    rules: ["VAST-child-order-inline"],
+  },
+  {
     file: "malformed.xml",
     verdict: "fail",
     rules: ["VAST-xml-well-formed"],

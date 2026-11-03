@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.2">
+  <Ad id="11111111-2222-4333-8444-555555555555">
+    <InLine>
+      <AdSystem version="1.0">CreoSmith</AdSystem>
+      <Error><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=error&exp=1791032400&sig=7k9JMXDsrrsgQayzrcERYlB-JP_JXGs4Odb3kVU1mbQ&code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=impression&exp=1791032400&sig=M_2tWRJ42mC6qNnJ3jIkKeIewR4Pn5b98zckbD70tZo]]></Impression>
+      <AdServingId>11111111-2222-4333-8444-555555555555</AdServingId>
+      <AdTitle><![CDATA[CreoSmith Interactive Creative]]></AdTitle>
+      <Creatives>
+        <Creative id="11111111-2222-4333-8444-555555555555" sequence="1">
+          <Linear>
+            <AdParameters><![CDATA[{"imageUrl":"https://media.smithcdn.net/u/p.png","width":640.5,"durationSeconds":30,"viewableTrackingUrl":"https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=viewable&exp=1791032400&sig=I6bmh91YD3O35AeKbyvndhsVJiAQojThpPExbTeFR10"}]]></AdParameters>
+            <Duration>00:00:30</Duration>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="application/javascript" apiFramework="VPAID" width="640" height="360"><![CDATA[https://media.smithcdn.net/runtime/quiz/vpaid.8eeec37b.js]]></MediaFile>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickTracking><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=click&exp=1791032400&sig=UkADMYRzgEBgKIs72YYWrQGsHBsgo_SgxGgX8xCMlH0]]></ClickTracking>
+            </VideoClicks>
+          </Linear>
+          <UniversalAdId idRegistry="creosmith">11111111-2222-4333-8444-555555555555</UniversalAdId>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

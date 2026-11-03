@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.2">
+  <Ad id="11111111-2222-4333-8444-555555555555">
+    <InLine>
+      <AdSystem version="1.0">CreoSmith</AdSystem>
+      <Error><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=error&exp=1791032400&sig=udK-qPAQtonlnqpqynype-vvCc08TsqxkNEpRVSUnjI&code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=impression&exp=1791032400&sig=lyOQiFyXJ2ZQhVu4QotpOKOgg4oirxE-Hb8y-EU6pHc]]></Impression>
+      <ViewableImpression id="11111111-2222-4333-8444-555555555555">
+        <Viewable><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=viewable&exp=1791032400&sig=zAGZUcxDAXkkrUZtiU3EukhYqU4rarTOoKJCOsTS6Mk]]></Viewable>
+      </ViewableImpression>
+      <AdServingId>11111111-2222-4333-8444-555555555555</AdServingId>
+      <AdTitle><![CDATA[Spring sale]]></AdTitle>
+      <Creatives>
+        <Creative id="11111111-2222-4333-8444-555555555555" sequence="1">
+          <Linear>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=start&exp=1791032400&sig=7c7FdNuWgoxm1QgQFcQmdzIAF7D5ZEQ0ZN1QGCzhplc]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=q25&exp=1791032400&sig=VsK9K3i1RJGzCtKJpR6VjyLiaVWhTeUmSZ_s0hCeMdA]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=q50&exp=1791032400&sig=BcEDrQ_NvdOLbIaxjrZxGHdbR_UPs8uwjrbWN2mnuYA]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=q75&exp=1791032400&sig=OT11_m5NkoO57kDPnVRYDHmkEyq5S4Z5DoQ-NTua8xo]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=complete&exp=1791032400&sig=kKvdNEHPuKzXAHHRfmhthQMhteIrczJmEgXNvL0OKZw]]></Tracking>
+            </TrackingEvents>
+            <Duration>00:00:15.000</Duration>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="1280" height="720" bitrate="800" scalable="true" maintainAspectRatio="true"><![CDATA[https://media.smithcdn.net/66666666-7777-4888-9999-aaaaaaaaaaaa/0f0f0f0f-1e1e-4d2d-8c3c-4b4b4b4b4b4b.mp4]]></MediaFile>
+            </MediaFiles>
+            <VideoClicks>
+              <ClickTracking><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=click&exp=1791032400&sig=ehh5WtIjJ9x_dtQ0XkjxxPpka5Nmb9yfArHg6Z9OC6Q]]></ClickTracking>
+            </VideoClicks>
+          </Linear>
+          <UniversalAdId idRegistry="creosmith">11111111-2222-4333-8444-555555555555</UniversalAdId>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

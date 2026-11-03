@@ -61,6 +61,12 @@ jobs:
       - run: npm run test:media
       - run: npm run test:postback
       - run: npm run test:click
+      - run: npm run test:auth
+      # The only check of the orders below InLine (ADR-0035): every golden —
+      # video, SIMID, VPAID — against IAB's XSDs, fetched at a pinned commit, so
+      # a golden rewritten with UPDATE_GOLDEN=1 cannot pass here without also
+      # being schema-valid.
+      - run: npm run check:vast-xsd
 
       # The ad Worker bundles: an import that only resolves under Next (or not
       # at all in a Worker) fails here, before the deploy job, not in production.

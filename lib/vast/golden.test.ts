@@ -151,6 +151,38 @@ test("SIMID document with an OMID verification node, byte for byte", () => {
   });
 });
 
+/**
+ * The branches the full row never takes, so the schema check sees them too: an
+ * image-only unit (one MediaFile, no base video), no destination (VideoClicks
+ * is ClickTracking alone), and owner-written numbers the XSD would refuse — a
+ * fractional width, a day of seconds — which fall back to the defaults
+ * (lib/vast/config.ts).
+ */
+const VPAID_MINIMAL_ROW = serving({
+  config_json: { imageUrl: "https://media.smithcdn.net/u/p.png", width: 640.5, durationSeconds: 90_000 },
+  click_fields: [],
+});
+
+test("minimal VPAID document, byte for byte", () => {
+  withSecrets({ preview: "golden-preview-secret" }, () => {
+    golden(
+      "vpaid-minimal.xml",
+      build(VPAID_MINIMAL_ROW, "https://media.smithcdn.net/runtime/quiz/vpaid.8eeec37b.js"),
+    );
+  });
+});
+
+test("interactive documents carry no TrackingEvents: their runtime reports, not the player (ADR-0016)", () => {
+  // Pinned apart from the goldens, which UPDATE_GOLDEN=1 could re-approve with
+  // a regression in them; a progress signature exists only for a video creative.
+  withSecrets({ preview: "golden-preview-secret" }, () => {
+    const vpaid = build(VPAID_ROW, "https://media.smithcdn.net/runtime/quiz/vpaid.8eeec37b.js");
+    const { token } = signInteractiveToken("shoppable/simid/index.html", "simid");
+    const simid = build(SIMID_ROW, `${SITE}/c/s/${token}`);
+    for (const xml of [vpaid, simid]) assert.ok(!xml.includes("<TrackingEvents"), "no TrackingEvents");
+  });
+});
+
 test("a dedicated TRACK_TOKEN_SECRET changes the beacon key, not the document's shape", () => {
   withSecrets({ preview: "golden-preview-secret", track: "golden-track-secret" }, () => {
     golden(

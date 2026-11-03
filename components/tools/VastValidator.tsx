@@ -19,6 +19,7 @@ import {
   ValidatorStage,
   type ResolvedAd,
 } from "@/components/validator/ValidatorStage";
+import { WellFrame, WellIdle } from "@/components/validator/WellFrame";
 import { IMA_SDK_SRC } from "@/components/players/load-ima-sdk";
 import type { PlayerEvent } from "@/components/players/types";
 // Per-module import: the @/lib/vast-inspect barrel reaches node:dns via the
@@ -139,7 +140,11 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
       });
       const data = (await response.json()) as InspectReport | { error: string };
       if (!response.ok || "error" in data) {
-        setError("error" in data ? data.error : t.errRequest);
+        // The route's own `error` is an English sentence for developers; the
+        // interface speaks the visitor's language (CLAUDE.md, rule 7).
+        setError(
+          response.status === 413 ? t.errTooLarge : response.status === 400 && mode === "url" ? t.errBadUrl : t.errRequest,
+        );
         // Nothing will ever be handed to the player, so take the stage down
         // rather than leaving a black rectangle waiting on a document.
         setRunToken(0);
@@ -181,29 +186,27 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
           track at the container and lets the table scroll inside its own box. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className="flex flex-col gap-2">
-          {/* The player well (§7) — separated by elevation and a hairline, not by being
-              darker than the page. Clipping lives on the inner
-              screen rectangle, not here — same shape as PreviewPanel, so a focus
-              ring inside the well is never cut off (§3). */}
-          <div className="rounded-well border border-well-line bg-well p-3">
-            {/* Serving well, not demo well: a real ad request happened, so the
-                strip states the fixed facts of that request (§7). Both values
-                come from the report, so nothing is fabricated — which is what §7
-                forbids on a well that made no request. */}
-            <div className="flex items-center justify-between gap-3 pb-3">
-              <span className="chip-instr text-well-fg">
-                {t.standard} · {standardLabel}
-              </span>
-              {report?.chain[0]?.elapsedMs ? (
-                <span className="inline-flex items-center gap-1.5 text-well-live">
-                  <span className="size-1.5 rounded-full bg-well-live" />
-                  <span className="chip-instr">
-                    {t.responded} · {report.chain[0].elapsedMs} {t.ms}
-                  </span>
+          {/* Serving well, not demo well: a real ad request happened, so the
+              strip states the fixed facts of that request (§7). Both values
+              come from the report, so nothing is fabricated — which is what §7
+              forbids on a well that made no request. */}
+          <WellFrame
+            strip={
+              <>
+                <span className="chip-instr text-well-fg">
+                  {t.standard} · {standardLabel}
                 </span>
-              ) : null}
-            </div>
-
+                {report?.chain[0]?.elapsedMs ? (
+                  <span className="inline-flex items-center gap-1.5 text-well-live">
+                    <span className="size-1.5 rounded-full bg-well-live" />
+                    <span className="chip-instr">
+                      {t.responded} · {report.chain[0].elapsedMs} {t.ms}
+                    </span>
+                  </span>
+                ) : null}
+              </>
+            }
+          >
             {started ? (
               <ValidatorStage
                 key={runToken}
@@ -215,15 +218,9 @@ export function VastValidator({ initialTag = "" }: { initialTag?: string }) {
                 onUnavailable={() => setSandboxMissing(true)}
               />
             ) : (
-              <div className="flex aspect-video w-full items-center justify-center rounded-ctl bg-well-screen px-6">
-                {/* Human prose, so sans at the caption role — the well's mono is
-                    for machine readouts, not for sentences (§4, §7). */}
-                <p className="max-w-[52ch] text-center type-caption text-well-fg">
-                  {t.wellIdle}
-                </p>
-              </div>
+              <WellIdle>{t.wellIdle}</WellIdle>
             )}
-          </div>
+          </WellFrame>
 
           {sandboxMissing && <Notice tone="dead">{t.sandboxUnavailable}</Notice>}
 

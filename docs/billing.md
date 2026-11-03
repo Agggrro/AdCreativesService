@@ -47,6 +47,12 @@ covered = (plan_type = 'all_access')
        OR (plan_type = 'single' AND subscription.template_id = creative.template_id)
 ```
 
+A **VAST video creative** ([ADR-0035](decisions/0035-vast-video-creatives.md)) is a
+row under the system template `vast_video`, which is published like any other, so the
+rule covers it unchanged: an `all_access` grant serves it, and a revoke empties its tag
+— to an empty VAST at the version the creative declares. Neither copy of the predicate
+knows the kind exists.
+
 This boolean is **denormalized into the serving record** so the VAST path never calls
 anything and never does a live join. See [architecture.md](architecture.md).
 
@@ -80,7 +86,7 @@ so a change to `subscriptions` is invisible to the kill-switch until the publish
 
 | Row state | VAST endpoint |
 | --- | --- |
-| `active` / `trialing`, not expired, covers template | serves interactive payload |
+| `active` / `trialing`, not expired, covers template | serves its payload — the interactive unit, or a video creative's document |
 | `past_due` | serves empty/fallback |
 | `canceled` / expired (`current_period_end` passed) | serves empty/fallback |
 | no covering row (never granted, or revoked) | serves empty/fallback |

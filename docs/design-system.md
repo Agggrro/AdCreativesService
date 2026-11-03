@@ -138,9 +138,10 @@ exemption covers exactly three things:
   budget is the rule mis-applied;
 - the **active-section marker** (the underline on desktop, the coloured row in the mobile
   panel — the same marker in two layouts);
-- the **single sign-up action for a signed-out visitor**. There is one of it in the whole
-  app, it is the product's only conversion action, and both reference sites this system
-  was measured against fill theirs. A signed-in bar has no such button, so this costs
+- the **single sign-up action for a signed-out visitor** — in the bar, or below `xs` in
+  the mobile panel: one action in two layouts, never both visible, like the section marker
+  above. There is one of it in the whole app, it is the product's only conversion action,
+  and both reference sites this system was measured against fill theirs. A signed-in bar has no such button, so this costs
   nothing on the surfaces where the budget is tightest.
 
 Nothing else. The language control is not a task action and must not be accent-filled,
@@ -251,8 +252,8 @@ viewport width and wrong at every other.
   | --- | --- | --- |
   | `narrow` | `416px` | A single-column panel: sign-in, sign-up, anything whose form is the whole page |
   | `prose` | `68ch` | Documentation-like pages, legal copy |
-  | `default` | `1200px` | Dashboard, catalog, tool pages |
-  | `wide` | `1440px` | Marketing sections with grids |
+  | `default` | `1200px` | Dashboard pages |
+  | `wide` | `1440px` | Marketing sections with grids, the catalog, and the free tools — a well beside a form needs the width |
   | `full` | none (padding only) | A section that must reach both edges |
 
 - **Colour owns the monitor, not text width.** Section backgrounds run **full-bleed**
@@ -263,11 +264,13 @@ viewport width and wrong at every other.
   answer to a wide display — banding is. `ui/Section.tsx` exists for exactly this and is
   the only place a full-bleed background is declared.
 - **Every surface is responsive, and that includes the wide end.** Breakpoints
-  `sm` 640 · `md` 768 · `lg` 1024 · `xl` 1280 · `2xl` 1536. A page must be checked at
-  390 / 768 / 1280 / 1920 / 2560 before it ships. A layout that only exists at one width
-  is unfinished.
+  `xs` 384 · `sm` 640 · `md` 768 · `lg` 1024 · `xl` 1280 · `2xl` 1536. `xs` is ours, a
+  token in `app/globals.css`'s `@theme`, and has one use: the top bar's sign-up placement
+  (§6, "Mobile navigation"). A page must be checked at 360 / 390 / 768 / 1280 / 1920 /
+  2560 before it ships — 360 because a phone that narrow is common and `xs` changes the
+  bar below 384. A layout that only exists at one width is unfinished.
 - **Navigation must survive every width.** There is no width at which the nav simply
-  disappears; below `sm` it becomes a disclosure panel, not nothing.
+  disappears; below `lg` it becomes a disclosure panel, not nothing.
 - The spec-sheet grid — a `168px` label gutter plus a fluid content column — is the
   default for **wide** settings and documentation-like screens. Two kinds of form stack the
   label above the field instead: panels narrower than ~520px (the auth panels), and the
@@ -517,15 +520,35 @@ There is no `/tools` index page.
 
 ### Mobile navigation
 
-Below `sm` the section links collapse into a disclosure panel behind a labelled trigger.
+Below `lg` the section links collapse into a disclosure panel behind a labelled trigger.
 **They do not disappear.** The previous system hid them outright at 640px with no
 replacement, which left a phone visitor with a brand mark and nothing to navigate with.
+
+**Why `lg`, measured** (2026-11-03, labels that never wrap — `navItemClass` is
+`whitespace-nowrap`): the full bar needs 768px signed out and 832px signed in, in Russian,
+the longer locale; collapsing at `sm`, as the bar once did, overlapped the language
+control and the Tools trigger from 640 to 768 and wrapped «Мои креативы» onto two lines.
+`lg` is the first standard breakpoint above both. The signed-in account's email joins the
+bar from `xl`: at `lg` it was the 4px a Russian admin's bar overlapped by.
 
 - The trigger is a 44px touch target carrying `aria-expanded` and `aria-controls`.
 - The panel is a full-width sheet under the bar: `bg-surface`, hairline top and bottom,
   44px rows, the same links as the desktop nav plus the auth actions.
 - `Escape` closes and returns focus to the trigger.
 - An icon may accompany the trigger but never replaces its label (§10).
+- **What the bar keeps.** Below `lg` the bar carries the lockup, a signed-out visitor's
+  sign-up action and the trigger; sign-in, the language control and the account move into
+  the panel. **Below `xs` — the 360 and 375 phones — the sign-up action moves into the
+  panel too**: the English label met the wordmark by 4px at 375 and by 19px at 360,
+  measured with overlay scrollbars as on a phone. The panel shows it only where the bar
+  dropped it (`max-xs:hidden` in the bar, `xs:hidden` in the panel — one token, so the
+  pair cannot drift), so each action has one placement at any width. The lockup itself
+  never shrinks to the monogram: it is one object ("Brand lockup").
+- **Accepted, and to re-measure on any label change:** in English the bar runs tighter
+  than its declared 16px between the lockup and the actions from `xs` to about 395px — 5px
+  at 384, 11px at 390 — rather than send the sign-up action into the panel on the 390/393
+  phones most visitors carry. Nothing touches; Russian clears by 32px or more. A longer
+  label breaks this, and then `xs` moves, not the label's box.
 
 ### Site strip — the closed-beta notice
 
@@ -632,8 +655,10 @@ is the only thing a timeline is for.
 
 ### Segmented controls
 
-Language, delivery format, player backend, and the landing hero's template switcher all use
-the same shape: mono `chip` type, 1px `line` border, `surface-2` on the current segment,
+Language, delivery format, player backend, the landing hero's template switcher, the VAST
+generator's version picker and its on/off switches for an optional section (skip, AdChoices,
+OMID — the system has no checkbox, and a switch between two named states reads better than
+one) all use the same shape: mono `chip` type, 1px `line` border, `surface-2` on the current segment,
 hairline dividers between segments. The wrapper must **not** clip overflow — a focus outline
 drawn at 2px offset inside an `overflow-hidden` box is invisible. Round the first and last
 segment instead.
@@ -659,9 +684,10 @@ segmented template switcher above a single **demo well** (§7), then the primary
 
 ### Free tools — the public utility surface
 
-`/tools/vast-validator` and `/tools/vast-generator` are public, unauthenticated pages that
-exist to be found by someone with a broken ad tag
-([ADR-0013](decisions/0013-public-free-tools-section.md)). They are held to the same system
+`/tools/vast-validator` and `/tools/vast-generator` are public pages that exist to be found
+by someone with a broken ad tag, or one to make
+([ADR-0013](decisions/0013-public-free-tools-section.md)); the generator asks for an account
+only to save ([ADR-0036](decisions/0036-public-tool-that-saves.md)). They are held to the same system
 as the dashboard, with two points worth stating because the temptation to relax them is
 highest on a marketing-adjacent surface.
 
@@ -701,6 +727,45 @@ worse than one that omits it.
 
 The pasted-XML input is the one place the mono rule is load-bearing rather than aesthetic:
 it holds a VAST document, and a proportional face makes indentation unreadable.
+
+**The generator** ([ADR-0035](decisions/0035-vast-video-creatives.md),
+[ADR-0036](decisions/0036-public-tool-that-saves.md)) keeps the validator's frame and changes
+what sits in it, because its job is to make something rather than to judge it.
+
+- **The well is left and sticky from `lg`**, the form right: the form is long, and the
+  preview has to stay in view while it scrolls. Below `lg` both stack, well first, as on
+  the validator.
+- **The accent budget is one, spent on *Create creative*** — or *Sign in and create* for a
+  signed-out visitor, the same button with the same position. *Check and play* is a
+  secondary under the well: analysis and playback are still one click, but they are not
+  the page's verb.
+- **The form is the configurator's sections** (§6, "Configurator sections"): a fieldset per
+  section with an `h3` legend and a hairline rule, labels stacked above fields. A section a
+  version cannot carry is not rendered; a caption under the version picker names what
+  later versions add, and an `info` notice names what the draft holds that this version
+  leaves out — `info`, because nothing is wrong.
+- **The buyer's pixels are one list of rows**, each an event menu, a URL input and a
+  `Remove` word, with `Add pixel` as an `sm` secondary under it. No rail: a pixel row has
+  no state. The menu offers only the events the chosen version's XSD names. The rules a
+  URL must meet — https, only the macros a player substitutes — are a visible caption,
+  never a tooltip, and so is the three-banner cap; a row the current settings leave out
+  says so under itself.
+- **Our own trackers are stated, not configured**: one mono line of their element and event
+  names, under a `HelpLabel` saying they are always in the tag and counted.
+- **The XML is full width below**, in a scrollable mono `<pre>` that takes keyboard focus,
+  captioned as a preview whose tracking links are placeholders. Then the validator's
+  recommendations, when a check has run.
+- **Media fields take the scenario tile's states** (§6) at full width: `Choose file` and
+  `Link` words when empty; a frame one second in, the file's name and a mono readout —
+  type, size, duration, bitrate, megabytes — with `Replace` when filled; a linked file
+  shows its URL in mono where an upload shows its name. The link state departs from the
+  tile in one way: a type menu and an `Apply` word beside the input, and Enter applies
+  where blur does not — the check reads the file over the network, and a URL may carry no
+  extension to take the type from. Signed out, the upload word becomes `Sign in to upload
+  a file`, and does exactly that.
+- **A verdict belongs to the document it ran on.** Once the form changes the document,
+  the well returns to its idle screen, saying the tag changed since the check, and the
+  verdict and recommendations leave with it.
 
 ### Configurator sections and the outcome matrix
 
@@ -850,8 +915,10 @@ Counting rules, because a metric that lies costs more than a metric that is miss
   event is not ingested. Today the product records three delivery events
   ([ADR-0016](decisions/0016-three-events-hourly-counters.md)): **impression**, **click**
   (fired only from the final call-to-action that opens the advertiser's URL — never from an
-  intermediate interaction such as a quiz answer), and **viewable** (VPAID-only,
-  self-reported). Since [ADR-0033](decisions/0033-vast-error-statistics.md) it also counts
+  intermediate interaction such as a quiz answer), and **viewable** (self-reported by a
+  VPAID unit; reported by the player for a VAST video creative from 4.0). A VAST video
+  creative also records start, the three quartiles and complete
+  ([ADR-0035](decisions/0035-vast-video-creatives.md)). Since [ADR-0033](decisions/0033-vast-error-statistics.md) it also counts
   the player's **`<Error>` beacon, per VAST code**. There is still no count of ad requests, and an
   error often fires before any impression, so **error rate and fill rate may not appear on
   any screen**. CTR became derivable when click arrived and
@@ -904,6 +971,16 @@ Counting rules, because a metric that lies costs more than a metric that is miss
     language; "No goal", for conversions that came without one, is copy and sorts last. No
     rail — a goal has no state.
 
+- **A VAST video creative's progress is its own strip, under the delivery one**
+  ([ADR-0035](decisions/0035-vast-video-creatives.md)). Only that kind counts start, the
+  three quartiles and complete, so they cannot join the closed impression → click strip;
+  the strip is absent, not dashed, on an interactive creative's page. It reads start →
+  25% → 50% → 75% → complete, left to right as a player fires them, and is closed by
+  **VTR "completed, of impressions"** — the denominator named, all-time like the counts
+  beside it, the transient em dash with no impressions. VTR exists nowhere else: an
+  interactive creative ingests no progress event. Its viewability tile says *reported by
+  the player* from VAST 4.0 (its `<ViewableImpression>`), and *not applicable* below it,
+  with the version named.
 - **VAST errors are their own section, not a delivery tile**
   ([ADR-0033](decisions/0033-vast-error-statistics.md)). An error is not a step in
   impression → click. It is a total tile, shaped like the viewability tile, whose caption
@@ -1099,14 +1176,15 @@ Movement is slow and few. Nothing bounces, nothing springs.
 | ✕ | Warm red for errors. The alarm is cold `#EE8089`, or it stops being an alarm. |
 | ✕ | Card grids where a table belongs. The catalog is the one grid, and only because a template has no state. |
 | ✕ | A live creative running anywhere but a player well, or more than one live unit on a page. The VPAID host is a single global — the second unit overwrites the first. |
-| ✕ | Derived-ratio metrics without the counts they come from. VTR and fill rate are barred outright — their events are not ingested — and so is error rate: errors are counted, but ad requests are not, and an error often fires before any impression (ADR-0033). CTR is permitted since ADR-0016 made click a real count, but only with its denominator stated (§6). |
+| ✕ | Derived-ratio metrics without the counts they come from. Fill rate is barred outright — ad requests are not counted — and so is error rate: errors are counted, but an error often fires before any impression (ADR-0033). CTR is permitted since ADR-0016 made click a real count, and VTR only on a VAST video creative's page, whose progress events ADR-0035 counts — both with their denominator stated (§6). |
 | ✕ | Raw Tailwind palette colours (`gray-200`, `green-100`, `blue-600`, …), or any literal hex, in `app/` or `components/`. Tokens only. §8 exempts `runtime/templates/**` and nothing else. |
 | ✕ | Arbitrary type sizes (`text-[13px]`) on content. Roles from §4, as utilities. The one place a literal size is correct is **inside a shared primitive that defines a documented control size** — `ui/Button.tsx`'s three label sizes, the top bar's brand and nav sizes. A control's size is part of its specification (§6), not a call site's opinion; a page reaching for a literal size is the defect this bans. |
 | ✕ | Rounded pills as a default shape. The radius scale in §2; `50%` only for the status dot and the two circles §2 names as circles by nature (the brand stage's halo, a drag knob). |
 | ✕ | Hard `<br>` inside a heading. Use `text-wrap: balance`. |
 | ✕ | Icon-only actions, no exceptions. Verbs label actions; an icon accompanies a word. Tried once as a data-table space-saving device and retracted: even a spec-correct 18px icon read as an indistinguishable speck once it had no word to lean on, confirmed twice from live screenshots and a DevTools inspection that ruled out a rendering bug — the icon was never the problem, having no label was. If a row's action cell is too narrow for labelled buttons, the fix is narrower *other* columns or a taller cell, not a smaller word. |
 | ✕ | Flags for language. |
-| ✕ | A layout that exists at one width. Every surface is checked at 390 / 768 / 1280 / 1920 / 2560. |
+| ✕ | A layout that exists at one width. Every surface is checked at 360 / 390 / 768 / 1280 / 1920 / 2560. |
+| ✕ | A base utility at a call site that sets a property the primitive already sets (`hidden` on a `Button`'s `inline-flex`, `w-28` on `inputClass`'s `w-full`, `h-9` on a button's `h-11`). Tailwind orders same-property utilities by name, not by their place in the attribute, so the call site's class simply loses — that is how Sign in, `hidden sm:inline-flex`, never hid and sat over the wordmark at 390. Use a variant, which is emitted after every base utility (`max-lg:hidden`), or a prop or a base class the primitive offers (`size`, `inputBaseClass`). |
 | ✕ | Motion that ignores `prefers-reduced-motion`, or a `transition` on `all`. |
 | ✓ | Density as respect: 44px rows, spacing in multiples of 4 — and the 32px readout density (§6) for system-emitted tables that are read as a stream rather than acted on. |
 | ✓ | State encoded in form as well as colour. |
@@ -1129,7 +1207,7 @@ Movement is slow and few. Nothing bounces, nothing springs.
 - Page structure goes through `ui/Container.tsx` and `ui/Section.tsx`. A hand-typed
   `max-w-[…]` on a page shell is a defect — that is how the previous system ended up with
   one width literal re-typed in eight files.
-- **Any new colour, radius, shadow, or type size is a change to this document first** — add
+- **Any new colour, radius, shadow, type size, or breakpoint is a change to this document first** — add
   the token here, then use it. That friction is what kept literal hex out of the components
   entirely, and it is the reason a whole-product repalette was a `@theme` edit rather than a
   sixty-file migration.

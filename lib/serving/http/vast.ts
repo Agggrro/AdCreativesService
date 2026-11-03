@@ -6,6 +6,10 @@ import { vastCorsHeaders, vastPreflightHeaders } from "@/lib/vast/cors";
 import { snapshotToServing } from "@/lib/serving/row";
 import { UUID_RE } from "@/lib/uuid";
 import { getCdnUrl } from "@/lib/site";
+import { VIDEO_FORMAT } from "@/lib/vast-gen/kind";
+import { serveVideo } from "@/lib/vast-gen/serve";
+import { declaredVersion } from "@/lib/vast-gen/validate";
+import type { VastVersion } from "@/lib/vast-inspect/model";
 import type { CreativeServing } from "@/types/database.types";
 import type { ServingPlatform } from "./platform";
 
@@ -69,9 +73,15 @@ function vastResponse(body: string, cors: Cors): Response {
   });
 }
 
-/** A settled "no ad": correct, stable, and cacheable for the normal window. */
-function noAd(cors: Cors): Response {
-  return vastResponse(emptyVast(), cors);
+/**
+ * A settled "no ad": correct, stable, and cacheable for the normal window.
+ *
+ * `version` is a VAST video creative's own (ADR-0035): a player that ingests
+ * only 2.0 may report an unsupported-version error for an empty 4.2 document
+ * rather than read it as no fill. Everything else answers 4.2, as before.
+ */
+function noAd(cors: Cors, version?: VastVersion): Response {
+  return vastResponse(emptyVast(version), cors);
 }
 
 /**
@@ -185,9 +195,12 @@ export async function handleVast(request: Request, platform: ServingPlatform): P
     if (loaded.status === "unavailable") return unavailable(cors);
 
     const serving = loaded.serving;
+    const isVideo = serving.selected_format === VIDEO_FORMAT;
 
     // Subscription gate: not entitled / not active => empty VAST.
-    if (!serving.should_serve) return noAd(cors);
+    if (!serving.should_serve) {
+      return noAd(cors, isVideo ? declaredVersion(serving.config_json) : undefined);
+    }
 
     // The ad domain, not the app domain (ADR-0018): every URL inside this
     // document — beacons, the SIMID document, the click links — inherits it, and
@@ -195,6 +208,15 @@ export async function handleVast(request: Request, platform: ServingPlatform): P
     // falls back to the app URL while NEXT_PUBLIC_CDN_URL is unset, which is what
     // makes the cutover reversible by unsetting one variable.
     const siteUrl = getCdnUrl();
+
+    // A VAST video creative (ADR-0035) is a document kind beside the adapter
+    // registry, not an adapter: no interactive unit to resolve, a document per
+    // declared version, and a config re-validated on every build (serveVideo).
+    // After the gate above, so it decides nothing about access.
+    if (isVideo) {
+      const video = serveVideo(serving, siteUrl);
+      return video.ok ? vastResponse(video.xml, cors) : noAd(cors, video.version);
+    }
 
     // Local HMAC, no network: building this document touches no Supabase
     // service at all. A failure here means the template has no asset for the

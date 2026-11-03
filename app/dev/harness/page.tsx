@@ -57,6 +57,8 @@ export default async function HarnessPage({
   const { data: rows, error } = await supabase
     .from("templates")
     .select("id, name, runtime_keys, config_schema, is_published")
+    // A system template (ADR-0035) has no VPAID unit to run.
+    .eq("in_catalog", true)
     .order("name");
 
   // Surfaced rather than swallowed: an empty `rows` from a failed read renders

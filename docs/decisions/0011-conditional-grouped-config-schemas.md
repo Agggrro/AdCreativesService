@@ -114,8 +114,9 @@ IMA is known to favour the VAST-level URL when one is present.** So:
   region without it. That trade is rejected.
   - **One caveat, stated because "never dead" is otherwise an overclaim:** the
     requirement lives in the template's `config_schema`, not in the serving path.
-    `lib/vast/builder.ts` omits `<VideoClicks>` when `clickThroughUrl` is absent and
-    `generateVast` still serves, so a row that predates the requirement — or a
+    `lib/vast/builder.ts` omits `<ClickThrough>` (keeping `<VideoClicks>` for its
+    `<ClickTracking>`) when `clickThroughUrl` is absent and `generateVast` still
+    serves, so a row that predates the requirement — or a
     hand-built config — would serve a click-to-nowhere ad. Every seeded template
     marks the field required, so no configurator-built creative can reach that
     state; enforcing it in `generateVast` (or an adapter's `isServable`) is the

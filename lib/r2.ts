@@ -88,9 +88,16 @@ export async function presignUpload(
   return signed.url;
 }
 
+/** Per-request ceiling on a HEAD, which runs while a user waits on a save (ADR-0035). */
+const HEAD_TIMEOUT_MS = 5000;
+
 /** The size of an object in bytes, or null when there is none. Throws when R2 cannot say. */
 export async function objectSize(r: R2, key: string): Promise<number | null> {
-  const res = await r.client.fetch(objectUrl(r, key), { method: "HEAD" });
+  // Bounded for the same reason as the delete: someone is waiting on a save.
+  const res = await r.client.fetch(objectUrl(r, key), {
+    method: "HEAD",
+    signal: AbortSignal.timeout(HEAD_TIMEOUT_MS),
+  });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`R2 HEAD ${res.status}`);
   return Number(res.headers.get("content-length") ?? NaN);

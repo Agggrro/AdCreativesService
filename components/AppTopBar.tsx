@@ -46,10 +46,12 @@ export async function AppTopBar() {
       right={
         user ? (
           <>
-            <span className="data-instr hidden type-small text-fg-muted lg:inline">
+            {/* From `xl`: at `lg` the address was the 4px a Russian admin's bar
+                overlapped by. Below `lg` it is in the panel. */}
+            <span className="data-instr hidden type-small text-fg-muted xl:inline">
               {user.email}
             </span>
-            <form action={signOut} className="hidden sm:block">
+            <form action={signOut} className="hidden lg:block">
               <Button type="submit" variant="ghost">
                 {dict.common.signOut}
               </Button>
@@ -58,15 +60,25 @@ export async function AppTopBar() {
         ) : (
           <>
             {/*
-              The secondary action drops below `sm` and the primary one stays:
-              on a 390px bar there is room for one, and the one worth keeping is
-              the one the page exists to produce. Sign-in moves into the menu
-              panel rather than disappearing — see `mobileAccount`.
+              The secondary action drops below `lg` and the primary one stays:
+              on a compact bar there is room for one, and the one worth keeping
+              is the one the page exists to produce — down to `xs`, below which
+              not even that fits. Sign-in moves into the menu panel rather than
+              disappearing — see `mobileAccount`.
             */}
-            <LinkButton href="/login" variant="ghost" className="hidden sm:inline-flex">
+            {/* `max-lg:hidden`, not `hidden lg:inline-flex`: the button's own
+                `inline-flex` is emitted after `hidden` (Tailwind orders same-
+                property utilities by name), so that pair never hid it, and at
+                390px Sign in sat over the wordmark. A variant is emitted after
+                every base utility, so it wins. */}
+            <LinkButton href="/login" variant="ghost" className="max-lg:hidden">
               {dict.common.signIn}
             </LinkButton>
-            <LinkButton href="/signup" variant="primary">
+            {/* Below `xs` (24rem, app/globals.css) — the 360 and 375 phones —
+                even the one action does not fit beside the wordmark: the
+                English label met it by 4px at 375 and 19px at 360. It moves
+                into the panel there, below. */}
+            <LinkButton href="/signup" variant="primary" className="max-xs:hidden">
               {dict.common.getStarted}
             </LinkButton>
           </>
@@ -74,7 +86,8 @@ export async function AppTopBar() {
       }
       /*
        * The same actions again, for the menu panel. Everything in `right` above
-       * is hidden below `sm` because a 390px bar cannot hold it, and without a
+       * but the sign-up action is hidden below `lg` because a compact bar cannot
+       * hold it (sign-up below `xs`), and without a
        * second home a signed-in visitor on a phone had **no way to sign out at
        * all** — the account cluster was simply gone. The bar and the panel never
        * show the same control at the same width, so this is two placements of
@@ -93,9 +106,16 @@ export async function AppTopBar() {
             </form>
           </>
         ) : (
-          <LinkButton href="/login" variant="secondary" className="w-full">
-            {dict.common.signIn}
-          </LinkButton>
+          <>
+            <LinkButton href="/login" variant="secondary" className="w-full">
+              {dict.common.signIn}
+            </LinkButton>
+            {/* Only where the bar dropped it (below `xs`): one placement of
+                the sign-up action at any width, never two. */}
+            <LinkButton href="/signup" variant="primary" className="w-full xs:hidden">
+              {dict.common.getStarted}
+            </LinkButton>
+          </>
         )
       }
     />

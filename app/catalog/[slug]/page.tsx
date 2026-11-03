@@ -26,6 +26,8 @@ export default async function TemplatePage({
       .select("id, name, description, type, supported_standards, runtime_keys, config_schema")
       .eq("type", slugToType(slug))
       .eq("is_published", true)
+      // A system template (ADR-0035) has no catalog page of its own.
+      .eq("in_catalog", true)
       .maybeSingle(),
     supabase.auth.getUser(),
   ]);

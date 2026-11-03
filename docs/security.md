@@ -24,6 +24,8 @@
 | Browser → R2 media upload (`requestMediaUpload`, then a PUT to R2) | Signed-in dashboard users, uploading straight to Cloudflare R2 with a presigned URL (no app server in the byte path) | The server action is the gate: it checks the session, the MIME allow-list (`Object.hasOwn`, so no prototype names) and the 25 MB cap, mints the key under the caller's own prefix, and signs **type and size** into a 5-minute URL — R2 answers any other body `403`. The browser never names the key. The bucket is deliberately public-read, at `media.smithcdn.net`. See [ADR-0028](decisions/0028-creative-media-on-r2.md) |
 | Browser → `creative-media` Storage upload | Signed-in dashboard users, uploading directly to Supabase Storage — only on a deployment without the R2 variables | RLS-gated to the uploader's own `auth.uid()` path prefix (write); bucket is deliberately public-read. Bucket-level `file_size_limit`/`allowed_mime_types` is the authoritative validation gate, not the client. See [ADR-0010](decisions/0010-advertiser-media-uploads.md) |
 | `POST /api/tools/vast/inspect`, `GET /api/tools/vast/hop` | The open internet, and **an arbitrary third-party host the caller names** | Public, unauthenticated, no rate limit. This is the only outbound-fetch boundary in the product — see "Outbound fetches to untrusted URLs" below |
+| `/tools/vast-generator` and its save actions (`createVideoCreative`, `updateVideoCreative`) | Anyone, to configure and preview; signed-in users, to save | The page is public and builds its preview in the browser with inert, unsigned placeholders — no new public endpoint. The actions re-derive the user from the session, re-run `parseVideoConfig` in `save` mode, HEAD every upload in R2, and refuse a document our own validator flags. See "VAST video creatives" below and [ADR-0035](decisions/0035-vast-video-creatives.md), [ADR-0036](decisions/0036-public-tool-that-saves.md) |
+| `next` and `error` on `/login`, `/signup`, `/auth/callback` | Anyone who can make a link | Attacker-controlled by construction. `lib/safe-next.ts` admits only a same-site path under `/tools/vast-generator` or `/dashboard`, checked at every hop — the sign-in page is never an open redirect ([ADR-0036](decisions/0036-public-tool-that-saves.md)). `error` is a code of ours, never Supabase's message: the actions write it through `authErrorCode`, the pages read it back through `parseAuthErrorCode` and print a dictionary sentence (`lib/auth-errors.ts`). No query text is echoed, so a link cannot put its own sentence — "your account is blocked, call …" — into our sign-in page's alarm notice |
 
 ## Secrets
 
@@ -88,6 +90,7 @@
   objects there, which no tag names — the committed manifest decides what is served,
   and `runtime:push` checks each served unit's bytes against its hash.
   Used only by `lib/r2.ts`: signing uploads (`requestMediaUpload`), `deleteCreative`,
+  the VAST video save actions' size check (a HEAD per upload, ADR-0035),
   `npm run media:migrate`, and `npm run runtime:push`. The remedy
   for a leak is to roll the token in the Cloudflare dashboard. The access key id is
   not a secret — every presigned upload URL carries it in `X-Amz-Credential` — and
@@ -185,6 +188,65 @@ rename to do it.
   per creative stay bounded at 9,901; the table's check constraint is the second lock. The
   error numbers are read as player-reported, which they are either way.
 
+- **Progress beacons exist for VAST video creatives only** (ADR-0035). `/t` maps
+  `start`, `q25`, `q50`, `q75` and `complete` without asking what kind the creative is,
+  because it does not need to: the signature binds `(creative_id, event)`, and those URLs
+  are minted only into a video creative's document. For an interactive creative a valid
+  progress signature does not exist, so its counters cannot be filled by a third party
+  any more than its impressions can.
+
+## VAST video creatives (ADR-0035)
+
+A VAST video creative is a config the owner writes and a document a stranger's player
+executes on a publisher's page, so every value in it is untrusted twice: on the way in,
+and on every serve.
+
+- **Validated again on every serve.** An owner can PATCH their own `config_json` through
+  PostgREST, past every server action (see "Column grants on `creatives`"), so
+  `parseVideoConfig` runs in `serve` mode each time `/v` builds the document. An invalid
+  optional part is dropped; an invalid required one — the media, the title — is a cached
+  empty VAST. The builder escapes every value regardless: validation decides what is
+  allowed, `escapeXml`/`cdata` keep an allowed value from becoming markup.
+- **URLs.** Pixels, linked media and the OMID script are `https` only; destinations
+  `http(s)`; no script scheme (`isScriptUrl`), no whitespace or control character, no
+  credentials (`https://creosmith.com@elsewhere.example` reads as ours and is not; a
+  browser will not send a pixel carrying them), no backslash (WHATWG reads it as `/`, a
+  stricter parser does not, so the two would see different hosts), and no `<` or `>` —
+  which also keeps `]]>`, the one sequence CDATA cannot hold, out of every URL we emit.
+- **Macros.** A buyer's pixel carries only the macros IAB's own macro data says a player
+  substitutes in *that kind* of pixel — `[ERRORCODE]` in an Error pixel, `[CLICKPOS]` in
+  a click pixel, the request-URI macros in none — and an error pixel must carry
+  `[ERRORCODE]`. **No macro may stand in the host:** the check reads a URL with its
+  macros replaced, so `https://192.168.1.[ADCOUNT]/p` would pass as a name and reach the
+  viewer's router once the player filled it in. The OMID script carries no macro at all,
+  and a click destination no bracket macro: it is reached through `/r`, where nobody
+  substitutes one.
+- **Hosts.** A URL may not point at a non-public IP literal, `localhost`, a reserved or
+  router suffix (`*.local`, `*.internal`, `*.home.arpa`, `*.localdomain`, `*.lan`, …), an
+  empty label or a single-label name — these are fetched by a *viewer's* browser, and
+  would otherwise aim our tag at the viewer's own network. A name that merely *resolves*
+  to a private address cannot be caught without DNS, and is not. Nor at our own hosts
+  (the app, the ad domain, the media host, the sandbox, the Supabase project, with
+  subdomains): a signed `/r` link copied out of someone else's tag and pasted as a
+  "tracker" would record clicks, for a day, on a creative its owner never served, and
+  another account's upload "linked" as your own file would serve under your tag. The address classifier is the fetcher's own
+  (`lib/vast-inspect/address.ts`), without Node, so the browser and the Worker share it.
+- **Media.** An upload must parse as one of our keys under the owner's own prefix and be
+  mp4/webm (video) or png/jpeg/gif (image) — at save and at serve. Saving HEADs the object
+  in R2, so no creative points at a missing file, and its size — with the bitrate — is
+  R2's, not the browser's; an upload that cannot be HEAD-ed (the legacy Supabase store, a
+  deployment without R2) is refused rather than saved on the browser's word. A linked file must not be on our hosts, and its declared type
+  must match its extension. The MediaFile never carries an `apiFramework`: a VAST video
+  creative cannot deliver script.
+- **The preview signs nothing.** The generator builds the document in the browser with
+  `previewBeacons` — `cid=preview`, which `/t` drops before any write — so the beacon key
+  never reaches a client, and a public page cannot be used to mint counters.
+- **Our own validator gates the save.** The action builds the document — click-throughs
+  routed through `/r` as on air, so it checks what a player will see — and runs the
+  inspector over it; any error or warning refuses the save. A tag our validator would flag
+  must not reach a DSP. The object stored is the validator's own output, held to the same
+  size cap `/v` holds it to, so a saved tag is never dark on its first serve.
+
 ## Click redirect and postbacks (`/r`, `/pb` — ADR-0023)
 
 - **The request cannot point `/r` anywhere.** The link carries `cid` and a field *name*;
@@ -214,13 +276,17 @@ rename to do it.
   redirects without recording, anything else — forged, missing, older — is `404`. A
   lapsed account's links therefore stop redirecting within eight days of its last served
   tag. The signature also covers the creative's **owner**, checked against the creative as
-  read at click time: an authenticated client can insert a creative with an id of its
-  choosing, so once a creative is deleted its id can be re-registered by another account,
-  and links collected while the old one was live then fail rather than redirect to the
-  newcomer's URL.
+  read at click time. That was written when an authenticated client could insert a
+  creative with an id of its choosing, so a deleted creative's id could be re-registered
+  by another account; links collected while the old one was live then fail rather than
+  redirect to the newcomer's URL. Since ADR-0035 the id is no longer client-writable (see
+  "Column grants on `creatives`" below), which closes the larger version of the same hole
+  — the *tag* itself served to the newcomer — and the owner binding stays as the second
+  lock.
 - **Signed under the beacon key, domain-separated.** `/r` signs `r:<field>` with
   `signTrackToken`; `/t` accepts only its event names (`impression`, `viewable`, `click`,
-  `error`) and `/r` only `r:<field>`, so
+  `error`, and since ADR-0035 `start`, `q25`, `q50`, `q75`, `complete`) and `/r` only
+  `r:<field>`, so
   neither route accepts the other's signature. The same residual gap as the beacons
   applies, and it is sharper here: anyone who fetched a tag holds day-long signed click
   links and can replay them. That can dilute click counts and CR — bounded by
@@ -490,6 +556,29 @@ strict: `requestMediaUpload` mints every key itself (the browser never names one
 `{uuid}/{uuid}.{ext}`, nothing a URL parser could normalize — under the caller's own
 `{userId}/` prefix. A looser parse there is a cross-tenant delete.
 
+### Column grants on `creatives`
+
+RLS decides which rows a client may write; it says nothing about which columns. Since
+ADR-0035 the table-level INSERT and UPDATE on `creatives` are revoked from the API roles
+and granted back per column, exactly what the app's actions write:
+
+- **insert** `user_id, template_id, name, selected_format, config_json, status`;
+- **update** `name, selected_format, config_json`.
+
+Two holes close with it. **`id` is not insertable**, so a client can no longer re-register
+a deleted creative's id: that tag is still pasted in its old owner's DSP, `/v` falls back
+to Postgres on the missing snapshot, and the newcomer would have been served on those
+placements and budget. **`template_id` and `user_id` are fixed at creation**, so a row
+cannot be re-pointed from an interactive template to the VAST video system template or
+back, which would hand each builder the other kind's config and carry its counters
+across.
+
+What the grants do *not* do is validate `config_json`: an owner can still PATCH their
+own config through PostgREST, past every server action. That is why a VAST video
+creative's config is parsed again on every serve (`lib/vast-gen`, ADR-0035), and why the
+interactive builder treats `config_json` as untrusted too. A new client-written column
+must be added to the grant in `supabase/schema.sql`, or every write that names it fails.
+
 ### Function EXECUTE: revoke by role name, not only from PUBLIC
 
 A `SECURITY DEFINER` function runs as its owner, so **who may call it is the whole
@@ -522,7 +611,7 @@ The rule now, stated once in the file header:
   privileges only shape objects created after them;
 - every function then grants back only the role that calls it:
   - `service_role` for ingest, serving and cron;
-  - `authenticated` for the eight owner-scoped dashboard reads;
+  - `authenticated` for the nine owner-scoped dashboard reads;
   - nothing for the trigger functions. EXECUTE on a trigger function is checked when
     the trigger is created, never when it fires.
 
@@ -534,13 +623,27 @@ select p.proname,
   from pg_proc p where p.pronamespace = 'public'::regnamespace order by 1;
 ```
 `anon` must be false everywhere. `authenticated` must be true only for
-`get_creative_overview`, `get_creative_errors`, `get_creative_conversions`,
-`get_creative_conversion_goals`, `ensure_postback_key`, `rotate_postback_key`,
-`has_postback_key` and `get_postback_log`. The query covers `public` only.
+`get_creative_overview`, `get_creative_errors`, `get_creative_video_funnel`,
+`get_creative_conversions`, `get_creative_conversion_goals`, `ensure_postback_key`,
+`rotate_postback_key`, `has_postback_key` and `get_postback_log`. The query covers
+`public` only.
 `private.is_entitled` sits behind the `private` schema's USAGE revoke. `service_role`
 keeps Supabase's default EXECUTE everywhere, which is harmless: it is the server's own
 key. A function an extension installs into `public` would show up here, and it needs
 its own decision.
+
+**And the column grants on `creatives`** (below), which do nothing if a table-level
+INSERT or UPDATE survived — one recorded under another grantor, say:
+```sql
+select has_table_privilege('authenticated', 'public.creatives', 'INSERT')                as tbl_ins,  -- f
+       has_table_privilege('authenticated', 'public.creatives', 'UPDATE')                as tbl_upd,  -- f
+       has_column_privilege('authenticated', 'public.creatives', 'id', 'INSERT')          as id_ins,   -- f
+       has_column_privilege('authenticated', 'public.creatives', 'template_id', 'UPDATE') as tpl_upd,  -- f
+       has_column_privilege('authenticated', 'public.creatives', 'user_id', 'UPDATE')     as uid_upd,  -- f
+       has_column_privilege('authenticated', 'public.creatives', 'status', 'UPDATE')      as st_upd,   -- f
+       has_column_privilege('authenticated', 'public.creatives', 'config_json', 'UPDATE') as cfg_upd,  -- t
+       has_any_column_privilege('anon', 'public.creatives', 'INSERT')                     as anon_ins; -- f
+```
 
 Counts written through the open RPCs before the fix cannot be told apart from real ones:
 the counters keep no per-hit record.

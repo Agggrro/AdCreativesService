@@ -28,8 +28,8 @@ export function freeTools(dict: Dict): ToolListing[] {
       href: "/tools/vast-generator",
       name: t.generatorName,
       description: t.generatorDescription,
-      tone: "idle",
-      state: t.stateSoon,
+      tone: "live",
+      state: t.stateAvailable,
     },
   ];
 }

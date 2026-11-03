@@ -39,7 +39,7 @@ export function TopBar({
   dict: Dict;
   brandHref: string;
   nav?: TopBarLink[];
-  /** The account cluster in the bar itself, from `sm` up. */
+  /** The account cluster in the bar itself, from `lg` up. */
   right?: React.ReactNode;
   /** The same actions for the mobile panel, where the bar has no room. */
   mobileAccount?: React.ReactNode;
@@ -85,20 +85,25 @@ export function TopBar({
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           {/*
-            Below `sm` the bar carries brand · primary action · menu. The language
-            control moves into the menu panel rather than being dropped — it is
-            reachable at every width, just not always in the bar.
+            Below `lg` the bar carries the lockup, a signed-out visitor's sign-up
+            action and the menu; below `xs` the lockup and the menu (AppTopBar).
+            The navigation, the language control and the account move into the
+            menu panel rather than being dropped — reachable at every width,
+            just not always in the bar.
 
-            This used to cite an 11px overflow at 390px. That figure was measured
-            against the previous lockup, which was 47.5px wide at `h-7`; the mark
-            is 39.9px now, so the number no longer reproduces. Re-measure before
-            citing one again.
+            Measured 2026-11-03, labels unwrapped, overlay scrollbars as on a
+            phone: the full bar fits from 768 signed out and from 832 signed in
+            (Russian, the longer locale), hence `lg`. At 390 the English sign-up
+            clears the wordmark by 11px, at 384 by 5px. What overlapped at 390
+            before was a Sign in that never hid — see docs/design-system.md §11.
           */}
-          <span className="hidden sm:flex">
+          <span className="hidden lg:flex">
             <LanguageSwitcher />
           </span>
           {right}
-          {nav.length > 0 && <MobileNav items={nav} account={mobileAccount} />}
+          {/* Below `lg` the panel is the only home of sign-in and the account,
+              so it mounts whenever it has either to hold. */}
+          {(nav.length > 0 || mobileAccount) && <MobileNav items={nav} account={mobileAccount} />}
         </div>
       </Container>
       {below}

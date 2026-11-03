@@ -1,68 +1,15 @@
 import { atLeast } from "../model";
+import { acceptedTrackingEvents } from "../spec";
 import { attr, descendants } from "../xml-tree";
 import { checkUrl, hit, macrosIn, SKIPOFFSET_RE, vast, type Rule } from "./kit";
 
 /**
- * The `event` values each version defines for <Tracking>. A player silently
- * ignores an event it does not recognise, which is the worst possible failure
- * mode: the tag looks fine and the metric is simply never reported.
+ * The `event` values each version defines for <Tracking> live in `../spec.ts`
+ * (ADR-0035), beside the strict XSD sets the VAST generator emits from. A player
+ * silently ignores an event it does not recognise, which is the worst possible
+ * failure mode: the tag looks fine and the metric is simply never reported.
  */
-/** The VAST 2.0.1 XSD enumeration, exactly. */
-const EVENTS_2_0 = [
-  "creativeView",
-  "start",
-  "midpoint",
-  "firstQuartile",
-  "thirdQuartile",
-  "complete",
-  "mute",
-  "unmute",
-  "pause",
-  "rewind",
-  "resume",
-  "fullscreen",
-  "expand",
-  "collapse",
-  "acceptInvitation",
-  "close",
-];
-
-/** The VAST 3 XSD enumeration, exactly. */
-const EVENTS_3_0 = [
-  ...EVENTS_2_0,
-  "exitFullscreen",
-  "skip",
-  "progress",
-  "closeLinear",
-  "acceptInvitationLinear",
-];
-
-/**
- * VAST 4.x. `otherAdInteraction` is 4.x, not 3.0 — listing it under 3.0 turned
- * a real finding into a false negative. `interactiveStart` was added by the 4.2
- * XSD and is precisely the event a SIMID creative fires, so its absence here
- * warned on a conformant tag in this product's own domain.
- */
-const EVENTS_4_X = [
-  ...EVENTS_3_0,
-  "otherAdInteraction",
-  "loaded",
-  "interactiveStart",
-  "playerExpand",
-  "playerCollapse",
-  "adExpand",
-  "adCollapse",
-  "minimize",
-  "overlayViewDuration",
-  "verificationNotExecuted",
-];
-
-function allowedEvents(version: string | undefined): string[] {
-  if (!version) return EVENTS_4_X;
-  if (version === "2.0") return EVENTS_2_0;
-  if (version === "3.0") return EVENTS_3_0;
-  return EVENTS_4_X;
-}
+const allowedEvents = acceptedTrackingEvents;
 
 /**
  * Every element whose text content is a URL a player will ping.

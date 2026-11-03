@@ -28,10 +28,8 @@ export const dynamic = "force-dynamic";
  * `/tools` itself isn't listed because it isn't a route any more — there is no
  * index page, only the two tool pages below it, reached from the top-bar
  * dropdown (`docs/design-system.md` §6, "Nav dropdown"). `/tools/vast-generator`
- * is absent too, and that is the sitemap agreeing with the `noindex` on the
- * page itself: it is a placeholder, and a thin "in development" page in the
- * index is a weak quality signal for the whole domain. It goes in when the
- * generator ships.
+ * is listed since the generator shipped (ADR-0035); while it was a placeholder
+ * it was absent here and `noindex` on the page, together.
  *
  * Catalog entries are read with a plain anon client — the same rows RLS grants
  * a signed-out visitor through `templates_select_published`, and no service-role
@@ -57,6 +55,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.9,
     },
+    {
+      url: `${base}/tools/vast-generator`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
   ];
 
   try {
@@ -70,7 +74,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const { data: templates } = await supabase
       .from("templates")
       .select("type, updated_at")
-      .eq("is_published", true);
+      .eq("is_published", true)
+      // A system template (ADR-0035) has no /catalog page to list.
+      .eq("in_catalog", true);
 
     return [
       ...staticPages,

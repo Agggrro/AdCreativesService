@@ -1,4 +1,5 @@
 import type { Json } from "../../types/database.types";
+import type { VastVersion } from "../vast-inspect/model";
 import type { VastBuildContext } from "./types";
 import { getAdapter } from "./adapters";
 import { cdata, escapeXml, indent } from "./xml";
@@ -22,9 +23,15 @@ const DEFAULT_DURATION_SECONDS = 30;
 // numbers the buyer's own DSP already reports. An element with no children
 // would be pointless, so the whole node is dropped rather than left empty.
 
-/** Minimal valid empty VAST — the fail-closed / not-entitled response. */
-export function emptyVast(): string {
-  return `${XML_DECL}\n<VAST version="4.2"></VAST>`;
+/**
+ * Minimal valid empty VAST — the fail-closed / not-entitled response.
+ *
+ * 4.2 unless told otherwise, byte for byte what every tag has always answered.
+ * A VAST video creative (ADR-0035) passes its own declared version, so a player
+ * that only reads 2.0 still hears "no ad" rather than "unsupported version".
+ */
+export function emptyVast(version: VastVersion = "4.2"): string {
+  return `${XML_DECL}\n<VAST version="${version}"></VAST>`;
 }
 
 /** Format seconds as HH:MM:SS for <Duration>. */
@@ -68,12 +75,16 @@ export function buildInlineVast(ctx: VastBuildContext): string {
     ctx.config.durationSeconds ?? DEFAULT_DURATION_SECONDS,
   );
 
-  // Emitted after <MediaFiles>, which is the XSD's order for Linear's derived
-  // sequence (Duration, AdParameters, MediaFiles, VideoClicks, Icons). It used to
-  // sit before it. lib/vast-inspect/rules/ordering.ts deliberately does not
-  // enforce Linear's order — the XSD contradicts real tags there — but "not
-  // warned about" is not a reason for our own output to be the wrong one, and
-  // this block went from conditional to unconditional in the same change.
+  // The order inside <Creative> is vast_4.2.xsd's, which `npm run
+  // check:vast-xsd` validates the goldens against. Linear_Inline_type extends
+  // Linear_Base_type, so the base's Icons and TrackingEvents (we emit neither)
+  // come first and the derived AdParameters, Duration, MediaFiles, VideoClicks
+  // follow in that order; VideoClicks is ClickTracking, then ClickThrough; and
+  // UniversalAdId closes the Creative, after Linear — as IAB's 4.2 sample has
+  // it. IAB's 4.1 sample puts UniversalAdId first, and Google Ad Manager's own
+  // output orders Creative and Linear its own way, which is why
+  // lib/vast-inspect/rules/ordering.ts leaves them unchecked in third-party
+  // tags. A parser that validates against the schema accepts only this one.
   //
   // <VideoClicks> is emitted even without a tag-level <ClickThrough>: the click
   // tracker is the point, and some templates carry no tag-level destination at
@@ -120,10 +131,10 @@ export function buildInlineVast(ctx: VastBuildContext): string {
     : "";
   const videoClicks =
     `            <VideoClicks>\n` +
-    clickThrough +
     `              <ClickTracking>${cdata(
       trackingUrl(ctx.siteUrl, cid, "click"),
     )}</ClickTracking>\n` +
+    clickThrough +
     `            </VideoClicks>\n`;
 
   // AdParameters carries the creative config to the SIMID/VPAID runtime
@@ -191,7 +202,7 @@ export function buildInlineVast(ctx: VastBuildContext): string {
   // A strict parser rejects a mis-ordered document outright while a lenient one
   // accepts it, so getting this wrong ships a tag that works on the player you
   // happened to test and fails elsewhere. Our own inspector holds the same
-  // sequence in lib/vast-inspect/rules/ordering.ts — change both or neither.
+  // sequence in lib/vast-inspect/spec.ts (`childOrder`) — change both or neither.
   //
   // AdServingId is required and non-empty from 4.1 (§3.4). An SSP that wraps
   // this tag mints its own at its own level, which does not satisfy the
@@ -208,14 +219,13 @@ export function buildInlineVast(ctx: VastBuildContext): string {
       <AdTitle><![CDATA[CreoSmith Interactive Creative]]></AdTitle>
 ${adVerifications}      <Creatives>
         <Creative id="${escapeXml(cid)}" sequence="1">
-          <UniversalAdId idRegistry="creosmith">${escapeXml(cid)}</UniversalAdId>
           <Linear>
-            <Duration>${duration}</Duration>
-${adParameters}            <MediaFiles>
+${adParameters}            <Duration>${duration}</Duration>
+            <MediaFiles>
 ${mediaFiles}
             </MediaFiles>
-${videoClicks}
-          </Linear>
+${videoClicks}          </Linear>
+          <UniversalAdId idRegistry="creosmith">${escapeXml(cid)}</UniversalAdId>
         </Creative>
       </Creatives>
     </InLine>

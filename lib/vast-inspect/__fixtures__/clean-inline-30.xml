@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A deliberately correct VAST 3.0 InLine: skippable, with an AdChoices icon,
+  pricing and the 3.0 error macro. Zero errors and zero warnings.
+
+  3.0's InLine is a flat xs:sequence too (vast3_draft.xsd), with Advertiser and
+  Pricing added after Description:
+
+    AdSystem → AdTitle → Description → Advertiser → Pricing → Error →
+    Impression → Creatives
+
+  Inside Linear, 3.0 puts Icons first and MediaFiles last; IconClicks lists its
+  trackers before the click-through, the reverse of 4.x.
+-->
+<VAST version="3.0">
+  <Ad id="ad-30">
+    <InLine>
+      <AdSystem version="1.0">CreoSmith Fixtures</AdSystem>
+      <AdTitle>Clean linear preroll, 3.0</AdTitle>
+      <Description>A skippable linear video with an AdChoices icon</Description>
+      <Advertiser>Example Brand</Advertiser>
+      <Pricing model="cpm" currency="USD"><![CDATA[4.50]]></Pricing>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://tracking.example.com/impression?cb=[CACHEBUSTING]]]></Impression>
+      <Creatives>
+        <Creative id="creative-30" sequence="1">
+          <Linear skipoffset="00:00:05">
+            <Icons>
+              <Icon program="AdChoices" width="20" height="20" xPosition="right" yPosition="top" offset="00:00:00" duration="00:00:15">
+                <StaticResource creativeType="image/png"><![CDATA[https://cdn.example.com/adchoices.png]]></StaticResource>
+                <IconClicks>
+                  <IconClickTracking><![CDATA[https://tracking.example.com/icon-click]]></IconClickTracking>
+                  <IconClickThrough><![CDATA[https://www.example.com/privacy]]></IconClickThrough>
+                </IconClicks>
+                <IconViewTracking><![CDATA[https://tracking.example.com/icon-view]]></IconViewTracking>
+              </Icon>
+            </Icons>
+            <Duration>00:00:15.000</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracking.example.com/start]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://tracking.example.com/q1]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://tracking.example.com/q2]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://tracking.example.com/q3]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://tracking.example.com/complete]]></Tracking>
+              <Tracking event="skip"><![CDATA[https://tracking.example.com/skip]]></Tracking>
+              <Tracking event="progress" offset="00:00:10"><![CDATA[https://tracking.example.com/p10]]></Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://www.example.com/landing]]></ClickThrough>
+              <ClickTracking><![CDATA[https://tracking.example.com/click]]></ClickTracking>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="1280" height="720" bitrate="1600"><![CDATA[https://cdn.example.com/creative-720.mp4]]></MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

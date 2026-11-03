@@ -61,6 +61,7 @@ export async function POST(request: Request): Promise<Response> {
     .select("id, supported_standards, runtime_keys, config_schema")
     .eq("id", templateId)
     .eq("is_published", true)
+    .eq("in_catalog", true)
     .maybeSingle();
 
   if (!template) {

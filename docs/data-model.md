@@ -18,13 +18,15 @@ Catalog of available interactive ad templates (admin-curated, read-only to users
 | --- | --- |
 | `id` | uuid PK |
 | `name`, `description` | display |
-| `type` | e.g. `shoppable_video`, `branching_story`, `lead_gen`. **Unique** — the public catalog URL is `/catalog/<type hyphenated>` ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)) |
+| `type` | e.g. `shoppable_video`, `branching_story`, `lead_gen`. **Unique** — the public catalog URL is `/catalog/<type hyphenated>` ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)). `vast_video` is the one *system* template ([ADR-0035](decisions/0035-vast-video-creatives.md)): the VAST generator's plain linear video, `supported_standards {video}`, no runtime keys, a `config_schema` that declares only its two click destinations (so `click_fields` routes them through `/r`) |
 | `category` | grouping for the catalog; populated (`commerce`, `interactive`) but not yet used as a filter |
 | `supported_standards` | array, e.g. `{simid, vpaid}` — drives the format picker |
 | `runtime_keys` | per-standard pointer to the runtime build. Its first path segment is also the demo unit key used by `/api/preview-unit/<key>` |
 | `preview_url` | **Reserved, unused.** NULL in every row and rendered nowhere: the catalog shows a live demo rather than a thumbnail. Remove it or fill it — do not read it |
 | `config_schema` | JSON schema describing the fields a user must fill. Since [ADR-0011](decisions/0011-conditional-grouped-config-schemas.md) a field may also carry `group` / `block` (presentation) and `showWhen` (conditional visibility), and a `groups` root key declares how each section renders. Field **order is significant**: visibility resolves top-down, so a field's controllers must be declared before it. Since [ADR-0012](decisions/0012-viewability-measurement.md), `showWhen` may also gate on the synthetic `"selected_format"` controller — the creative's chosen delivery format, not a schema field — used e.g. to show OMID vendor fields only when SIMID is selected |
 | `pricing_tier` | reserved for a billing provider's price family; nothing reads it since [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md) |
+| `is_published` | readable by anyone when true (`templates_select_published`) — which is also what lets `validate_creative_format()`, running under the inserting user's RLS, see the template at all |
+| `in_catalog` | bool, default true. **False for a system template** ([ADR-0035](decisions/0035-vast-video-creatives.md)): published, so creatives can reference it, but never listed — `/catalog`, its pages, the landing gallery, the sitemap, the configurator's entry and the harness all filter on it, and the schema-driven `createCreative`/`updateCreative` refuse such a template |
 | `created_at`, `updated_at` | |
 
 ### `creatives`
@@ -32,11 +34,11 @@ A user's configured instance of a template.
 
 | Field | Notes |
 | --- | --- |
-| `id` | uuid PK (this is the `creative_id` in the VAST URL) |
-| `user_id` | FK → auth user |
-| `template_id` | FK → templates |
+| `id` | uuid PK (this is the `creative_id` in the VAST URL). Always minted by the default: since [ADR-0035](decisions/0035-vast-video-creatives.md) a client may insert only `user_id, template_id, name, selected_format, config_json, status`, so a deleted creative's id — still live in its old owner's DSP — cannot be re-registered by another account (see [security.md](security.md), "Column grants on `creatives`") |
+| `user_id` | FK → auth user. Fixed at creation |
+| `template_id` | FK → templates. Fixed at creation — a client may update only `name, selected_format, config_json` |
 | `name` | optional user label; the UI falls back to the template name. Without it two creatives from one template differ only by uuid |
-| `selected_format` | `simid` \| `vpaid` \| … — user's choice; must be in template's `supported_standards` |
+| `selected_format` | `simid` \| `vpaid` \| `video` — user's choice; must be in template's `supported_standards`. `video` exists only on the `vast_video` system template ([ADR-0035](decisions/0035-vast-video-creatives.md)) |
 | `config_json` | jsonb — validated against the template's `config_schema`. Holds only the fields that were **active** at save time, so two creatives built from the same template can legitimately have different key sets, and a conditional field's absence is meaningful rather than a gap ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)). Nothing reading it may assume a fixed shape |
 | `status` | `draft` \| `active` \| `paused` \| `archived`. **Only `active` is reachable today** — it is hardcoded on insert and nothing updates it. The dashboard therefore shows a serving state derived from entitlement, not this column ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)). A per-creative kill switch still has no server action: what shipped instead is a **hard delete** (`deleteCreative`), which takes the row, its delivery counters, and its uploaded media with it. Both `should_serve` expressions already gate on `status = 'active'`, so setting `archived` would silence a tag identically while keeping its history — the non-destructive option remains one `UPDATE` away and is worth revisiting |
 | `created_at`, `updated_at` | |
@@ -71,16 +73,21 @@ action cannot be undone.
 | Field | Notes |
 | --- | --- |
 | `creative_id` | FK, `on delete cascade` — see above. Part of the PK |
-| `event_type` | Only three are ever written: `impression`, `viewable`, `click`. The enum still carries the retired video-progress values and `interaction`, none of which anything produces. **`viewable` is VPAID-only** — self-reported, non-OMID-accredited (ADR-0012); a SIMID creative never writes it, since its viewability is measured by the advertiser's own OMID vendor, which we don't ingest. **`click` fires only from the creative's final call-to-action**, the one that opens the advertiser's URL — never from an intermediate interaction such as a quiz answer, so it reads lower than a DSP's click count |
+| `event_type` | For an interactive creative only three are ever written: `impression`, `viewable`, `click`. A VAST video creative also writes `start`, `q25`, `q50`, `q75` and `complete` ([ADR-0035](decisions/0035-vast-video-creatives.md)) — its document is the only one that carries a signed progress beacon. `interaction` is still in the enum and nothing produces it. **`viewable` is never OMID-accredited**: a VPAID unit reports it itself (ADR-0012), a VAST video creative's player reports it through `<ViewableImpression>` from 4.0 (ADR-0035), and a SIMID creative never writes it, since its viewability is measured by the advertiser's own OMID vendor, which we don't ingest. **`click` fires only from the creative's final call-to-action**, the one that opens the advertiser's URL — never from an intermediate interaction such as a quiz answer, so it reads lower than a DSP's click count |
 | `bucket` | `date_trunc('hour', now())` at ingest. Collapsed to one bucket per day for data older than 30 days by `rollup_creative_events()`, called from the daily cron |
 | `count` | bigint, incremented in place |
 
 > Volume note: size is now a function of creatives × events × time, not of
 > traffic. Roughly 1000 creatives × 3 events × 24 h ≈ 26M rows/year before the
-> 30-day rollup, which is what the rollup exists to bound.
+> 30-day rollup, which is what the rollup exists to bound. A video creative has eight
+> events, not three, so it costs up to eight rows an hour; and its *writes* do scale
+> with traffic — a completed view is six `increment_creative_event` upserts, seven with
+> viewable, against two or three for an interactive impression (ADR-0035 has the
+> arithmetic, and when to batch).
 
 Ingested by [`app/api/track/route.ts`](../app/api/track/route.ts) — a public,
-fire-and-forget beacon that maps the three VAST/runtime event names to the enum and
+fire-and-forget beacon that maps its event names (the three above, and the five progress
+names of a video creative) to the enum and
 calls `public.increment_creative_event()` via the service role. The upsert lives in
 SQL because PostgREST cannot express `on conflict do update set count = count + 1`,
 and a read-then-write in app code would lose updates under the concurrency this
@@ -90,11 +97,14 @@ in the VAST tag itself, so without a signature anyone holding a tag could forge 
 for it, and these counts feed a customer-facing dashboard. See
 [security.md](security.md).
 
-**What is not collected**, so no screen may imply it: `start`, the quartiles and `complete` are no
-longer emitted into the VAST at all, so the completion funnel is gone; and
-`/api/vast` writes nothing, so ad *requests* are uncounted and fill rate cannot be
-derived — nor can an error rate, although errors themselves are counted (below). **CTR is displayed** on the creative page, over impressions — see
-design-system.md §6 for why the denominator has to be stated.
+**What is not collected**, so no screen may imply it: for an interactive creative,
+`start`, the quartiles and `complete` are not emitted into the VAST at all, so it has
+no completion funnel — only a VAST video creative does (ADR-0035), and VTR is shown on
+its page alone. `/api/vast` writes nothing, so ad *requests* are uncounted and fill rate
+cannot be derived — nor can an error rate, although errors themselves are counted
+(below). **CTR is displayed** on the creative page, over impressions, and VTR on a video
+creative's page, over impressions too — see design-system.md §6 for why the denominator
+has to be stated.
 
 There is also no per-impression detail any more, by construction. Frequency, unique
 reach and session paths need a different store, not a different query. Clicks that go
@@ -109,6 +119,14 @@ creative, granted to `authenticated` only. Those last two are not analytics: the
 badge and the state rail depend on them. It works because the function owner is exempt
 from RLS; running `alter table public.creative_event_counters force row level security`
 would make it silently return zeros.
+
+`public.get_creative_video_funnel(creative_id)` ([ADR-0035](decisions/0035-vast-video-creatives.md))
+is the second read: one VAST video creative's impression, start, quartile, complete,
+click and viewable counts, all-time like the overview so a ratio of two of them is over
+one window. `SECURITY DEFINER`, the `owned` check inside like `get_creative_errors()` — a
+creative the caller does not own yields no row — granted to `authenticated` only. The
+progress events it reads are written for video creatives only, by the generator release
+of ADR-0035; an interactive creative never has them.
 
 ### `creative_error_counters` (VAST errors — [ADR-0033](decisions/0033-vast-error-statistics.md))
 The `<Error>` beacon, counted the way `creative_event_counters` counts events: one row per
@@ -319,10 +337,10 @@ ended it was missed or delayed.
 | --- | --- |
 | `profiles` | owner can read/update own row |
 | `templates` | **published** templates readable by anon + authenticated (public showcase); drafts hidden; writes admin-only (service role). A new template is seeded as a draft and only the local-only `/dev/harness` reads drafts, with the service role ([ADR-0024](decisions/0024-pick-message-template.md)) |
-| `creatives` | owner can CRUD own rows only |
+| `creatives` | owner can CRUD own rows only — and, since ADR-0035, only through per-column grants: insert `user_id, template_id, name, selected_format, config_json, status`, update `name, selected_format, config_json` |
 | `profiles`, `templates`, `creatives`, `subscriptions` | TRUNCATE revoked from `anon`/`authenticated` — the one table privilege RLS cannot gate; PostgREST has no verb for it, closed all the same ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md) review) |
 | `subscriptions` | owner can **read** own rows; **no client writes** (only the admin's grant actions, via service role — [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)) |
-| `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
+| `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` and the owner-checked `public.get_creative_video_funnel()` (ADR-0035) |
 | `creative_error_counters` | the same: RLS on, zero policies, table privileges revoked from `anon`/`authenticated`; written by `increment_creative_error()` (service role), read only through the owner-checked `public.get_creative_errors()` ([ADR-0033](decisions/0033-vast-error-statistics.md)) |
 | `creative_clicks`, `conversions`, `postback_keys`, `postback_log` | **no direct client access** (RLS on, zero policies, table and identity-sequence privileges revoked from `anon`/`authenticated`); clicks written by `record_click()` and conversions + log by `record_postback()`, both service role only; the owner reads through `get_creative_conversions()`, `ensure_postback_key()`, `has_postback_key()` and `get_postback_log()`, each scoped to `auth.uid()` ([ADR-0023](decisions/0023-conversion-postbacks.md)) |
 | `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent. Since [ADR-0028](decisions/0028-creative-media-on-r2.md) new uploads go to R2, which has no RLS: there the same prefix rule is enforced in code (`requestMediaUpload` mints the key; `deleteCreative` deletes only keys under the caller's prefix) |

@@ -41,6 +41,8 @@ export default async function Home({
       "id, name, description, type, supported_standards, runtime_keys, config_schema",
     )
     .eq("is_published", true)
+    // A system template (ADR-0035) is published but is not part of the gallery.
+    .eq("in_catalog", true)
     .order("name");
 
   // Only templates with a resolvable demo unit get a tab — an honest gap

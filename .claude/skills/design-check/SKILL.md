@@ -76,7 +76,7 @@ rather than skipping silently.
    the token. This is not optional on a dark theme: the previous palette's five state
    colours all measured between 2.30 and 3.57 here, and the alarm colour failed even the
    non-text floor.
-7. **Check every width.** 390 / 768 / 1280 / 1920 / 2560. No page scrolls sideways, and
+7. **Check every width.** 360 / 390 / 768 / 1280 / 1920 / 2560. No page scrolls sideways, and
    navigation exists at every width.
 8. **Verify both locales** are supplied for every new string, and that no locale logic
    reached `app/api/vast/**`. Russian runs longer than English — check the longer one.

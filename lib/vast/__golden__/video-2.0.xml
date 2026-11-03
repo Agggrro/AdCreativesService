@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="2.0">
+  <Ad id="11111111-2222-4333-8444-555555555555">
+    <InLine>
+      <AdSystem version="1.0">CreoSmith</AdSystem>
+      <AdTitle><![CDATA[Spring sale — 30% off]]></AdTitle>
+      <Description><![CDATA[Linear spot with a companion banner]]></Description>
+      <Error><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=error&exp=1791032400&sig=udK-qPAQtonlnqpqynype-vvCc08TsqxkNEpRVSUnjI]]></Error>
+      <Impression><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=impression&exp=1791032400&sig=lyOQiFyXJ2ZQhVu4QotpOKOgg4oirxE-Hb8y-EU6pHc]]></Impression>
+      <Impression><![CDATA[https://t.example.com/impression?cb=[CACHEBUSTING]]]></Impression>
+      <Creatives>
+        <Creative id="11111111-2222-4333-8444-555555555555" sequence="1">
+          <Linear>
+            <Duration>00:00:15</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=start&exp=1791032400&sig=7c7FdNuWgoxm1QgQFcQmdzIAF7D5ZEQ0ZN1QGCzhplc]]></Tracking>
+              <Tracking event="firstQuartile"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=q25&exp=1791032400&sig=VsK9K3i1RJGzCtKJpR6VjyLiaVWhTeUmSZ_s0hCeMdA]]></Tracking>
+              <Tracking event="midpoint"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=q50&exp=1791032400&sig=BcEDrQ_NvdOLbIaxjrZxGHdbR_UPs8uwjrbWN2mnuYA]]></Tracking>
+              <Tracking event="thirdQuartile"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=q75&exp=1791032400&sig=OT11_m5NkoO57kDPnVRYDHmkEyq5S4Z5DoQ-NTua8xo]]></Tracking>
+              <Tracking event="complete"><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=complete&exp=1791032400&sig=kKvdNEHPuKzXAHHRfmhthQMhteIrczJmEgXNvL0OKZw]]></Tracking>
+              <Tracking event="mute"><![CDATA[https://t.example.com/mute?cb=[CACHEBUSTING]]]></Tracking>
+              <Tracking event="pause"><![CDATA[https://t.example.com/pause?cb=[CACHEBUSTING]]]></Tracking>
+              <Tracking event="fullscreen"><![CDATA[https://t.example.com/fullscreen?cb=[CACHEBUSTING]]]></Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=clickThroughUrl&exp=1791115200&sig=eALrOn0kwj_1zhMYcuYstbtLUVzHsjGaHktK9xXaDX8]]></ClickThrough>
+              <ClickTracking><![CDATA[https://smithcdn.net/t?cid=11111111-2222-4333-8444-555555555555&e=click&exp=1791032400&sig=ehh5WtIjJ9x_dtQ0XkjxxPpka5Nmb9yfArHg6Z9OC6Q]]></ClickTracking>
+              <ClickTracking><![CDATA[https://t.example.com/click]]></ClickTracking>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="1280" height="720" bitrate="800" scalable="true" maintainAspectRatio="true"><![CDATA[https://media.smithcdn.net/66666666-7777-4888-9999-aaaaaaaaaaaa/0f0f0f0f-1e1e-4d2d-8c3c-4b4b4b4b4b4b.mp4]]></MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+        <Creative id="11111111-2222-4333-8444-555555555555-companions" sequence="1">
+          <CompanionAds>
+            <Companion width="300" height="250">
+              <StaticResource creativeType="image/png"><![CDATA[https://media.smithcdn.net/66666666-7777-4888-9999-aaaaaaaaaaaa/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.png]]></StaticResource>
+              <TrackingEvents>
+                <Tracking event="creativeView"><![CDATA[https://t.example.com/companion-view]]></Tracking>
+              </TrackingEvents>
+              <CompanionClickThrough><![CDATA[https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=companionClickThroughUrl&exp=1791115200&sig=D_czJtx-3YeyuasUjm7BQj_aEVz9RQOTkRt9jy919zI]]></CompanionClickThrough>
+              <AltText>Spring sale banner</AltText>
+            </Companion>
+            <Companion width="728" height="90">
+              <StaticResource creativeType="image/gif"><![CDATA[https://cdn.example.com/banner-728x90.gif]]></StaticResource>
+              <CompanionClickThrough><![CDATA[https://smithcdn.net/r?cid=11111111-2222-4333-8444-555555555555&f=companionClickThroughUrl&exp=1791115200&sig=D_czJtx-3YeyuasUjm7BQj_aEVz9RQOTkRt9jy919zI]]></CompanionClickThrough>
+            </Companion>
+          </CompanionAds>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

@@ -11,46 +11,8 @@ import {
 } from "@/lib/creative-media";
 import { deleteObjects, r2 } from "@/lib/r2";
 import { UUID_RE } from "@/lib/uuid";
-import {
-  publishCreativeSnapshot,
-  unpublishCreativeSnapshot,
-} from "@/lib/serving/publish";
-
-/**
- * Publish the creative's serving snapshot, and on failure make sure no *stale*
- * snapshot is left behind (ADR-0015).
- *
- * A save is not rolled back when publishing fails, and the user is not shown an
- * error: the row is already committed, and `GET /api/vast` falls back to
- * Postgres whenever a snapshot is missing — so the tag keeps serving, correctly,
- * off the database. Telling a media buyer their save failed when it did not
- * would only produce duplicate creatives.
- *
- * Deleting on failure is the part that matters. A stale snapshot is worse than
- * no snapshot: it would serve the *previous* configuration indefinitely, while
- * its absence degrades to the fallback, which is right by construction.
- * `npm run snapshot:backfill` repairs the missing object afterwards.
- */
-async function publishOrClear(creativeId: string): Promise<void> {
-  try {
-    await publishCreativeSnapshot(creativeId);
-  } catch (err) {
-    console.error("snapshot publish failed; clearing to force DB fallback", {
-      creativeId,
-      err,
-    });
-    try {
-      await unpublishCreativeSnapshot(creativeId);
-    } catch (clearErr) {
-      // Both legs failed: the CDN may still hold an older configuration. Loud,
-      // because only a backfill run will fix it.
-      console.error("snapshot clear ALSO failed; stale snapshot may be serving", {
-        creativeId,
-        clearErr,
-      });
-    }
-  }
-}
+import { unpublishCreativeSnapshot } from "@/lib/serving/publish";
+import { publishOrClear } from "@/lib/serving/publish-or-clear";
 
 export async function createCreative(formData: FormData): Promise<void> {
   const supabase = await createServerSupabase();
@@ -75,12 +37,16 @@ export async function createCreative(formData: FormData): Promise<void> {
 
   if (!templateId || !selectedFormat) fail("format_required");
 
-  // Load the template's schema and build config_json generically from it.
+  // Load the template's schema and build config_json generically from it. A
+  // system template (ADR-0035) is refused like an unknown one: its config_schema
+  // declares only its click fields, so a creative built from it here would be
+  // saved with a config the VAST generator's validator never saw.
   const { data: template } = await supabase
     .from("templates")
     .select("config_schema")
     .eq("id", templateId)
     .eq("is_published", true)
+    .eq("in_catalog", true)
     .maybeSingle();
   if (!template) fail("template_not_found");
 
@@ -159,11 +125,15 @@ export async function updateCreative(formData: FormData): Promise<void> {
     .maybeSingle();
   if (!creative) fail("save_failed");
 
+  // A VAST video creative (ADR-0035) is edited through its own action: running
+  // it through this one would rebuild its config_json from a schema that names
+  // two fields, and silently throw the rest of it away.
   const { data: template } = await supabase
     .from("templates")
     .select("config_schema")
     .eq("id", creative!.template_id)
     .eq("is_published", true)
+    .eq("in_catalog", true)
     .maybeSingle();
   if (!template) fail("template_not_found");
 

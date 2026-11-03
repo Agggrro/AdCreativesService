@@ -24,6 +24,9 @@ process.env.TRACK_TOKEN_SECRET = "test-track-secret";
 process.env.NEXT_PUBLIC_CDN_URL = "https://smithcdn.net";
 process.env.NEXT_PUBLIC_SITE_URL = "https://creosmith.com";
 process.env.NEXT_PUBLIC_SUPABASE_URL = SUPABASE;
+// The Worker reads this from its wrangler `vars` through process.env, which is
+// how a VAST video creative's upload is recognised as ours (ADR-0035).
+process.env.NEXT_PUBLIC_MEDIA_URL = "https://media.smithcdn.net";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 
 /** The Cache API, in memory, with a switch to make it fail. */
@@ -387,5 +390,89 @@ test("an <Error> beacon writes nothing when its signature is forged, expired or 
   // And the error signature does not count an impression either.
   const error = signTrackToken(CID, "error");
   await call(`/t?cid=${CID}&e=impression&exp=${error.exp}&sig=${error.sig}`);
+  assert.deepEqual(writes, []);
+});
+
+/* ---------- VAST video creatives (ADR-0035) ---------- */
+
+const VIDEO_URL = `https://media.smithcdn.net/${OWNER}/0f0f0f0f-1e1e-4d2d-8c3c-4b4b4b4b4b4b.mp4`;
+
+function videoConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    v: 1,
+    version: "3.0",
+    adTitle: "Spring sale",
+    media: { source: "upload", url: VIDEO_URL, mime: "video/mp4", width: 1280, height: 720, durationMs: 15_000 },
+    clickThroughUrl: "https://advertiser.example/landing",
+    trackers: { impression: ["https://t.example.com/i"] },
+    companions: [],
+    ...overrides,
+  };
+}
+
+function publishVideo(config: Record<string, unknown>, entitled = true): void {
+  publish(entitled);
+  kv.data.set(
+    `serving/creative/${CID}.json`,
+    JSON.stringify({
+      ...creative,
+      template_id: "00000000-0000-4000-8000-000000000100",
+      selected_format: "video",
+      config_json: config,
+      template_type: "vast_video",
+      runtime_keys: {},
+      supported_standards: ["video"],
+      click_fields: ["clickThroughUrl", "companionClickThroughUrl"],
+    }),
+  );
+}
+
+test("a VAST video creative is built from KV at its own version, with signed progress beacons, and cached", async () => {
+  publishVideo(videoConfig());
+  const res = await call(`/v?creative_id=${CID}`, { headers: ORIGIN });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://publisher.example");
+  const body = await res.text();
+  assert.match(body, /^<\?xml version="1\.0" encoding="UTF-8"\?>\n<VAST version="3\.0">/);
+  assert.match(body, /<Tracking event="firstQuartile"><!\[CDATA\[https:\/\/smithcdn\.net\/t\?cid=[^&]+&e=q25&exp=\d+&sig=/);
+  assert.match(body, /<MediaFile delivery="progressive" type="video\/mp4"[^>]*><!\[CDATA\[https:\/\/media\.smithcdn\.net\//);
+  assert.match(body, /<ClickThrough><!\[CDATA\[https:\/\/smithcdn\.net\/r\?cid=[^&]+&f=clickThroughUrl&/);
+  assert.ok(!body.includes("AdParameters"), "a plain video carries no interactive config");
+  assert.equal(fetchMock.mock.callCount(), 0, "the snapshots answered");
+  assert.ok(cache.entries.has(`https://smithcdn.net/__tag/test-version/${CID}`));
+});
+
+test("a VAST video creative that may not serve answers an empty document at its own version", async () => {
+  publishVideo(videoConfig({ version: "2.0" }), false);
+  const res = await call(`/v?creative_id=${CID}`);
+  assert.equal(res.status, 200);
+  assert.equal(await res.text(), '<?xml version="1.0" encoding="UTF-8"?>\n<VAST version="2.0"></VAST>');
+});
+
+test("a stored video config the validator refuses is a settled no-ad, cached, never a 503", async () => {
+  // Hand-written through PostgREST: a "video" that is somebody's script.
+  publishVideo(videoConfig({ media: { source: "external", url: "https://cdn.example.com/unit.js", mime: "application/javascript", width: 640, height: 360, durationMs: 5_000 } }));
+  const res = await call(`/v?creative_id=${CID}`);
+  assert.equal(res.status, 200);
+  assert.equal(await res.text(), '<?xml version="1.0" encoding="UTF-8"?>\n<VAST version="3.0"></VAST>');
+  assert.ok(cache.entries.has(`https://smithcdn.net/__tag/test-version/${CID}`));
+});
+
+test("signed progress beacons are counted; forged ones and other events' signatures write nothing", async () => {
+  for (const event of ["start", "q25", "q50", "q75", "complete"]) {
+    writes = [];
+    const res = await call(beacon(event));
+    assert.equal(res.status, 204);
+    assert.deepEqual(writes, [
+      { rpc: "increment_creative_event", body: { p_creative_id: CID, p_event_type: event } },
+    ]);
+  }
+  writes = [];
+  const impression = signTrackToken(CID, "impression");
+  await call(`/t?cid=${CID}&e=q25&exp=${impression.exp}&sig=${impression.sig}`);
+  await call(`/t?cid=${CID}&e=complete&exp=9999999999&sig=AAAA`);
+  // VAST's own name is not the counter's, and is not accepted under it.
+  const vastName = signTrackToken(CID, "firstQuartile");
+  await call(`/t?cid=${CID}&e=firstQuartile&exp=${vastName.exp}&sig=${vastName.sig}`);
   assert.deepEqual(writes, []);
 });

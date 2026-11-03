@@ -4,18 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, Loader2, Upload as UploadIcon } from "lucide-react";
 import type { ConfigField } from "@/lib/config-schema";
 import {
-  CREATIVE_MEDIA_BUCKET,
   MEDIA_ACCEPT,
   MEDIA_MAX_BYTES,
-  buildMediaObjectPath,
   isAllowedMediaMime,
   isOwnMediaUrl,
 } from "@/lib/creative-media";
-import { createBrowserSupabase } from "@/lib/supabase/client";
-import {
-  requestMediaUpload,
-  type MediaUploadTicket,
-} from "@/app/dashboard/creatives/media-actions";
+import { uploadMediaFile } from "@/lib/media-upload-client";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { Segmented } from "@/components/ui/Segmented";
 import { buttonClass } from "@/components/ui/Button";
@@ -25,41 +19,6 @@ type Mode = "upload" | "url";
 
 /** A URL whose path looks like a video file — the same test the runtime's media layer makes. */
 const VIDEO_URL_RE = /\.(webm|mp4|m4v|mov|ogv)(\?|#|$)/i;
-
-/**
- * PUT the file to a presigned R2 URL (ADR-0028). The `Content-Type` sent must
- * be the one that was signed; the browser adds the matching `Content-Length`
- * itself, and R2 refuses the upload if either differs from the declaration.
- */
-async function uploadToR2(
-  ticket: Extract<MediaUploadTicket, { store: "r2" }>,
-  file: File,
-): Promise<string | null> {
-  const res = await fetch(ticket.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type },
-    body: file,
-  });
-  return res.ok ? ticket.publicUrl : null;
-}
-
-/**
- * The pre-ADR-0028 path, for a deployment without the R2 variables: straight
- * into the Storage bucket, under the user's own prefix (its RLS insert policy).
- */
-async function uploadToSupabase(file: File): Promise<string | null> {
-  const supabase = createBrowserSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const path = user ? buildMediaObjectPath(user.id, file.type) : null;
-  if (!path) return null;
-  const { error } = await supabase.storage
-    .from(CREATIVE_MEDIA_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: false });
-  if (error) return null;
-  return supabase.storage.from(CREATIVE_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
-}
 
 /**
  * The `type: "image"` field control: upload a file to our media store — R2
@@ -122,29 +81,24 @@ export function MediaUploadField({
 
     setUploading(true);
     try {
-      const ticket = await requestMediaUpload(file.type, file.size);
-      if ("error" in ticket) {
+      // lib/media-upload-client.ts, shared with the VAST generator (ADR-0035).
+      const result = await uploadMediaFile(file);
+      if ("error" in result) {
         setError(
-          ticket.error === "wrong_type"
+          result.error === "wrong_type"
             ? m.errWrongType
-            : ticket.error === "too_large"
+            : result.error === "too_large"
               ? m.errTooLarge
-              : m.errUploadFailed,
+              : result.error === "unauthorized"
+                ? // "Try again" cannot help an expired session; signing in can.
+                  dict.vastGen.errUnauthorized
+                : m.errUploadFailed,
         );
         return;
       }
-
-      const url =
-        ticket.store === "r2" ? await uploadToR2(ticket, file) : await uploadToSupabase(file);
-      if (!url) {
-        setError(m.errUploadFailed);
-        return;
-      }
-      onChange(url);
+      onChange(result.url);
       setUploadedName(file.name);
       focusNext.current = "replace";
-    } catch {
-      setError(m.errUploadFailed);
     } finally {
       if (focusNext.current !== "replace") focusNext.current = "file";
       setUploading(false);

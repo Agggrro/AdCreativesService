@@ -107,7 +107,10 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 - The **free tools section** (`/tools/*`) was not in the MVP and is not part of the
   core loop above. It ships as an acquisition surface alongside it — see
   [ADR-0013](decisions/0013-public-free-tools-section.md). The VAST validator is
-  built; the VAST generator is a placeholder route.
+  built, and since [ADR-0035](decisions/0035-vast-video-creatives.md) so is the VAST
+  generator: a linear video creative, VAST 2.0–4.3, saved to the account and served and
+  gated like any other ([ADR-0036](decisions/0036-public-tool-that-saves.md) for how a
+  public page saves). Wrapper and fallback third-party tags are still out.
 - MRAID / in-app display product line.
 - Becoming our own OMID verification vendor (IAB Tech Lab partner
   registration, running an OM SDK service, MRC accreditation). OMID

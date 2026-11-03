@@ -15,6 +15,12 @@
  * a creative wears the advertiser's brand, not ours.
  */
 @theme {
+  /* ---- Breakpoints beyond Tailwind's defaults (docs/design-system.md §5) ----
+     xs: the top bar's one narrow-phone rule. Below it the signed-out sign-up
+     action leaves the bar for the menu panel — at 375 the English label met
+     the wordmark by 4px, at 360 by 19px. Nothing else uses it. */
+  --breakpoint-xs: 24rem;
+
   /* ---- Neutrals — warm-biased, so they sit with the apricot accent ---- */
   --color-ground: #0d0b0a;
   --color-surface: #161311;

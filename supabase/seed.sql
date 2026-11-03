@@ -356,4 +356,53 @@ on conflict (id) do update set
   runtime_keys        = excluded.runtime_keys,
   config_schema       = excluded.config_schema,
   pricing_tier        = excluded.pricing_tier,
-  is_published        = excluded.is_published;
+  is_published        = excluded.is_published,
+  -- Re-asserted rather than left to the column default, so a catalog template
+  -- someone flipped by hand comes back on re-seed (ADR-0035).
+  in_catalog          = true;
+
+-- VAST video (ADR-0035) — the VAST generator's plain linear video creative, a
+-- *system* template rather than a catalog one. It has no runtime unit and no
+-- tile: a creative of this kind is built on /tools/vast-generator, and the VAST
+-- document is produced by lib/vast-gen rather than by a format adapter.
+--
+-- Published, because validate_creative_format() reads the template under the
+-- inserting user's RLS and templates_select_published shows published rows only;
+-- kept out of the catalog, the landing gallery and the sitemap by `in_catalog`.
+--
+-- config_schema declares only the two destinations, because
+-- private.creative_serving derives click_fields from its url-typed fields: that
+-- is what lets `/r` mint click ids for them (ADR-0023) without a line of new
+-- serving code. Everything else in a video creative's config_json is validated
+-- by lib/vast-gen/validate.ts, not by this schema. The icon's click-through is
+-- deliberately absent: an AdChoices click is a disclosure, not an ad click.
+insert into public.templates (
+  id, name, description, type, category,
+  supported_standards, runtime_keys, config_schema, pricing_tier, is_published, in_catalog
+) values (
+  '00000000-0000-4000-8000-000000000100',
+  'VAST Video',
+  'A linear video ad with tracking, built in the VAST generator.',
+  'vast_video',
+  'vast',
+  array['video'],
+  '{}'::jsonb,
+  '{"fields":[
+     {"name":"clickThroughUrl","label":"Click-through URL","type":"url"},
+     {"name":"companionClickThroughUrl","label":"Companion click-through URL","type":"url"}
+   ]}'::jsonb,
+  null,
+  true,
+  false
+)
+on conflict (id) do update set
+  name                = excluded.name,
+  description         = excluded.description,
+  type                = excluded.type,
+  category            = excluded.category,
+  supported_standards = excluded.supported_standards,
+  runtime_keys        = excluded.runtime_keys,
+  config_schema       = excluded.config_schema,
+  pricing_tier        = excluded.pricing_tier,
+  is_published        = excluded.is_published,
+  in_catalog          = excluded.in_catalog;

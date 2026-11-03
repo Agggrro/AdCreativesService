@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getCdnUrl } from "@/lib/site";
+import { vastTagUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
 import { LOCALE_TAG, type Dict } from "@/lib/i18n/dictionaries";
 import { formatDate } from "@/lib/i18n/format";
@@ -24,8 +24,12 @@ import {
   type ExitLabel,
 } from "@/components/ConversionReport";
 import { VastErrorReport } from "@/components/VastErrorReport";
+import { LinkButton } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Field";
 import { ServingBadge } from "@/components/ui/State";
+import { VIDEO_FORMAT } from "@/lib/vast-gen/kind";
+import { supports } from "@/lib/vast-gen/spec";
+import { declaredVersion } from "@/lib/vast-gen/validate";
 
 /**
  * The delivery strip reads left to right in the order the events can occur (§6):
@@ -48,6 +52,21 @@ const DELIVERY = [
   label: keyof Dict["catalog"]["funnel"];
   hint: keyof Dict["dashboard"] | null;
 }[];
+
+/**
+ * A VAST video creative's progress strip (ADR-0035): its own labelled strip,
+ * not more tiles in the delivery one. Progress exists only for this kind, and a
+ * metric that is structurally absent for some creatives does not belong inside
+ * the closed delivery set (§6). Left to right in the order a player fires them,
+ * closed by VTR over impressions — the denominator named, as for CTR.
+ */
+const PROGRESS = [
+  { key: "starts", label: "start" },
+  { key: "q25", label: "q25" },
+  { key: "q50", label: "q50" },
+  { key: "q75", label: "q75" },
+  { key: "completes", label: "complete" },
+] as const satisfies readonly { key: string; label: keyof Dict["dashboard"]["progressSteps"] }[];
 
 export default async function CreativePage({
   params,
@@ -97,11 +116,23 @@ export default async function CreativePage({
 
   if (!creative) notFound();
 
-  const { data: template } = await supabase
-    .from("templates")
-    .select("name, type, config_schema")
-    .eq("id", creative.template_id)
-    .maybeSingle();
+  const isVideo = creative.selected_format === VIDEO_FORMAT;
+  const videoVersion = isVideo ? declaredVersion(creative.config_json) : undefined;
+
+  const [{ data: template }, { data: funnelRows, error: funnelError }] = await Promise.all([
+    supabase
+      .from("templates")
+      .select("name, type, config_schema")
+      .eq("id", creative.template_id)
+      .maybeSingle(),
+    // Progress is counted for VAST video creatives only (ADR-0035);
+    // owner-checked inside, like the reads above.
+    isVideo
+      ? supabase.rpc("get_creative_video_funnel", { p_creative_id: id })
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  const funnel = funnelRows?.[0];
+  const funnelAvailable = isVideo && !funnelError;
 
   // The exits this creative actually has: click-destination fields with a
   // configured URL, in schema order (ADR-0023). A quiz's answer paths are
@@ -113,7 +144,9 @@ export default async function CreativePage({
   const exits: ExitLabel[] = clickFields.map((field) =>
     field.name === TAG_CLICK_FIELD
       ? { field: field.name, label: dict.conversions.mainExit, machine: false }
-      : {
+      : isVideo && field.name === "companionClickThroughUrl"
+        ? { field: field.name, label: dict.conversions.companionExit, machine: false }
+        : {
           field: field.name,
           label: field.block ? formatAnswerPath(field.block) : field.name,
           machine: true,
@@ -135,15 +168,25 @@ export default async function CreativePage({
     style: "percent",
     maximumFractionDigits: 2,
   });
-  const tag = `${getCdnUrl()}/v?creative_id=${creative.id}`;
+  const tag = vastTagUrl(creative.id);
   const counts: Record<string, number> = {
     impressions: row?.impressions ?? 0,
     clicks: row?.clicks ?? 0,
     viewable: row?.viewable ?? 0,
   };
-  // VPAID-only (ADR-0012): render as "not applicable to this format" rather
-  // than a confident zero for every other format.
-  const viewableApplicable = creative.selected_format === "vpaid";
+  // Self-reported by a VPAID unit (ADR-0012), or reported by the player through
+  // a VAST video creative's <ViewableImpression> from 4.0 (ADR-0035). Anything
+  // else renders as "not applicable" rather than a confident zero.
+  const videoViewable = isVideo && videoVersion !== undefined && supports(videoVersion, "viewableImpression");
+  const viewableApplicable = creative.selected_format === "vpaid" || videoViewable;
+  const viewableCaption =
+    creative.selected_format === "vpaid"
+      ? dict.dashboard.viewableSelfReported
+      : videoViewable
+        ? dict.dashboard.viewablePlayerReported
+        : isVideo
+          ? dict.dashboard.viewableNoVersion
+          : dict.dashboard.viewableNotApplicable;
 
   return (
     <div className="flex flex-col gap-6">
@@ -160,9 +203,9 @@ export default async function CreativePage({
             {creative.name ?? template?.name ?? dict.dashboard.template}
           </h1>
           <p className="type-small text-fg-muted">
-            {template?.name} ·{" "}
+            {isVideo ? dict.dashboard.videoKind : template?.name} ·{" "}
             <span className="data-instr uppercase">
-              {creative.selected_format}
+              {isVideo ? (videoVersion ? `VAST ${videoVersion}` : "—") : creative.selected_format}
             </span>{" "}
             · {dict.dashboard.createdAt}{" "}
             <span className="data-instr">{formatDate(locale, creative.created_at)}</span>
@@ -227,11 +270,41 @@ export default async function CreativePage({
         </div>
       </div>
 
-{/*
+      {isVideo && (
+        <div className="flex flex-col gap-2">
+          <h2 className="label-instr">{dict.dashboard.progress}</h2>
+          {/* Static readouts only, like the delivery strip, so the clipping
+              parent cannot cut a focus ring (§2). */}
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-3 lg:grid-cols-6">
+            {PROGRESS.map((step) => (
+              <div key={step.key} className="flex flex-col gap-2 bg-surface p-4">
+                <span className="label-instr">{dict.dashboard.progressSteps[step.label]}</span>
+                <span className="type-metric">
+                  {funnelAvailable ? number.format(funnel?.[step.key] ?? 0) : "—"}
+                </span>
+              </div>
+            ))}
+            <div className="flex flex-col gap-2 bg-surface p-4">
+              <span className="label-instr">{dict.dashboard.vtr}</span>
+              <span className="type-metric">
+                {/* No impressions: not measurable yet, never 0%. And no ratio
+                    while the impressions tile it is "of" shows a dash (§6). */}
+                {statsAvailable && funnelAvailable && funnel && funnel.impressions > 0
+                  ? percent.format(funnel.completes / funnel.impressions)
+                  : "—"}
+              </span>
+              <span className="type-caption text-fg-muted">{dict.dashboard.vtrOfImpressions}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/*
         Viewability (ADR-0012) is deliberately its own strip, not a third
         delivery tile: it isn't part of the sequential, always-applicable
-        delivery set (§6) — it's VPAID-only, self-reported, and structurally
-        absent for SIMID. A SIMID row prints the em dash in `text-fg-disabled`
+        delivery set (§6) — VPAID reports it itself, a VAST video creative from
+        4.0 has the player report it (ADR-0035), and it is structurally absent
+        for SIMID. A SIMID row prints the em dash in `text-fg-disabled`
         (not the default `text-fg` the outage/unmeasurable dash above uses) so
         the two "—" readings stay visually distinct even without reading the
         caption.
@@ -260,11 +333,7 @@ export default async function CreativePage({
               ? number.format(counts.viewable)
               : "—"}
           </span>
-          <span className="type-caption text-fg-muted">
-            {viewableApplicable
-              ? dict.dashboard.viewableSelfReported
-              : dict.dashboard.viewableNotApplicable}
-          </span>
+          <span className="type-caption text-fg-muted">{viewableCaption}</span>
         </Panel>
       </div>
 
@@ -282,6 +351,13 @@ export default async function CreativePage({
             {tag}
           </code>
           <CopyButton value={tag} />
+          {/* The validator fetches the live tag with its pixels held back
+              (dry run), so checking it counts nothing. */}
+          {isVideo && (
+            <LinkButton href={`/tools/vast-validator?tag=${encodeURIComponent(tag)}`} variant="secondary">
+              {dict.dashboard.checkInValidator}
+            </LinkButton>
+          )}
         </Panel>
       </div>
 

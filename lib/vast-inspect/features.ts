@@ -1,4 +1,5 @@
 import { atLeast, type FeatureHit, type Msg, type VastVersion } from "./model";
+import { FEATURE_SINCE } from "./spec";
 import { attr, descendants, type VNode } from "./xml-tree";
 
 /**
@@ -10,8 +11,11 @@ import { attr, descendants, type VNode } from "./xml-tree";
  * carry a Mezzanine no matter how much the buyer wants one, and saying so is
  * more useful than a row of red crosses.
  *
- * `since` values are taken from the IAB XSDs, not from folklore — several of
- * them are widely misreported, including by other validators:
+ * `since` values are taken from the IAB XSDs, not from folklore, and live in
+ * `./spec.ts` (`FEATURE_SINCE`) since ADR-0035: the VAST generator gates its form
+ * and its builder on the same table, so it cannot offer a feature at a version
+ * this matrix calls unavailable. Several of them are widely misreported,
+ * including by other validators:
  *
  * - `InteractiveCreativeFile` is **4.0** (declared in vast4.xsd); 4.1 added its
  *   `variableDuration` attribute. `AdVerifications` at InLine level really is 4.1.
@@ -72,19 +76,19 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "linear",
     label: { ru: "Линейная видеореклама", en: "Linear video ad" },
-    since: "2.0",
+    since: FEATURE_SINCE["linear"],
     detect: byElement("Linear"),
   },
   {
     id: "nonlinear-companion",
     label: { ru: "Оверлеи и баннеры", en: "Overlays and companion banners" },
-    since: "2.0",
+    since: FEATURE_SINCE["nonlinear-companion"],
     detect: byAnyElement("NonLinearAds", "CompanionAds"),
   },
   {
     id: "basic-tracking",
     label: { ru: "Базовый трекинг событий", en: "Basic event tracking" },
-    since: "2.0",
+    since: FEATURE_SINCE["basic-tracking"],
     detect: (docs) => {
       const impressions = nodes(docs, "Impression").length;
       const trackings = nodes(docs, "Tracking").length;
@@ -98,7 +102,7 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "wrappers",
     label: { ru: "Обёртки и редиректы", en: "Wrappers and redirects" },
-    since: "2.0",
+    since: FEATURE_SINCE["wrappers"],
     detect: (docs) => {
       const found = nodes(docs, "Wrapper");
       return { present: found.length > 0, detail: found.length > 0 ? `×${found.length}` : undefined };
@@ -107,7 +111,7 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "vpaid",
     label: { ru: "VPAID", en: "VPAID" },
-    since: "2.0",
+    since: FEATURE_SINCE["vpaid"],
     deprecatedIn: "4.1",
     detect: (docs) => {
       const found = [...nodes(docs, "MediaFile"), ...nodes(docs, "Creative")].filter(
@@ -119,13 +123,13 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "skip",
     label: { ru: "Пропуск рекламы (Skip)", en: "Skippable ads" },
-    since: "3.0",
+    since: FEATURE_SINCE["skip"],
     detect: byAttribute("Linear", "skipoffset"),
   },
   {
     id: "ad-pods",
     label: { ru: "Рекламные подборки (Ad Pods)", en: "Ad pods" },
-    since: "3.0",
+    since: FEATURE_SINCE["ad-pods"],
     detect: (docs) => {
       const found = nodes(docs, "Ad").filter((node) => attr(node, "sequence") !== undefined);
       // `detail` is machine text and is NOT localised — so it may only ever
@@ -136,13 +140,13 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "error-codes",
     label: { ru: "Стандартизированные коды ошибок", en: "Standardised error codes" },
-    since: "2.0",
+    since: FEATURE_SINCE["error-codes"],
     detect: byElement("Error"),
   },
   {
     id: "error-macros",
     label: { ru: "Макросы в URL ошибок", en: "Error URL macros" },
-    since: "3.0",
+    since: FEATURE_SINCE["error-macros"],
     detect: (docs) => {
       const macros = new Set<string>();
       for (const node of nodes(docs, "Error")) {
@@ -154,13 +158,13 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "mezzanine",
     label: { ru: "Файл высокого качества (Mezzanine)", en: "Mezzanine file" },
-    since: "4.0",
+    since: FEATURE_SINCE["mezzanine"],
     detect: byElement("Mezzanine"),
   },
   {
     id: "universal-ad-id",
     label: { ru: "Сквозной ID креатива (UniversalAdId)", en: "Universal Ad ID" },
-    since: "4.0",
+    since: FEATURE_SINCE["universal-ad-id"],
     detect: (docs) => {
       const found = nodes(docs, "UniversalAdId");
       const first = found[0];
@@ -173,13 +177,13 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "ad-categories",
     label: { ru: "Категории объявлений", en: "Ad categories" },
-    since: "4.0",
+    since: FEATURE_SINCE["ad-categories"],
     detect: byAnyElement("Category", "BlockedAdCategories"),
   },
   {
     id: "viewable-impression",
     label: { ru: "Трекинг видимости (ViewableImpression)", en: "Viewability tracking" },
-    since: "4.0",
+    since: FEATURE_SINCE["viewable-impression"],
     detect: byElement("ViewableImpression"),
   },
   {
@@ -187,7 +191,7 @@ export const FEATURES: readonly FeatureSpec[] = [
     label: { ru: "Оптимизация под SSAI и CTV", en: "SSAI and CTV optimisation" },
     // 4.0 is when the SSAI story starts (Mezzanine, ViewableImpression); the
     // rest of the signals below are 4.1, and each has its own row above.
-    since: "4.0",
+    since: FEATURE_SINCE["ssai"],
     detect: (docs) => {
       const signals = ["Mezzanine", "AdServingId", "ClosedCaptionFiles", "ViewableImpression"].filter(
         (name) => nodes(docs, name).length > 0,
@@ -198,13 +202,13 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "ad-serving-id",
     label: { ru: "AdServingId", en: "AdServingId" },
-    since: "4.1",
+    since: FEATURE_SINCE["ad-serving-id"],
     detect: byElement("AdServingId"),
   },
   {
     id: "simid",
     label: { ru: "SIMID — интерактив без VPAID", en: "SIMID interactive creative" },
-    since: "4.1",
+    since: FEATURE_SINCE["simid"],
     detect: (docs) => {
       const found = nodes(docs, "InteractiveCreativeFile").filter(
         (node) => (attr(node, "apiFramework") ?? "").toLowerCase() === "simid",
@@ -215,7 +219,7 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "omid",
     label: { ru: "OMID — независимая верификация", en: "OMID verification" },
-    since: "4.1",
+    since: FEATURE_SINCE["omid"],
     detect: (docs) => {
       const verifications = nodes(docs, "Verification");
       const vendors = verifications
@@ -230,19 +234,19 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "closed-captions",
     label: { ru: "Субтитры (ClosedCaptionFiles)", en: "Closed caption files" },
-    since: "4.1",
+    since: FEATURE_SINCE["closed-captions"],
     detect: byElement("ClosedCaptionFiles"),
   },
   {
     id: "icons",
     label: { ru: "Иконки (AdChoices)", en: "Icons (AdChoices)" },
-    since: "3.0",
+    since: FEATURE_SINCE["icons"],
     detect: byElement("Icon"),
   },
   {
     id: "pricing",
     label: { ru: "Цена показа (Pricing)", en: "Pricing" },
-    since: "3.0",
+    since: FEATURE_SINCE["pricing"],
     detect: (docs) => {
       const found = nodes(docs, "Pricing");
       const first = found[0];
@@ -255,7 +259,7 @@ export const FEATURES: readonly FeatureSpec[] = [
   {
     id: "expires",
     label: { ru: "Срок годности объявления (Expires)", en: "Ad expiry" },
-    since: "4.1",
+    since: FEATURE_SINCE["expires"],
     detect: byElement("Expires"),
   },
 ] as const;

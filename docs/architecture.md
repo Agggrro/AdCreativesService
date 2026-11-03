@@ -51,7 +51,8 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 | `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
 | `/dashboard/access` | session | The account's closed-beta status and the Telegram link ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)); `/dashboard/subscriptions` redirects here |
 | `/dashboard/admin` | session + `ADMIN_EMAILS` | Every registered account and the grant/revoke action; 404 for anyone else |
-| `/tools/vast-validator`, `/tools/vast-generator` | public | Free tools ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read; the generator is a placeholder |
+| `/tools/vast-validator` | public | Free tool ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read |
+| `/tools/vast-generator` | public; saving needs a session | The VAST generator ([ADR-0035](decisions/0035-vast-video-creatives.md), [ADR-0036](decisions/0036-public-tool-that-saves.md)): builds a VAST video creative — version 2.0–4.3, an uploaded or linked spot, the buyer's pixels, companion banners, AdChoices — with the XML built in the browser by the same validator and builder the ad path runs, and played through the validator's isolated well. Reads the session only to choose between *Create* and *Sign in and create*; a signed-out visitor's draft stays in their browser across the sign-in and comes back on `?resume=1`, the sign-in's return (and the dashboard's link here), never on a plain visit. Saves through `createVideoCreative`; editing a video creative at `/dashboard/creatives/[id]/edit` renders the same form |
 | `/c/player` | public | The validator's player, deliberately on a **different origin** from the app ([ADR-0021](decisions/0021-validator-player-on-an-isolated-origin.md)) — it executes a stranger's VPAID unit, so it hosts nothing of ours. Inert until its parent posts a document |
 | `/icon`, `/opengraph-image` | public | Generated from the monogram’s own geometry at build time (Satori, so they read `lib/brand-palette.ts` rather than CSS tokens — [design-system.md](design-system.md) §12). `/favicon.ico` redirects to `/icon`, **app domain only**: an unscoped redirect would fire on the ad domain, which answers ads and one page and nothing else (ADR-0018) |
 | `/dev/harness` | **local only** | The creative harness: runs a built VPAID unit against schema-derived config at four slot sizes and judges it against the mandatory lifecycle. `?t=<unit>&set=field:value` runs a mode other than the schema default — the slider's vertical divider, the quiz's per-path results — including a field not yet seeded. Lists draft templates too, so a new one is checked before it is published ([ADR-0024](decisions/0024-pick-message-template.md)). 404 outside local development ([security.md](security.md)) |
@@ -137,7 +138,7 @@ ADR-0029, the VPAID units — a separate host, so none of the routing above appl
 
 Request flow:
 
-1. Parse + validate `creative_id` (and optional `format` override, macros).
+1. Parse + validate `creative_id`. (A `format` override was once planned and never built: the format is the creative's own `selected_format`.)
 2. Read the serving state from the **snapshots** in Workers KV, not the database
    ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md),
    [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)):
@@ -160,9 +161,15 @@ Request flow:
    comparing `current_period_end` against the clock, so a row that carries an expiry
    still lapses on time with no event at all.
    - **Active** → build a valid VAST 4.2 document containing the interactive payload
-     for the selected format via the **format adapter** (see below).
-   - **Inactive / missing / invalid** → return empty VAST: `<VAST version="4.2"></VAST>`
-     (optionally with a configured fallback ad).
+     for the selected format via the **format adapter** (see below) — or, for a
+     **VAST video creative** (`selected_format = 'video'`,
+     [ADR-0035](decisions/0035-vast-video-creatives.md)), the document `lib/vast-gen`
+     builds at the creative's own declared version, after re-validating its stored
+     config on every build (`serveVideo`). An invalid required part — the media, the
+     title — is a cached empty VAST; an invalid optional one is dropped and the ad still
+     serves.
+   - **Inactive / missing / invalid** → return empty VAST: `<VAST version="4.2"></VAST>`,
+     or `<VAST version="x.y"></VAST>` at a video creative's own version.
 4. Return XML with correct `Content-Type` and cache headers.
 
 Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
@@ -264,6 +271,25 @@ FormatAdapter:
 The VAST builder selects the adapter from the user's chosen format on the creative.
 Adding a new standard = adding an adapter, not touching the endpoint. See
 [ADR-0002](decisions/0002-multi-format-creative-delivery.md).
+
+**`video` is a document kind beside the registry, not an adapter**
+([ADR-0035](decisions/0035-vast-video-creatives.md)). An adapter fills the
+interactive InLine's `<MediaFiles>`; a plain linear video needs a whole document per
+VAST version, so `handleVast` dispatches it to `lib/vast-gen` after the `should_serve`
+gate:
+
+- `validate.ts` — `parseVideoConfig`, in `save`, `preview` and `serve` modes, shared
+  by the save actions, the browser's live preview and the ad path;
+- `build.ts` — `buildVideoVast`, in each version's XSD order, with the InLine and
+  Wrapper sequences read from `lib/vast-inspect/spec.ts`, the same table the
+  validator's ordering rule reads;
+- `beacons.ts` (signed, server-only) and `preview.ts` (inert placeholders) — the URLs
+  are injected, so the browser never sees the beacon key;
+- `serve.ts` — the `/v` entry point.
+
+A video creative points at the one *system* template `vast_video`
+(`templates.in_catalog = false`), so the FK, the format trigger, the serving view, the
+snapshot and the entitlement predicate are the ones every creative has.
 
 ### Live preview: `POST /api/vast/preview` + `GET /api/vast/preview/[token]`
 

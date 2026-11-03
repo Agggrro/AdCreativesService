@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Correct in every respect except one: it declares 3.0 and is authored in the
+  4.x order, with Error and Impression before AdTitle. 3.0's InLine is a flat
+  xs:sequence that opens AdSystem → AdTitle (vast3_draft.xsd), so a strict 3.0
+  parser rejects this document. The version-aware ordering rule (ADR-0035) must
+  warn here, and nothing else should fire.
+-->
+<VAST version="3.0">
+  <Ad id="ordering-30">
+    <InLine>
+      <AdSystem>Fixture</AdSystem>
+      <Error><![CDATA[https://tracking.example.com/error?code=[ERRORCODE]]]></Error>
+      <Impression><![CDATA[https://tracking.example.com/impression]]></Impression>
+      <AdTitle>3.0 in the 4.x order</AdTitle>
+      <Creatives>
+        <Creative id="creative-1" sequence="1">
+          <Linear>
+            <Duration>00:00:15</Duration>
+            <TrackingEvents>
+              <Tracking event="start"><![CDATA[https://tracking.example.com/start]]></Tracking>
+            </TrackingEvents>
+            <VideoClicks>
+              <ClickThrough><![CDATA[https://www.example.com/landing]]></ClickThrough>
+            </VideoClicks>
+            <MediaFiles>
+              <MediaFile delivery="progressive" type="video/mp4" width="640" height="360" bitrate="800"><![CDATA[https://cdn.example.com/creative.mp4]]></MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

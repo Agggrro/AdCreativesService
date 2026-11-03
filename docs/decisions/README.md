@@ -16,7 +16,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | ADR | Title | Status |
 | --- | --- | --- |
 | [0001](0001-tech-stack.md) | Tech stack: Next.js + Supabase + Stripe + Vercel | Accepted (billing amended by 0034, hosting by 0029) |
-| [0002](0002-multi-format-creative-delivery.md) | Multi-format creative delivery via adapter layer | Accepted |
+| [0002](0002-multi-format-creative-delivery.md) | Multi-format creative delivery via adapter layer | Accepted (a document kind beside the adapters, 0035) |
 | [0003](0003-access-control-over-code-hiding.md) | Access control over creative-code secrecy | Accepted |
 | [0004](0004-mvp-on-free-tiers.md) | Run the MVP entirely on free tiers | Accepted |
 | [0005](0005-interactive-image-creatives.md) | Interactive-image creatives via VPAID/SIMID (not display) | Accepted |
@@ -27,10 +27,10 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted (storage location and replace-delete amended by 0028) |
 | [0011](0011-conditional-grouped-config-schemas.md) | Conditional, grouped config schemas — and per-path click-through | Accepted |
 | [0012](0012-viewability-measurement.md) | Viewability measurement — OMID pass-through for SIMID, a custom module for VPAID | Accepted |
-| [0013](0013-public-free-tools-section.md) | A public free-tools section, and a nav for signed-out visitors | Accepted |
+| [0013](0013-public-free-tools-section.md) | A public free-tools section, and a nav for signed-out visitors | Accepted (the generator reads a session and saves, 0036) |
 | [0014](0014-vast-inspection-engine.md) | The VAST inspection engine — prose-derived rules, and dry-run by substitution | Accepted |
 | [0015](0015-serving-snapshots-on-cdn.md) | Serving snapshots on the CDN, not a live database read | Accepted (store amended by 0029) |
-| [0016](0016-three-events-hourly-counters.md) | Three ingested events, counted into hourly buckets | Accepted |
+| [0016](0016-three-events-hourly-counters.md) | Three ingested events, counted into hourly buckets | Accepted (start, quartiles and complete counted for VAST video creatives, 0035) |
 | [0017](0017-runtime-assets-on-public-cdn.md) | Creative runtime assets on a public, content-addressed CDN | Accepted (store amended by 0029) |
 | [0018](0018-dedicated-ad-serving-domain.md) | A dedicated ad-serving domain, with neutral paths | Accepted (CORS superseded by 0026, routing amended by 0029) |
 | [0019](0019-creative-telemetry-channel.md) | Creative telemetry over an origin-locked postMessage channel | Accepted |
@@ -49,7 +49,8 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0032](0032-engagement-extends-the-ad.md) | An ad the viewer is engaging with runs longer, up to 30 seconds more | Accepted |
 | [0033](0033-vast-error-statistics.md) | VAST errors, counted per code | Accepted |
 | [0034](0034-closed-beta-manual-entitlement.md) | Closed beta: entitlement granted by hand, Stripe disconnected | Accepted |
-| [0034](0034-closed-beta-manual-entitlement.md) | Closed beta: entitlement granted by hand, Stripe disconnected | Accepted |
+| [0035](0035-vast-video-creatives.md) | VAST video creatives: a system template, a version-aware builder, and quartiles counted | Accepted |
+| [0036](0036-public-tool-that-saves.md) | A public tool that saves: sign in at the end, the draft kept in the browser | Accepted |
 
 ## Template
 

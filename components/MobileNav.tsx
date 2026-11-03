@@ -8,7 +8,7 @@ import { useDict } from "@/components/i18n/LocaleProvider";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 /**
- * The navigation below `sm` (docs/design-system.md §6, "Mobile navigation").
+ * The navigation below `lg` (docs/design-system.md §6, "Mobile navigation").
  *
  * It exists because the previous system did not have one: `TopNav` was
  * `hidden … sm:flex`, so a phone visitor got a brand mark and nothing to navigate
@@ -28,7 +28,7 @@ export function MobileNav({
   items: TopBarLink[];
   /**
    * The account actions. They live here because the bar has no room for them
-   * below `sm` — and without this slot a signed-in visitor on a phone had no
+   * below `lg` — and without this slot a signed-in visitor on a phone had no
    * way to sign out at all, which the desktop-only guard in `AppTopBar` caused.
    */
   account?: React.ReactNode;
@@ -65,7 +65,7 @@ export function MobileNav({
   );
 
   return (
-    <div className="sm:hidden">
+    <div className="lg:hidden">
       <button
         ref={triggerRef}
         type="button"
@@ -123,7 +123,7 @@ export function MobileNav({
               </div>
             )}
             {/*
-              The language control lives here below `sm` — the bar has no room for
+              The language control lives here below `lg` — the bar has no room for
               it at 390px, and dropping it entirely would strand a Russian visitor
               on a phone.
             */}

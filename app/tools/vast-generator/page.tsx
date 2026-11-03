@@ -1,57 +1,67 @@
 import type { Metadata } from "next";
 import { getDict } from "@/lib/i18n/server";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { withNext } from "@/lib/safe-next";
+import { getCdnUrl } from "@/lib/site";
 import { AppTopBar } from "@/components/AppTopBar";
 import { Section } from "@/components/ui/Section";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { LinkButton } from "@/components/ui/Button";
-import { Panel } from "@/components/ui/Field";
+import { VideoTagGenerator } from "@/components/vast-gen/VideoTagGenerator";
+import { emptyDraft } from "@/components/vast-gen/draft";
+import { createVideoCreative } from "@/app/dashboard/creatives/video-actions";
 
 /**
- * A tab title and a SERP description are user-visible strings (§10), so they come
- * from the dictionary. `robots` does not — it is a directive to a crawler, not
- * copy — and it stays exactly as it was.
+ * A tab title and a SERP description are user-visible strings (§10), so they
+ * come from the dictionary. Indexed since the generator shipped (ADR-0035): the
+ * placeholder was `noindex` only for as long as it did nothing.
  */
 export async function generateMetadata(): Promise<Metadata> {
   const { dict } = await getDict();
   return {
     title: dict.tools.generatorMetaTitle,
     description: dict.tools.generatorMetaDescription,
-    // Reachable and linked, but kept out of the index until it does something.
-    // A thin "in development" page is a weak quality signal that costs the whole
-    // domain, not just this URL. Comes out when the generator ships — and the
-    // sitemap omits it for the same reason.
-    robots: { index: false, follow: true },
   };
 }
 
 /**
- * Placeholder for the second free tool (ADR-0013).
+ * The VAST generator (ADR-0035, ADR-0036): a VAST video creative built from a
+ * form, saved to Мои креативы, served as a dynamic tag.
  *
- * It exists as a route rather than a disabled row so the tools index can link
- * somewhere honest, and so the page can say what the generator will be for
- * instead of leaving a dead link that reads as a broken build.
+ * Public, like every tool: a signed-out visitor configures everything, previews
+ * the XML and plays it — and creating it takes an account, with the draft kept
+ * in their browser across the sign-in (ADR-0036). The page reads the session
+ * only to choose between those two endings; nothing is stored for a visitor.
  */
-export default async function VastGeneratorPage() {
+export default async function VastGeneratorPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ resume?: string | string[] }>;
+}) {
   const { dict } = await getDict();
-  const t = dict.tools;
+  const t = dict.vastGen;
+  const { resume } = await searchParams;
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return (
     <main className="flex flex-1 flex-col">
       <AppTopBar />
 
-      <Section tone="ground" pad="md" width="wide" innerClassName="flex flex-col gap-8">
-        <PageHeader title={t.generatorName} subtitle={t.generatorDescription} />
-
-        <Panel className="p-8">
-          <div className="flex max-w-[66ch] flex-col items-start gap-4">
-            <h2 className="type-h3">{t.generatorSoonTitle}</h2>
-            <p className="type-small text-fg-secondary">{t.generatorSoonBody}</p>
-            {/* A control names what happens, not what it points at (§10). */}
-            <LinkButton href="/tools/vast-validator" variant="secondary">
-              {t.open} · {t.validatorName}
-            </LinkButton>
-          </div>
-        </Panel>
+      <Section tone="surface" pad="md" width="wide" innerClassName="flex flex-col gap-8">
+        <PageHeader title={t.title} subtitle={t.subtitle} />
+        <VideoTagGenerator
+          mode="create"
+          signedIn={Boolean(user)}
+          // Back from signing in, and only then, the draft kept in this
+          // browser is restored: a later visit starts clean (ADR-0036).
+          resume={resume === "1"}
+          cdnUrl={getCdnUrl()}
+          signInHref={withNext("/login", "/tools/vast-generator?resume=1")}
+          action={createVideoCreative}
+          initialDraft={emptyDraft()}
+        />
       </Section>
     </main>
   );

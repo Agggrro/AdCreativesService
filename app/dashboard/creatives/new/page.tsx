@@ -26,6 +26,9 @@ export default async function NewCreativePage({
     .select("id, name, supported_standards, config_schema")
     .eq("id", sp.template)
     .eq("is_published", true)
+    // A system template (ADR-0035) is configured in its own tool, never through
+    // the schema-driven form: its config_schema declares only its click fields.
+    .eq("in_catalog", true)
     .maybeSingle();
 
   if (!template) {

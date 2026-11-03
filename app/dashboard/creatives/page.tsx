@@ -4,6 +4,7 @@ import { creativeErrorMessage } from "@/lib/creative-errors";
 import { LinkButton } from "@/components/ui/Button";
 import { CreativesTable } from "@/components/CreativesTable";
 import { Notice, Panel } from "@/components/ui/Field";
+import { VIDEO_FORMAT } from "@/lib/vast-gen/kind";
 
 export default async function MyCreativesPage({
   searchParams,
@@ -24,7 +25,8 @@ export default async function MyCreativesPage({
     await Promise.all([
       supabase
         .from("creatives")
-        .select("id, name, selected_format, template_id, created_at")
+        // `version` is a VAST video creative's own (ADR-0035), for its format chip.
+        .select("id, name, selected_format, template_id, created_at, version:config_json->>version")
         .order("created_at", { ascending: false }),
       supabase.from("templates").select("id, name"),
       // The only read path into creative_event_counters: an owner-scoped
@@ -59,6 +61,13 @@ export default async function MyCreativesPage({
           <LinkButton href="/dashboard/creatives/postback" variant="secondary">
             {dict.conversions.setUp}
           </LinkButton>
+          {/* A plain video tag is built in the VAST generator rather than
+              from a catalog tile (ADR-0035); secondary, so the page keeps one
+              primary (§3). `resume`: an unfinished draft left in this browser
+              — by a sign-up that came back signed out — is picked up here. */}
+          <LinkButton href="/tools/vast-generator?resume=1" variant="secondary">
+            {dict.dashboard.newVideo}
+          </LinkButton>
           <LinkButton href="/catalog" variant="primary">
             {dict.dashboard.createCreative}
           </LinkButton>
@@ -78,7 +87,12 @@ export default async function MyCreativesPage({
             return {
               id: c.id,
               label: c.name ?? templateName.get(c.template_id) ?? "—",
-              format: c.selected_format,
+              // Machine text, the same in both locales (§10): `VAST 4.2`, the
+              // name the creative's page and the generator's well give it too.
+              format:
+                c.selected_format === VIDEO_FORMAT && typeof c.version === "string"
+                  ? `VAST ${c.version}`
+                  : c.selected_format,
               impressions: row?.impressions ?? 0,
               clicks: row?.clicks ?? 0,
               serving: row?.should_serve ?? false,

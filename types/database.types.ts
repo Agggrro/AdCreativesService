@@ -54,6 +54,8 @@ export type Database = {
           config_schema: Json;
           pricing_tier: string | null;
           is_published: boolean;
+          /** False for a system template (ADR-0035): published, never listed in the catalog. */
+          in_catalog: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -69,6 +71,7 @@ export type Database = {
           config_schema?: Json;
           pricing_tier?: string | null;
           is_published?: boolean;
+          in_catalog?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -84,6 +87,7 @@ export type Database = {
           config_schema?: Json;
           pricing_tier?: string | null;
           is_published?: boolean;
+          in_catalog?: boolean;
           created_at?: string;
           updated_at?: string;
         };
@@ -101,27 +105,22 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
+        // Insert and Update list exactly the columns `authenticated` is granted
+        // (ADR-0035, docs/security.md "Column grants on `creatives`"): the
+        // compiler then refuses what Postgres would refuse at runtime with 42501.
+        // `id` is never client-chosen, and `template_id`/`user_id` never change.
         Insert: {
-          id?: string;
           user_id: string;
           template_id: string;
           name?: string | null;
           selected_format: string;
           config_json?: Json;
           status?: Database["public"]["Enums"]["creative_status"];
-          created_at?: string;
-          updated_at?: string;
         };
         Update: {
-          id?: string;
-          user_id?: string;
-          template_id?: string;
           name?: string | null;
           selected_format?: string;
           config_json?: Json;
-          status?: Database["public"]["Enums"]["creative_status"];
-          created_at?: string;
-          updated_at?: string;
         };
         Relationships: [
           {
@@ -377,7 +376,8 @@ export type Database = {
         Args: { p_creative_id: string };
         Returns: Database["private"]["Views"]["creative_serving"]["Row"][];
       };
-      // Dashboard analytics: the only read path into creative_event_counters.
+      // Dashboard analytics: with get_creative_video_funnel (below), the only read
+      // path into creative_event_counters.
       // Scoped to auth.uid() inside the function, hence no arguments (ADR-0008).
       get_creative_overview: {
         Args: Record<string, never>;
@@ -399,6 +399,21 @@ export type Database = {
         Returns: {
           code: number;
           count: number;
+        }[];
+      };
+      // One VAST video creative's delivery funnel, all-time (ADR-0035). Owner-
+      // checked inside: another account's id yields no row.
+      get_creative_video_funnel: {
+        Args: { p_creative_id: string };
+        Returns: {
+          impressions: number;
+          starts: number;
+          q25: number;
+          q50: number;
+          q75: number;
+          completes: number;
+          clicks: number;
+          viewable: number;
         }[];
       };
       // One creative's clicks through `/r` and its conversions per (UTC day,

@@ -74,7 +74,8 @@ export function Segmented<T extends string>({
    * outer border draws a box around the ragged block rather than around the
    * controls. So the wrapping variant becomes separate chips with a gap — each
    * one carries its own border and radius, which is correct at any number of
-   * rows. Only the landing hero and the harness pass `wrap`.
+   * rows. The landing hero, the harness and the VAST generator's icon corner
+   * pass `wrap`.
    */
   const container = wrap
     ? `inline-flex flex-wrap gap-2 ${fill ? "w-full" : ""}`
