@@ -7,7 +7,7 @@ import { isWorkersRuntime } from "@/lib/runtime-env";
 
 /**
  * The only place in this codebase that issues an outbound request to a URL a
- * stranger chose. Everything else talks to Supabase, Stripe, or ourselves.
+ * stranger chose. Everything else talks to Supabase, Cloudflare, or ourselves.
  *
  * That makes this file the whole SSRF surface of the product, so the guards are
  * not optional and not configurable by the caller:

@@ -8,7 +8,8 @@
 
 ### `users`
 Backed by Supabase Auth (`auth.users`). App-level profile data lives in a `profiles`
-table keyed by the auth user id, holding `stripe_customer_id` and preferences.
+table keyed by the auth user id, holding a display name (and a `stripe_customer_id`
+column left from the Stripe era, unused since [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)).
 
 ### `templates`
 Catalog of available interactive ad templates (admin-curated, read-only to users).
@@ -23,7 +24,7 @@ Catalog of available interactive ad templates (admin-curated, read-only to users
 | `runtime_keys` | per-standard pointer to the runtime build. Its first path segment is also the demo unit key used by `/api/preview-unit/<key>` |
 | `preview_url` | **Reserved, unused.** NULL in every row and rendered nowhere: the catalog shows a live demo rather than a thumbnail. Remove it or fill it — do not read it |
 | `config_schema` | JSON schema describing the fields a user must fill. Since [ADR-0011](decisions/0011-conditional-grouped-config-schemas.md) a field may also carry `group` / `block` (presentation) and `showWhen` (conditional visibility), and a `groups` root key declares how each section renders. Field **order is significant**: visibility resolves top-down, so a field's controllers must be declared before it. Since [ADR-0012](decisions/0012-viewability-measurement.md), `showWhen` may also gate on the synthetic `"selected_format"` controller — the creative's chosen delivery format, not a schema field — used e.g. to show OMID vendor fields only when SIMID is selected |
-| `pricing_tier` | links to a Stripe price / plan |
+| `pricing_tier` | reserved for a billing provider's price family; nothing reads it since [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md) |
 | `created_at`, `updated_at` | |
 
 ### `creatives`
@@ -41,7 +42,10 @@ A user's configured instance of a template.
 | `created_at`, `updated_at` | |
 
 ### `subscriptions`
-Source-of-truth mirror of Stripe state. See [billing.md](billing.md).
+The entitlement rows. Born as a mirror of Stripe state; since the closed beta
+([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)) written only by the admin's
+grant — a participant is `{all_access, active, template_id null, current_period_end null,
+stripe_subscription_id null}`. See [billing.md](billing.md).
 
 | Field | Notes |
 | --- | --- |
@@ -49,8 +53,8 @@ Source-of-truth mirror of Stripe state. See [billing.md](billing.md).
 | `user_id` | FK → auth user |
 | `plan_type` | `single` \| `all_access` |
 | `template_id` | FK → templates, **null for all-access** |
-| `status` | `active` \| `trialing` \| `past_due` \| `canceled` \| `incomplete`. **`canceled` is final**: the trigger `subscriptions_keep_canceled` skips any update that would move a row out of it — Stripe never revives a canceled subscription, so such a write is an older view landing late (see [billing.md](billing.md)) |
-| `stripe_subscription_id`, `stripe_customer_id` | |
+| `status` | `active` \| `trialing` \| `past_due` \| `canceled` \| `incomplete`. **`canceled` is final**: the trigger `subscriptions_keep_canceled` skips any update that would move a row out of it — a billing provider never revives a canceled subscription, so such a write is an older view landing late. A revoke sets the manual row to `canceled` (an update keeps the user inside the reconciler's `updated_at` window; a delete would not) and a later grant is a new row (see [billing.md](billing.md)) |
+| `stripe_subscription_id`, `stripe_customer_id` | nullable; **null marks a manual grant**. The admin's actions never touch a row that has one. The partial unique index `subscriptions_one_manual_grant_idx` allows one live manual grant per user |
 | `current_period_end` | ts; the effective expiry used by the gate |
 | `cancel_at_period_end` | bool |
 | `created_at`, `updated_at` | |
@@ -210,15 +214,9 @@ processed and only its log line is skipped.
 | `get_creative_conversion_goals(creative_id, days)` | authenticated | The same window, bucketing and ownership check, per goal: approved/pending/rejected counts and approved revenue per currency. No clicks — a click has no goal (ADR-0027) |
 | `ensure_postback_key()` / `rotate_postback_key()` / `has_postback_key()` / `get_postback_log(limit)` | authenticated | The caller's own key and log, scoped to `auth.uid()` |
 
-### `stripe_events` (webhook idempotency)
-Ledger of claimed and processed Stripe event ids. Service-role only; no client access.
-
-| Field | Notes |
-| --- | --- |
-| `id` | text PK — the Stripe event id |
-| `type` | event type |
-| `received_at` | ts — when the event was last claimed: first delivery, or a takeover of an abandoned claim |
-| `processed_at` | ts, nullable — when the handler finished; null while in flight or abandoned. Only a processed event is a duplicate (see [billing.md](billing.md), "Idempotent") |
+### `stripe_events`
+Dropped with the Stripe webhook ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md));
+`schema.sql` carries the `drop table if exists` so a re-apply removes it everywhere.
 
 ## Relationships
 
@@ -293,12 +291,12 @@ REST API. The private Vercel Blob store the documents lived in before went with 
 | Key | Projection of | Republished by |
 | --- | --- | --- |
 | `serving/creative/<creative_id>.json` | `private.creative_serving`, minus the two computed columns | `createCreative` / `updateCreative` / `duplicateCreative`; removed by `deleteCreative` **before** the row, and once more after it; the reconciler |
-| `serving/entitlement/<user_id>.json` | that user's `subscriptions` rows, as facts (`status`, `plan_type`, `template_id`, `current_period_end`) | the Stripe webhook's `upsertSubscription`; the reconciler |
+| `serving/entitlement/<user_id>.json` | that user's `subscriptions` rows, as facts (`status`, `plan_type`, `template_id`, `current_period_end`) | the admin's `grantBetaAccess` / `revokeBetaAccess` (`app/dashboard/admin/actions.ts`); the reconciler |
 
 The **reconciler** (`lib/serving/reconcile.ts`, `/api/cron/reconcile`, every ten minutes
 on the app's Worker) compares every snapshot whose row changed in the last four days with
 what a publish would write now, and republishes the ones that drifted — a store that could
-neither take a write nor clear it, a webhook whose retries ran out. A publish re-reads the
+neither take a write nor clear it, a grant whose publish failed. A publish re-reads the
 row after writing and removes the snapshot if the creative was deleted meanwhile.
 
 Postgres remains the source of truth; these are a projection of it, and
@@ -312,8 +310,8 @@ reader that predates it ignores it, and a snapshot without it routes no click th
 `/r` — the behaviour before ADR-0023, not an error.
 
 `is_entitled` / `should_serve` are deliberately *not* stored. They depend on `now()`,
-and freezing them would keep a lapsed subscription serving whenever a Stripe webhook
-was missed or delayed.
+and freezing them would keep a lapsed row serving whenever the event that should have
+ended it was missed or delayed.
 
 ## RLS intent
 
@@ -322,11 +320,11 @@ was missed or delayed.
 | `profiles` | owner can read/update own row |
 | `templates` | **published** templates readable by anon + authenticated (public showcase); drafts hidden; writes admin-only (service role). A new template is seeded as a draft and only the local-only `/dev/harness` reads drafts, with the service role ([ADR-0024](decisions/0024-pick-message-template.md)) |
 | `creatives` | owner can CRUD own rows only |
-| `subscriptions` | owner can **read** own rows; **no client writes** (only webhook via service role) |
+| `profiles`, `templates`, `creatives`, `subscriptions` | TRUNCATE revoked from `anon`/`authenticated` — the one table privilege RLS cannot gate; PostgREST has no verb for it, closed all the same ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md) review) |
+| `subscriptions` | owner can **read** own rows; **no client writes** (only the admin's grant actions, via service role — [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)) |
 | `creative_event_counters` | **no direct client access** (RLS on, zero policies); writes via the ingest beacon with the service role, reads only through the owner-scoped aggregate `public.get_creative_overview()` |
 | `creative_error_counters` | the same: RLS on, zero policies, table privileges revoked from `anon`/`authenticated`; written by `increment_creative_error()` (service role), read only through the owner-checked `public.get_creative_errors()` ([ADR-0033](decisions/0033-vast-error-statistics.md)) |
 | `creative_clicks`, `conversions`, `postback_keys`, `postback_log` | **no direct client access** (RLS on, zero policies, table and identity-sequence privileges revoked from `anon`/`authenticated`); clicks written by `record_click()` and conversions + log by `record_postback()`, both service role only; the owner reads through `get_creative_conversions()`, `ensure_postback_key()`, `has_postback_key()` and `get_postback_log()`, each scoped to `auth.uid()` ([ADR-0023](decisions/0023-conversion-postbacks.md)) |
-| `stripe_events` | **no direct client access**; written only by the webhook (service role) |
 | `storage.objects` (`creative-media`) | authenticated users can insert/update/delete only under their own `auth.uid()` path prefix; select is public (any role) — the bucket's own public-read already bypasses RLS for plain GETs, this policy just keeps `.list()`/`.download()` consistent. Since [ADR-0028](decisions/0028-creative-media-on-r2.md) new uploads go to R2, which has no RLS: there the same prefix rule is enforced in code (`requestMediaUpload` mints the key; `deleteCreative` deletes only keys under the caller's prefix) |
 
 RLS protects the **dashboard** path. It is intentionally not relied upon for the

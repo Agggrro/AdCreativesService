@@ -7,9 +7,8 @@
 // build time and come from the repository's Actions variables.
 //
 // Secrets are set with `wrangler secret put` and never live in this file:
-//   SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
-//   PREVIEW_TOKEN_SECRET, TRACK_TOKEN_SECRET (both equal to creosmith-ads'),
-//   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CRON_SECRET
+//   SUPABASE_SERVICE_ROLE_KEY, PREVIEW_TOKEN_SECRET, TRACK_TOKEN_SECRET (both
+//   equal to creosmith-ads'), R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, CRON_SECRET
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "creosmith-web",
@@ -51,9 +50,9 @@
   // site URL is here too because the entry reads it at runtime.
   "vars": {
     "NEXT_PUBLIC_SITE_URL": "https://creosmith.com",
-    "STRIPE_PRICE_SINGLE_WEEKLY": "price_1TqJGLRuVae2qc3xuiPHh0uo",
-    "STRIPE_PRICE_SINGLE_MONTHLY": "price_1TqJGMRuVae2qc3xNsPJ6pWF",
-    "STRIPE_PRICE_ULTIMATE_MONTHLY": "price_1TqJGNRuVae2qc3xq5h4x3H2",
+    // Who may grant closed-beta access on /dashboard/admin (ADR-0034). An email,
+    // not a secret: it names the account, it does not authenticate it.
+    "ADMIN_EMAILS": "agggrro@gmail.com",
     "R2_ACCOUNT_ID": "4e9bc9b3bf84f2a176586ef8dad3b43c",
     "R2_BUCKET": "creative-media"
   },

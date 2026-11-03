@@ -101,10 +101,11 @@ create table if not exists public.profiles (
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
-comment on table public.profiles is 'App profile per auth user; holds Stripe customer id.';
+comment on table public.profiles is 'App profile per auth user. stripe_customer_id is unused since ADR-0034 and must not become client-writable input to a billing provider: profiles_update_own lets the owner set it.';
 
-create index if not exists profiles_stripe_customer_id_idx
-  on public.profiles (stripe_customer_id);
+-- The `unique` on the column already indexes it; this second index was always
+-- redundant, and since ADR-0034 it indexed an unused column.
+drop index if exists public.profiles_stripe_customer_id_idx;
 
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
@@ -235,8 +236,17 @@ create trigger creatives_validate_format
   for each row execute function public.validate_creative_format();
 
 -- ---------------------------------------------------------------------------
--- subscriptions  (mirror of Stripe state; written only by the webhook)
+-- subscriptions  (entitlement rows; written only by the service role)
 -- ---------------------------------------------------------------------------
+-- Born as a mirror of Stripe subscriptions, written by the webhook. Since the
+-- closed beta (ADR-0034) the one writer is the admin's grant on
+-- /dashboard/admin: a participant is a row with `plan_type = 'all_access'`,
+-- `status = 'active'`, no period end and no `stripe_subscription_id`; a revoke
+-- marks it `canceled` (an UPDATE, so `updated_at` keeps the user inside the
+-- reconciler's window), and a later grant is a new row beside it. The
+-- Stripe columns stay, nullable, so a subscription written by a billing
+-- provider again one day lands beside a manual grant instead of replacing it,
+-- and `private.is_entitled` below reads both the same way.
 create table if not exists public.subscriptions (
   id                     uuid primary key default gen_random_uuid(),
   user_id                uuid not null references auth.users(id) on delete cascade,
@@ -255,7 +265,7 @@ create table if not exists public.subscriptions (
     (plan_type = 'single'     and template_id is not null)
   )
 );
-comment on table public.subscriptions is 'Stripe subscription mirror. Source of truth is Stripe; updated via webhook (service role).';
+comment on table public.subscriptions is 'Entitlement rows. During the closed beta (ADR-0034) written by the admin grant with the service role; a row with no stripe_subscription_id is a manual grant.';
 
 create index if not exists subscriptions_user_id_idx     on public.subscriptions (user_id);
 create index if not exists subscriptions_template_id_idx on public.subscriptions (template_id);
@@ -266,6 +276,17 @@ create index if not exists subscriptions_updated_at_idx  on public.subscriptions
 create index if not exists subscriptions_active_lookup_idx
   on public.subscriptions (user_id, plan_type, template_id, current_period_end)
   where status in ('active', 'trialing');
+-- One live manual grant per user (ADR-0034). The grant action reads before it
+-- inserts, but two submits can race past that read; this makes the second one
+-- a 23505 the action treats as success, rather than a second identical row.
+-- Cancelled grants fall outside the predicate, so a re-grant after a revoke
+-- is a new row and does not collide.
+create unique index if not exists subscriptions_one_manual_grant_idx
+  on public.subscriptions (user_id)
+  where stripe_subscription_id is null
+    and plan_type = 'all_access'
+    and status = 'active'
+    and current_period_end is null;
 
 drop trigger if exists subscriptions_set_updated_at on public.subscriptions;
 create trigger subscriptions_set_updated_at
@@ -307,7 +328,7 @@ create trigger subscriptions_keep_canceled
 -- Replaces the append-only `creative_events`, which stored one row per beacon.
 -- Two problems, both structural rather than tuning:
 --   * up to seven rows written per impression, into the same database that
---     serves login and the Stripe webhook;
+--     served login and, at the time, the Stripe webhook;
 --   * `get_creative_overview()` scanned every event a creative had ever
 --     produced, so the dashboard got slower forever rather than with a window.
 -- Counting into (creative, event, hour) buckets makes the write one upsert and
@@ -909,27 +930,15 @@ revoke all on function public.purge_tracking_data(int, int) from public, anon, a
 grant execute on function public.purge_tracking_data(int, int) to service_role;
 
 -- ---------------------------------------------------------------------------
--- stripe_events  (webhook idempotency ledger)
+-- stripe_events  (gone with the Stripe webhook — ADR-0034)
 -- ---------------------------------------------------------------------------
-create table if not exists public.stripe_events (
-  id          text primary key,        -- Stripe event id
-  type        text not null,
-  received_at timestamptz not null default now()
-);
-comment on table public.stripe_events is 'Claimed and processed Stripe event ids for webhook idempotency. Service-role only.';
-
--- A claim is not a completion. Without this column an event whose handler
--- died after claiming it — the rollback failing alongside, or the request cut
--- off when Stripe gave up waiting — answered "Duplicate" to every retry, and a
--- cancellation could be lost for good. Now only a processed event is a
--- duplicate; a claim older than the webhook's timeout is taken over by the
--- next delivery (app/api/stripe/webhook/route.ts). Nullable, so the deployed
--- code that does not know it keeps working; rows from before it are treated
--- as abandoned claims and reprocessed if Stripe ever redelivers them, which is
--- safe because every handler re-fetches the subscription from Stripe.
-alter table public.stripe_events add column if not exists processed_at timestamptz;
-comment on column public.stripe_events.received_at is 'When the event was last claimed (first delivery, or a takeover of an abandoned claim).';
-comment on column public.stripe_events.processed_at is 'When the handler finished. Null: claimed and in flight, or abandoned.';
+-- The webhook's idempotency ledger. The webhook was deleted when billing left
+-- the product for the closed beta, and nothing else ever read this table. The
+-- drop stays here, rather than the definition simply vanishing, because this
+-- file is re-applied as a whole: a deployment that still has the table gets
+-- rid of it on the next `npm run db:schema`. Bringing Stripe back means a new
+-- ledger, not this one — its claim/takeover semantics were the webhook's.
+drop table if exists public.stripe_events;
 
 -- ============================================================================
 -- Row Level Security
@@ -945,12 +954,10 @@ alter table public.creatives       enable row level security;
 alter table public.subscriptions   enable row level security;
 alter table public.creative_event_counters enable row level security;
 alter table public.creative_error_counters enable row level security;
-alter table public.stripe_events   enable row level security;
 alter table public.creative_clicks enable row level security;
 alter table public.conversions     enable row level security;
 alter table public.postback_keys   enable row level security;
 alter table public.postback_log    enable row level security;
--- stripe_events: no policy => no client access; only the service role (webhook) touches it.
 
 -- profiles: owner reads/updates own row (insert handled by trigger).
 drop policy if exists profiles_select_own on public.profiles;
@@ -987,8 +994,10 @@ drop policy if exists creatives_delete_own on public.creatives;
 create policy creatives_delete_own on public.creatives
   for delete to authenticated using (user_id = (select auth.uid()));
 
--- subscriptions: owner may READ own rows only. No client writes — the Stripe
--- webhook (service role) is the only writer.
+-- subscriptions: owner may READ own rows only. No client writes — the admin's
+-- grant action (service role, ADR-0034) is the only writer. This is what makes
+-- the closed-beta mark safe to keep here rather than on `profiles`, whose
+-- update policy lets a user change any column of their own row.
 drop policy if exists subscriptions_select_own on public.subscriptions;
 create policy subscriptions_select_own on public.subscriptions
   for select to authenticated using (user_id = (select auth.uid()));
@@ -1076,14 +1085,20 @@ grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;
 grant all on all sequences in schema public to anon, authenticated, service_role;
 
--- Two tables have no client contract at all: `creative_event_counters` is written by the
+-- `creative_event_counters` has no client contract at all: it is written by the
 -- ingest beacon with the service role and read only through
--- public.get_creative_overview(), and `stripe_events` is webhook-only. Take the
+-- public.get_creative_overview(). Take the
 -- table-level privileges away rather than relying on RLS alone — TRUNCATE is a
 -- table privilege that **no policy can gate**, and "RLS on, zero policies" does
 -- not stop it. SECURITY DEFINER functions are unaffected: they are checked
 -- against their owner, not the caller.
-revoke all on public.creative_event_counters, public.stripe_events from anon, authenticated;
+revoke all on public.creative_event_counters from anon, authenticated;
+-- The tables that *do* have a client contract keep their SELECT/INSERT/UPDATE/
+-- DELETE for RLS to gate, but TRUNCATE is the one privilege RLS cannot gate,
+-- and the blanket grant above handed it out. PostgREST has no verb for it, so
+-- this closes a privilege, not a reachable path — closed all the same.
+revoke truncate on public.profiles, public.templates, public.creatives, public.subscriptions
+  from anon, authenticated;
 -- creative_error_counters (ADR-0033) has no client contract either.
 revoke all on public.creative_error_counters from anon, authenticated;
 -- The same for the conversion-tracking tables (ADR-0023): no client contract,
@@ -1109,7 +1124,7 @@ alter default privileges in schema public
 -- ----------------------------------------------------------------------------
 -- Not exposed to PostgREST (only `public`/`graphql_public` are). The VAST
 -- endpoint reads this by creative_id with the service role. Resolves effective
--- entitlement so the serving path needs no Stripe call and no live join logic
+-- entitlement so the serving path needs no billing call and no live join logic
 -- in app code. See docs/architecture.md.
 -- ============================================================================
 create schema if not exists private;

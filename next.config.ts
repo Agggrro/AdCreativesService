@@ -83,16 +83,6 @@ const FRAME_ANCESTORS = (() => {
 
 const nextConfig: NextConfig = {
   /**
-   * Loaded from node_modules at runtime rather than bundled. Bundled, webpack
-   * inlines stripe's Node build — Node's `http` agents created at module load,
-   * `os.release()` on every request — and a Cloudflare Worker would run that.
-   * External, OpenNext resolves the package with the `workerd` condition and
-   * ships stripe's own Worker build (fetch and SubtleCrypto); on Node nothing
-   * changes (ADR-0029).
-   */
-  serverExternalPackages: ["stripe"],
-
-  /**
    * `app/icon.tsx` generates the tab icon and Next links it as `/icon`, which is
    * what a browser reading the markup uses. Nothing serves `/favicon.ico` any
    * more, though — the starter default that used to sit there was deleted — and
@@ -138,7 +128,7 @@ const nextConfig: NextConfig = {
       const onCdn = [{ type: "host" as const, value: CDN_HOST }];
 
       // The ad domain serves ads and one page explaining itself. Everything else
-      // — the dashboard, auth, the Stripe webhook, the free tools — is 404 here.
+      // — the dashboard, auth, the free tools — is 404 here.
       // It is loaded inside strangers' players on strangers' pages; the less of
       // the product that answers on it, the smaller the surface.
       beforeFiles.push(

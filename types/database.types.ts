@@ -244,29 +244,6 @@ export type Database = {
           },
         ];
       };
-      stripe_events: {
-        Row: {
-          id: string;
-          type: string;
-          /** When the event was last claimed — first delivery, or a takeover. */
-          received_at: string;
-          /** When the handler finished; null while in flight or abandoned. */
-          processed_at: string | null;
-        };
-        Insert: {
-          id: string;
-          type: string;
-          received_at?: string;
-          processed_at?: string | null;
-        };
-        Update: {
-          id?: string;
-          type?: string;
-          received_at?: string;
-          processed_at?: string | null;
-        };
-        Relationships: [];
-      };
       // ADR-0023: the per-click store behind conversion attribution. Written
       // only by record_click(), from the `/r` redirect; no client access.
       creative_clicks: {

@@ -11,7 +11,7 @@ code on every change (see the [`doc-sync`](../.claude/skills/doc-sync/SKILL.md) 
 | [architecture.md](architecture.md) | System design: the three layers, the ad-serving path, data flow |
 | [adtech-standards.md](adtech-standards.md) | VAST / SIMID / VPAID / MRAID, the multi-format strategy, the protection reality |
 | [data-model.md](data-model.md) | Entities, relationships, and RLS intent (conceptual schema) |
-| [billing.md](billing.md) | Stripe model, plans, webhooks, subscription lifecycle |
+| [billing.md](billing.md) | Access during the closed beta: the manual grant, the snapshot publish, the entitlement lifecycle |
 | [security.md](security.md) | Trust boundaries, public endpoint, secrets, RLS scope |
 | [design-system.md](design-system.md) | Midnight: the binding UI contract — tokens, typography, components, motion, RU/EN |
 | [mvp-scope.md](mvp-scope.md) | What is in and out of the first shippable version |

@@ -1,5 +1,5 @@
 import type { SubscriptionStatus } from "@/types/database.types";
-import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
+import type { CreativeSnapshot, EntitlementRecord, EntitlementSnapshot } from "./types";
 
 /**
  * The entitlement predicate, evaluated on the serving path from snapshot facts.
@@ -20,7 +20,7 @@ import type { CreativeSnapshot, EntitlementSnapshot } from "./types";
  * now()` at read time, so a lapsed subscription stops serving with no event
  * required. Snapshotting a boolean `should_serve` would throw that away and
  * leave a paid payload serving indefinitely after the period ended, since a
- * missed or delayed Stripe webhook is precisely the case the live predicate is
+ * missed or delayed billing event is precisely the case the live predicate is
  * immune to. Storing the timestamp and re-evaluating here keeps the property.
  */
 
@@ -29,6 +29,30 @@ const SERVING_STATUSES: ReadonlySet<SubscriptionStatus> = new Set<SubscriptionSt
   "active",
   "trialing",
 ]);
+
+/**
+ * The row half of the predicate — `s.status in ('active', 'trialing') and
+ * (s.current_period_end is null or s.current_period_end > now())` — with no
+ * plan or template in it. Exported because the dashboard asks the same question
+ * of a row (`lib/beta-access.ts`, "does this account hold a live all-access
+ * row?") and must not drift from the serving path's answer.
+ */
+export function recordIsLive(
+  s: Pick<EntitlementRecord, "status" | "current_period_end">,
+  now: Date = new Date(),
+): boolean {
+  if (!SERVING_STATUSES.has(s.status)) return false;
+
+  // `s.current_period_end is null or s.current_period_end > now()`
+  if (s.current_period_end !== null) {
+    const endsAt = Date.parse(s.current_period_end);
+    // A timestamp we cannot parse is not a licence to serve. In SQL this case
+    // cannot arise (the column is typed); here the value has been through
+    // JSON, so it has to be handled — and the safe direction is closed.
+    if (Number.isNaN(endsAt) || endsAt <= now.getTime()) return false;
+  }
+  return true;
+}
 
 /**
  * Port of `private.is_entitled(p_user_id, p_template_id)`. The user is implicit:
@@ -46,16 +70,7 @@ export function isEntitled(
   if (!entitlement) return false;
 
   return entitlement.subscriptions.some((s) => {
-    if (!SERVING_STATUSES.has(s.status)) return false;
-
-    // `s.current_period_end is null or s.current_period_end > now()`
-    if (s.current_period_end !== null) {
-      const endsAt = Date.parse(s.current_period_end);
-      // A timestamp we cannot parse is not a licence to serve. In SQL this case
-      // cannot arise (the column is typed); here the value has been through
-      // JSON, so it has to be handled — and the safe direction is closed.
-      if (Number.isNaN(endsAt) || endsAt <= now.getTime()) return false;
-    }
+    if (!recordIsLive(s, now)) return false;
 
     // `s.plan_type = 'all_access' or (s.plan_type = 'single' and s.template_id = p_template_id)`
     // A single plan with a NULL template_id matches nothing, same as SQL's

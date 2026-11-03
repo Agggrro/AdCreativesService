@@ -5,8 +5,8 @@ import type { Database } from "@/types/database.types";
 /**
  * Server-only Supabase client using the SERVICE ROLE key. It bypasses RLS, so
  * it must NEVER be imported into client components. Used on the ad-serving path
- * (VAST read, beacons, clicks, postbacks, snapshots), by the Stripe webhook
- * writer, and by the local-only harness — the full list, which a new use must
+ * (VAST read, beacons, clicks, postbacks, snapshots), by the admin's closed-beta
+ * grant (ADR-0034), and by the local-only harness — the full list, which a new use must
  * join, is docs/security.md "Secrets".
  */
 const SERVICE_REQUEST_TIMEOUT_MS = 10_000;
@@ -22,8 +22,8 @@ export function createServiceClient() {
   return createClient<Database>(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     // Every request bounded at 10 s — the client has no timeout of its own. Its
-    // callers run under ceilings (a webhook whose event claim assumes the run
-    // ends, a player waiting on a tag); a call that hangs would outlive them.
+    // callers run under ceilings (a server action, a cron run, a player waiting
+    // on a tag); a call that hangs would outlive them.
     // A caller's own, shorter signal (`.abortSignal()`) still wins.
     global: {
       fetch: async (input, init) => {

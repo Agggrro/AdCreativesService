@@ -527,6 +527,41 @@ replacement, which left a phone visitor with a brand mark and nothing to navigat
 - `Escape` closes and returns focus to the trigger.
 - An icon may accompany the trigger but never replaces its label (§10).
 
+### Site strip — the closed-beta notice
+
+One strip under the top bar, on every page that renders the bar, for as long as the
+product is in closed beta ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)).
+It says that access is granted by hand and where to ask for it. `ClosedBetaStrip`.
+
+- **Tone `info`, and only `info`.** The strip informs; it is not an action, so it never
+  wears the accent, and it is not an alarm, so it is not `dead`. Tint `info-bg` with
+  `info` text — 7.63:1 — and a hairline rule above it. The link is underlined
+  (`underline-offset-4`) and hovers to `fg`, 14.54:1 on the tint.
+- **One sentence and one link.** The Telegram handle rides inside the link in mono: it is
+  a value to copy, not a word in the sentence (§4). No icon, no second line of copy, and
+  no dismiss control — there is no state to remember a dismissal with, and a strip that
+  can be closed is a strip that gets closed before it is read.
+- `type-small`, 40px minimum height, `py-2`. At 390px it wraps to two lines rather than
+  truncating; the sentence and the link are separate flex items so the link never breaks
+  mid-phrase.
+- **Hidden for a signed-in participant.** The sentence asks for something they already
+  have. The bar reads the viewer's own entitlement rows (owner-scoped under RLS) to
+  decide; a signed-out visitor always sees it.
+- Persistent chrome: it sits inside the sticky `<header>` under the bar's `Container`, so
+  the mobile panel (`top-full`) hangs below it, and it does not count against the accent
+  budget — it has no accent to count.
+
+The admin's accounts list (`/dashboard/admin`, the same ADR) is an ordinary state-rail
+table: rail `live` for a participant, `info` for an account entitled by an external
+subscription, none for an account with no access — and in that row the access cell is
+the muted em dash, not a state word: no access is an absence, not a state. Its row
+action is the `sm` secondary button the table rule prescribes — *Выдать доступ* /
+*Отозвать* — and the email is mono, because an address is an identifier. *Отозвать*
+goes through the destructive confirmation: a re-grant restores access, not the
+impressions a running campaign lost while the tag served nothing. The dialog's subject
+is the email, so mono — the one case where the subject is an identifier rather than a
+user-written name.
+
 ### Help tooltip
 
 Explanation a fluent user does not need belongs *behind* a trigger, not in a paragraph

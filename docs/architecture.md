@@ -12,23 +12,23 @@ performance profiles**. Keeping them separate is the core architectural idea.
 │  A. Dashboard App (authenticated, low QPS, user-facing)            │
 │     Next.js App Router · Supabase Auth · RLS-protected             │
 │     - Landing + template showcase                                  │
-│     - Configure creatives, manage billing, copy VAST tag URLs      │
+│     - Configure creatives, see access status, copy VAST tag URLs   │
+│     - /dashboard/admin: the closed-beta grant (ADR-0034)           │
 └──────────────────────────────────────────────────────────────────┘
-                │ writes config              │ Stripe Checkout
-                ▼                            ▼
+                │ writes config, grants      │
+                ▼                            │
 ┌──────────────────────────────────────────────────────────────────┐
 │  B. Database (Supabase / PostgreSQL)                               │
 │     users · templates · creatives · subscriptions · counters       │
 │     RLS protects user-facing access. A denormalized "serving view" │
 │     gives the VAST path a fast, RLS-free read.                     │
 └──────────────────────────────────────────────────────────────────┘
-                ▲ webhook sync               ▲ scoped service-role read
-                │                            │
+                                             ▲ scoped service-role read
+                                             │
 ┌──────────────────────────────────────────────────────────────────┐
 │  C. Ad-Serving Layer (public, high QPS, latency-sensitive)         │
 │     GET /api/vast?creative_id=…  (edge, cacheable)                 │
 │     GET /r click redirect · /pb conversion postbacks (ADR-0023)    │
-│     Stripe webhook  /api/stripe/webhook  (source of truth)        │
 │     Creative runtime/CDN: SIMID iframe / VPAID unit (signed URLs)  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -49,7 +49,8 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 | `/dashboard` | session | Redirect only — to `/dashboard/creatives`, or `/catalog` for a user with none |
 | `/dashboard/creatives`, `/dashboard/creatives/[id]` | session | The user's creatives, their VAST tags, and delivery counts |
 | `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
-| `/dashboard/subscriptions` | session | All billing; Stripe checkout returns here |
+| `/dashboard/access` | session | The account's closed-beta status and the Telegram link ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)); `/dashboard/subscriptions` redirects here |
+| `/dashboard/admin` | session + `ADMIN_EMAILS` | Every registered account and the grant/revoke action; 404 for anyone else |
 | `/tools/vast-validator`, `/tools/vast-generator` | public | Free tools ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read; the generator is a placeholder |
 | `/c/player` | public | The validator's player, deliberately on a **different origin** from the app ([ADR-0021](decisions/0021-validator-player-on-an-isolated-origin.md)) — it executes a stranger's VPAID unit, so it hosts nothing of ours. Inert until its parent posts a document |
 | `/icon`, `/opengraph-image` | public | Generated from the monogram’s own geometry at build time (Satori, so they read `lib/brand-palette.ts` rather than CSS tokens — [design-system.md](design-system.md) §12). `/favicon.ico` redirects to `/icon`, **app domain only**: an unscoped redirect would fire on the ad domain, which answers ads and one page and nothing else (ADR-0018) |
@@ -151,12 +152,13 @@ Request flow:
      schema, so a SECURITY DEFINER function in `public` — EXECUTE restricted to
      `service_role` — is the read path). See [data-model.md](data-model.md). A miss
      degrades to the previous behaviour, never to a dark ad. A missing *entitlement*
-     document is not a miss: it is a user who never subscribed, and does not serve.
-3. **Subscription gate:** is there an active subscription covering this creative's
-   template (single-template sub for that `template_id`, OR an all-access sub)?
+     document is not a miss: it is a user who was never granted access, and does not serve.
+3. **Entitlement gate:** is there an active subscription row covering this creative's
+   template (single-template row for that `template_id`, OR an all-access row — which is
+   what a closed-beta grant writes, [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md))?
    Evaluated in `lib/serving/entitlement.ts` from the snapshot's facts — including
-   comparing `current_period_end` against the clock, so a subscription still lapses
-   on time when no webhook arrives to say it did.
+   comparing `current_period_end` against the clock, so a row that carries an expiry
+   still lapses on time with no event at all.
    - **Active** → build a valid VAST 4.2 document containing the interactive payload
      for the selected format via the **format adapter** (see below).
    - **Inactive / missing / invalid** → return empty VAST: `<VAST version="4.2"></VAST>`
@@ -165,8 +167,8 @@ Request flow:
 
 Hard rules for this path (also in [CLAUDE.md](../CLAUDE.md)):
 
-- **No Stripe calls here.** Subscription status comes from the denormalized record,
-  kept fresh by webhooks.
+- **No billing or auth calls here.** Entitlement comes from the denormalized record,
+  republished by whoever writes `subscriptions` — today the admin's grant.
 - **No RLS dependency.** Use a scoped service-role client; never expose the service
   key to the client.
 - **Cache deliberately.** The Worker keeps each tag 60 s in its data centre's Cache
@@ -401,10 +403,11 @@ failure in one is not automatically a defect in the creative:
   ad-serving domain: when it does not arrive, the browser blocked it, and no change on
   our side makes it arrive.
 
-### Stripe webhook `/api/stripe/webhook`
+### The closed-beta grant `/dashboard/admin`
 
-Source of truth for subscription state. Verifies the Stripe signature, then updates
-the subscription record + the denormalized serving status. See [billing.md](billing.md).
+The one writer of `subscriptions` since Stripe left ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)):
+two server actions, gated on `ADMIN_EMAILS`, that insert or cancel the manual all-access
+row and then publish the entitlement snapshot. See [billing.md](billing.md).
 
 ### Creative runtime / CDN
 
@@ -511,10 +514,9 @@ discovering that externally hosted media routinely breaks via hotlink protection
 | VPAID unit | R2 + Cloudflare CDN at `media.smithcdn.net` (1y immutable) | Content-addressed URL straight in `<MediaFile>` — nothing of ours in the path ([ADR-0017](decisions/0017-runtime-assets-on-public-cdn.md), ADR-0029) |
 | Advertiser media | Cloudflare R2 + Cloudflare CDN at `media.smithcdn.net` (1 day, Smart Tiered Cache) | The heaviest bytes on the ad path — two looping videos are ~7 MB an impression — so they live where egress is free at any volume and no Vercel or Supabase quota is spent on them ([ADR-0028](decisions/0028-creative-media-on-r2.md)) |
 | `GET /api/creative/unit/[token]` | App Worker | Fallback only, for a logical key not yet in `runtime/manifest.ts`; app domain only. Removable once every template has been pushed |
-| Serving snapshots | Workers KV `creosmith-snapshots`, 60 s edge cache | Written by the creative writers and the Stripe webhook through the app Worker's binding, and by the Node scripts over the REST API; read by both Workers through their bindings. KV has no public URL, which matters because keys derive from `creative_id`, public in every tag ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
+| Serving snapshots | Workers KV `creosmith-snapshots`, 60 s edge cache | Written by the creative writers and the admin's grant through the app Worker's binding, and by the Node scripts over the REST API; read by both Workers through their bindings. KV has no public URL, which matters because keys derive from `creative_id`, public in every tag ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)) |
 | `GET /r` | Ad Worker (`/api/click`: Node, app domain) | The click redirect ([ADR-0023](decisions/0023-conversion-postbacks.md)): `node:crypto` for the link signature and the click id, and the service-role `record_click()` in `waitUntil` — the 302 never waits on Postgres. Excluded from the middleware matcher |
 | `GET\|POST /pb` → `/api/postback` | App Worker | S2S postbacks from partner networks. Awaits `record_postback()`, because the network needs to know whether it landed — a 5xx is what makes it retry. Excluded from the middleware matcher |
-| `POST /api/stripe/webhook` | App Worker | Needs the raw body for signature verification, checked through WebCrypto (`constructEventAsync`) |
 | `GET /c/s/:token` → `/api/creative/simid/[token]` | Ad Worker (the app Worker on the app domain) | Re-serves the SIMID document from the media host with headers an iframe will run; the Supabase `creatives` bucket only for a key not in the manifest |
 | Daily audit, reconciler | The app Worker's `scheduled()` — 03:00 UTC, and every ten minutes | Call `/api/cron/health` and `/api/cron/reconcile` in-process with the cron bearer, and fail the run on drift so it shows in the Worker's cron history (`workers/web/index.ts`). Vercel's crons until ADR-0029 |
 | `/api/tools/vast/*` | App Worker | The validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)). On the Worker the SSRF guard resolves every name first and refuses any private answer, then fetches — a pre-flight with a rebinding window that [security.md](security.md) weighs; under `npm run dev` it still pins the socket's own `lookup` through `node:http`. Excluded from the middleware matcher — `/hop` sits inside a player's wrapper-resolution timeout |

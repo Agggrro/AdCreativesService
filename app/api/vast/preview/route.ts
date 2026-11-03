@@ -23,7 +23,7 @@ const MAX_PREVIEW_CONFIG_BYTES = 5120;
  * Mint a short-TTL preview for a template using the CALLER'S CURRENT, unsaved
  * form values — no creative row is read or written. Authenticated (any
  * signed-in dashboard user, no subscription required: this is a try-before-you
- * -configure surface, not the entitled serving path). Never touches Stripe.
+ * -configure surface, not the entitled serving path). Never reads entitlement.
  *
  * Body: { templateId: string, format: string, fields: Record<string,string> }
  */

@@ -12,7 +12,7 @@ import type { CreativeSnapshot, EntitlementRecord, EntitlementSnapshot } from ".
  * Postgres stays the source of truth; these functions project it. Every writer
  * that changes a row behind `private.creative_serving` calls one of them in the
  * same unit of work — see app/dashboard/creatives/actions.ts and
- * app/api/stripe/webhook/route.ts.
+ * app/dashboard/admin/actions.ts (the closed-beta grant, ADR-0034).
  *
  * The creative snapshot is built from `get_creative_serving`, the very RPC the
  * serving path used to call, rather than from a hand-written join. That is
@@ -83,16 +83,16 @@ export async function publishCreativeSnapshot(
  *
  * Keyed by user rather than by creative on purpose: an all-access plan covers
  * every creative the user owns and a single plan covers every creative on one
- * template, so keying by creative would turn one Stripe event into N writes.
+ * template, so keying by creative would turn one entitlement change into N writes.
  * This is one write regardless of how many creatives exist.
  *
  * Note what is *not* stored: no boolean verdict. The rows carry
  * `current_period_end`, and the serving path compares it against the clock, so
- * a subscription still lapses on time when no webhook arrives to say it did.
+ * a subscription still lapses on time when no event arrives to say it did.
  *
- * Read, write, then read again: two publishes for one user can run at once — the
- * events of one checkout arrive together, and the reconciler can overlap a
- * webhook — and the one that read first can write last. Nothing would then
+ * Read, write, then read again: two publishes for one user can run at once — a
+ * grant and a revoke clicked in quick succession, and the reconciler can overlap
+ * either — and the one that read first can write last. Nothing would then
  * correct it, since both reported success. So the facts are read again after
  * the write, and a publish that is already out of date is redone. A store that
  * refuses the write clears its copy and this throws (store.ts, "fail closed").
@@ -110,7 +110,7 @@ export async function publishEntitlementSnapshot(
       .eq("user_id", userId)
       .order("stripe_subscription_id")
       .order("id")
-      // Not retried: this runs under a webhook's ceiling, and the failure path
+      // Not retried: this runs under its caller's ceiling (a server action, a cron run), and the failure path
       // (clear every store) must get to run before that ceiling cuts it off.
       .retry(false);
     if (error) throw new Error(`subscriptions read failed: ${error.message}`);
@@ -133,7 +133,7 @@ export async function publishEntitlementSnapshot(
   try {
     subscriptions = await readFacts();
   } catch (err) {
-    // The caller has usually just changed the rows (a webhook's upsert has
+    // The caller has usually just changed the rows (a grant's write has
     // committed), so the stores' copies are already out of date — and no put
     // will run to clear them on failure. Cleared here instead: fail closed.
     await snapshots.deleteEntitlement(userId).catch((clearErr: unknown) => {

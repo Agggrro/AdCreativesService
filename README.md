@@ -13,7 +13,7 @@ it lapses, the dynamic VAST stops serving the interactive payload.
 ## Tech stack
 
 Next.js (App Router, TypeScript) · Tailwind CSS · Lucide React · Supabase (Postgres,
-Auth, RLS) · Stripe · Cloudflare Workers (the app and the ad domain, off Vercel since
+Auth, RLS) · Cloudflare Workers (the app and the ad domain, off Vercel since
 2026-10-03 — [ADR-0029](docs/decisions/0029-off-vercel-onto-cloudflare-workers.md)) · Workers KV
 (serving snapshots) · Cloudflare R2 (advertiser media and creative units,
 [ADR-0028](docs/decisions/0028-creative-media-on-r2.md)).
@@ -52,7 +52,7 @@ for the variables they need.
 
 ## Three core layers
 
-1. **Dashboard** (authenticated, RLS) — showcase, configure creatives, manage billing.
+1. **Dashboard** (authenticated, RLS) — showcase, configure creatives, see access; the admin grants closed-beta access ([ADR-0034](docs/decisions/0034-closed-beta-manual-entitlement.md)).
 2. **Database** (Supabase) — with a denormalized serving record for the hot path.
-3. **Ad-serving** (public, edge, cached) — `GET /v` on the ad Worker, format-aware, subscription-gated,
-   fails closed; Stripe webhook as source of truth.
+3. **Ad-serving** (public, edge, cached) — `GET /v` on the ad Worker, format-aware, entitlement-gated,
+   fails closed; Postgres is the source of truth, projected into serving snapshots.

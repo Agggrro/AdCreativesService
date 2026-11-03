@@ -28,6 +28,13 @@ export const NUM_HEAD = `${HEAD} text-right`;
 export const ROW = "border-b border-hairline last:border-b-0";
 
 /**
+ * A column sized to its content (§6 "Size columns to their content, not to
+ * pixels"): every column but the one that wraps. Pixel widths pinned from an
+ * estimate broke the first time the real font measured wider.
+ */
+export const FIT = "w-px whitespace-nowrap";
+
+/**
  * First cell of a row, carrying the 3px state rail.
  *
  * `padding-left` drops to 13px so rail plus padding still sum to the 16px cell

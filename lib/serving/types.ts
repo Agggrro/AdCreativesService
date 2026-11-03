@@ -16,7 +16,7 @@ import type {
  * Two documents rather than one, and that split is load-bearing: a subscription
  * event covers every creative a user owns (all-access) or every creative on one
  * template (single). Folding entitlement into the creative snapshot would make
- * one Stripe webhook rewrite N documents. Keyed separately, it rewrites one.
+ * one entitlement change rewrite N documents. Keyed separately, it rewrites one.
  */
 
 /**
@@ -61,7 +61,7 @@ export interface CreativeSnapshot {
 
 /**
  * One subscription reduced to the four facts `private.is_entitled` actually
- * reads. Nothing about the Stripe customer, price, or cancellation intent
+ * reads. Nothing about the billing customer, price, or cancellation intent
  * belongs here: this document is world-readable object storage, so it carries
  * the minimum needed to answer "may this tag serve right now?".
  */

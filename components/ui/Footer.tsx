@@ -33,8 +33,8 @@ export function Footer({ dict }: { dict: Dict }) {
           <FooterColumn title={dict.footer.product}>
             <FooterLink href="/catalog">{dict.nav.catalog}</FooterLink>
             <FooterLink href="/#how">{dict.footer.howItWorks}</FooterLink>
-            <FooterLink href="/dashboard/subscriptions">
-              {dict.nav.subscriptions}
+            <FooterLink href="/dashboard/access">
+              {dict.nav.access}
             </FooterLink>
           </FooterColumn>
 

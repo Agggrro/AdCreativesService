@@ -9,13 +9,13 @@
 | --- | --- | --- |
 | Dashboard | Authenticated users | Supabase Auth + RLS; users touch only their own data |
 | `GET /api/vast` | The open internet / ad players | Public, unauthenticated, **fail closed** |
-| `POST /api/vast/preview` | Signed-in dashboard users | Authenticated (no subscription check); never touches Stripe or the entitlement gate |
+| `POST /api/vast/preview` | Signed-in dashboard users | Authenticated (no entitlement check); never touches the entitlement gate |
+| `/dashboard/admin` and its two server actions | The accounts named in `ADMIN_EMAILS`, on their own session | Gate: `getUser()` then `isAdminEmail(user.email)` (`lib/admin.ts`) — signed-out → `/login` (the dashboard's rule), signed-in non-admin → **404**. Behind it, a service-role read of `auth.users` and every `subscriptions` row, and the only write path into `subscriptions` ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)) |
 | `GET /api/vast/preview/[token]` | Third-party player SDKs (Google IMA, Fluid Player), fetched with no session | Public by necessity; self-authorizing via HMAC signature + 120s expiry, **fail closed** like `/api/vast` |
 | `/c/player` (browser) | Whoever pastes a tag into the validator — the creative it names is executed here | Runs `VpaidMode.INSECURE` on an **isolated origin** with no session, no storage and no API of ours; fails closed when none is configured (ADR-0021) |
-| `POST /api/stripe/webhook` | Stripe | Signature-verified; treat unsigned/invalid as hostile |
 | Creative runtime assets, via `/c/s/:token` on the ad Worker and `GET /api/creative/{simid,unit}/[token]` | Player iframes and `<script src>` on third-party pages, fetched with no session | Self-authorizing via an HMAC-signed 10-minute token that names one runtime path from a closed allow-list, re-checked against the calling route's kind; **fail closed** (404) |
 | The ad domain (`creosmith-ads` Worker) | The open internet, on every path of `smithcdn.net` | Answers the ad paths through the same handlers as the app, 404s everything else, and **forwards only** `/`, `/cdn…`, `/c/player` and `/_next/…` to the app's Worker (over a service binding), GET and HEAD only — so no dashboard, auth or API route, and no server action, is reachable on the ad domain. `Set-Cookie` is stripped from every response; the zone adds none after it, because Bot Fight Mode, Browser Integrity Check and challenges stay off on this zone. `/c/u/…` forwards only a content-addressed runtime **script** (`RUNTIME_SCRIPT_KEY_RE`) to the media host — never an advertiser's object, never the SIMID document, never an arbitrary path. The app's own `/c/u/` rewrite (`next.config.ts`) is held to the same pattern. See [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
-| The app domain (`creosmith-web` Worker) | The open internet, on every path of `creosmith.com` | Every route the app has, behind the Workers Route `creosmith.com/*`. The zone adds HSTS (`max-age=63072000`, as Vercel sent it), TLS 1.2 at least, Always Use HTTPS, and a 308 from `www` to the bare domain. **No challenge in front of it either:** Stripe and partner networks' servers call `/api/stripe/webhook` and `/pb`, not always with a browser's User-Agent, which Browser Integrity Check refuses — so it, Bot Fight Mode and the security level's challenges stay off, as nothing stood in front of the app on Vercel. Each of those routes authenticates its caller itself. See [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
+| The app domain (`creosmith-web` Worker) | The open internet, on every path of `creosmith.com` | Every route the app has, behind the Workers Route `creosmith.com/*`. The zone adds HSTS (`max-age=63072000`, as Vercel sent it), TLS 1.2 at least, Always Use HTTPS, and a 308 from `www` to the bare domain. **No challenge in front of it either:** partner networks' servers call `/pb`, not always with a browser's User-Agent, which Browser Integrity Check refuses — so it, Bot Fight Mode and the security level's challenges stay off, as nothing stood in front of the app on Vercel. Each of those routes authenticates its caller itself. See [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
 | Serving snapshots (Workers KV) | Read only through the two Workers' bindings, never by a player | **No public URL exists for KV**: a document is readable only through a binding or an API token. That property matters because keys derive from `creative_id`, which is published in every VAST tag URL a customer pastes into a DSP — a public store would let anyone holding a tag read `user_id` and the full creative config without passing the entitlement gate. Keys are shape-checked as UUIDs before use, so a crafted id cannot become a traversal. Until the app leaves Vercel it also writes the private Blob store it used before. See [ADR-0015](decisions/0015-serving-snapshots-on-cdn.md), [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md) |
 | `GET /api/track` | Player beacons, fired from a VAST doc anyone who has the tag could have fetched | Public by necessity; each beacon URL is HMAC-signed with a 1-hour expiry at VAST-build time — an unsigned or stale hit is silently dropped, same as an unentitled `creative_id` |
 | `GET /r` (click redirect) | A viewer's browser leaving an ad, from a link anyone holding the tag could have fetched | Public by necessity. The destination is read from the creative's own config by field name, never from the request, **and only a genuine signature minted by `/v` gets a redirect** — forged, missing or week-old links are 404, so no account can use the ad domain as a redirect to what it configured. See "Click redirect and postbacks" below |
@@ -31,22 +31,28 @@
   never reach the client bundle or any `NEXT_PUBLIC_*` var. Used only on: the serving
   read (`/v`, in the ad Worker and the Next route alike) and its Storage fallback for a
   unit not yet in the manifest (`lib/runtime-bytes.ts`); the beacon, click and postback
-  writes; the Stripe webhook
-  write path; serving-snapshot publishing, its health check and its reconciler
+  writes; the closed-beta grant and revoke actions and the admin's account list
+  (`app/dashboard/admin/`, [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md));
+  serving-snapshot publishing, its health check and its reconciler
   (`lib/serving/publish.ts`, `lib/serving/health.ts`, `lib/serving/reconcile.ts`,
   `/api/cron/health`, `/api/cron/reconcile`, `scripts/snapshot-backfill.mjs`); the
   one-off media move to R2, which reads every creative and rewrites the config of each
   one it moves (`scripts/media-migrate-r2.mjs`, [ADR-0028](decisions/0028-creative-media-on-r2.md));
   and, on loopback only, `/dev/harness`'s read of draft templates (below). A new use is a
   change to this list.
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — server-only.
+- `ADMIN_EMAILS` — **not a secret**: it names the accounts that may grant closed-beta
+  access, it does not authenticate them (the session does). Lives in `wrangler.jsonc`
+  `vars`. Empty means nobody is an admin. **Every address must already be a registered
+  account** — the gate rests on Supabase Auth keeping emails unique and confirming an
+  address change, and an address listed before anyone registers it belongs to whoever
+  registers it first. Email confirmation stays on in the Auth settings.
 - `CRON_SECRET` — server-only. The bearer `/api/cron/health` and `/api/cron/reconcile`
   demand (constant-time compare, `lib/cron-auth.ts`); both refuse to run without it. It
   authorizes service-role jobs that read across every tenant, write the snapshot stores
   and answer with tenant ids. The web Worker's cron sends it in-process, so it never
   crosses the network there.
 - `PREVIEW_TOKEN_SECRET` — server-only. Signs the short-TTL live-preview tokens
-  (`lib/vast/preview-token.ts`). Independent of the Supabase/Stripe secrets above —
+  (`lib/vast/preview-token.ts`). Independent of the Supabase secrets above —
   never derive one from another.
 - `TRACK_TOKEN_SECRET` — server-only. Signs tracking-beacon URLs and click links
   (`lib/track-token.ts`). Set since 2026-10-03; before that, beacon signing derived a
@@ -57,8 +63,7 @@
   each Worker (`wrangler secret put`, read through `process.env`). **The copies must be
   equal** — a beacon or click link minted by one Worker is verified by the other — so
   they change together or not at all. Vercel stored them write-only, which is why the
-  move rotated both signing secrets once rather than copying them, and why the Stripe
-  webhook got a new endpoint with a new secret ([billing.md](billing.md)).
+  move rotated both signing secrets once rather than copying them.
 - `SNAPSHOT_KV_API_TOKEN` — server-only. A Cloudflare API token holding **Workers KV
   Storage: Edit on the account and nothing else**, for writing snapshots from outside
   a Worker: the Node scripts and `npm run dev`. It can
@@ -130,7 +135,7 @@ rename to do it.
   early. Treat all query params/macros as untrusted.
 - **No RLS reliance:** there is no session here. Use a service-role client scoped to a
   single narrow read of the denormalized serving record — nothing else.
-- **No Stripe calls / no heavy joins** on this path (perf + blast radius).
+- **No billing or auth calls / no heavy joins** on this path (perf + blast radius).
 - **CORS echoes the origin, with credentials — safe only because nothing here reads
   them.** VAST 4.2 requires `Access-Control-Allow-Origin: <Origin>` plus
   `Access-Control-Allow-Credentials: true` (`lib/vast/cors.ts`,
@@ -144,7 +149,7 @@ rename to do it.
 - **Rate limiting / abuse:** plan for per-IP / per-creative limits and cache to absorb
   spikes (post-MVP hardening, but design for it). Applies to `POST /api/vast/preview`
   too: it requires a session (a materially higher bar than the fully public
-  `/api/vast`) but has no subscription check and no rate limit today, so a scripted
+  `/api/vast`) but has no entitlement check and no rate limit today, so a scripted
   client could re-mint indefinitely against any published template.
 
 ## Tracking beacon hardening (`/api/track`)
@@ -295,7 +300,7 @@ rename to do it.
 
 The VAST validator ([ADR-0014](decisions/0014-vast-inspection-engine.md)) fetches
 a URL the caller chose. It is the **only** place in this codebase that does so —
-everything else talks to Supabase, Stripe, or ourselves — which makes
+everything else talks to Supabase, Cloudflare, or ourselves — which makes
 [`lib/vast-inspect/fetch-tag.ts`](../lib/vast-inspect/fetch-tag.ts) the product's
 entire SSRF surface. Any future feature that fetches a user-supplied URL should
 go through it rather than reimplement these guards.
@@ -673,7 +678,7 @@ third-party script our own pages load. Where it may run, and what it is allowed 
 ## Pre-push checklist (security-sensitive changes)
 
 - [ ] No secret in client bundle / `NEXT_PUBLIC_*`.
-- [ ] Webhook verifies signature against raw body.
+- [ ] The admin gate answers 404 to a signed-in non-admin, and every write into `subscriptions` publishes the snapshot.
 - [ ] VAST path validates input and fails closed.
 - [ ] RLS policies cover new tables/columns (or explicit, documented exception).
 - [ ] A new function revokes EXECUTE from `public, anon, authenticated` by name and

@@ -9,6 +9,7 @@ import { ServingBadge } from "@/components/ui/State";
 import { Chip } from "@/components/ui/Chip";
 import {
   CELL,
+  FIT,
   HEAD,
   NUM_HEAD,
   railCell,
@@ -27,19 +28,15 @@ export interface CreativeRow {
 }
 
 /**
- * Every column but the name is sized to its content (`w-px` + `nowrap`), and
- * the name takes what is left and wraps. Pixel widths pinned in a colgroup
- * broke the moment the real font measured wider than the estimate — the
- * actions overran their column and the table scrolled at full width. Content
- * sizing cannot drift that way, and nothing here changes width with state: the
- * copy button stacks both of its labels in one cell.
+ * Every column but the name is sized to its content (`FIT`, from ui/Table), and
+ * the name takes what is left and wraps. Nothing here changes width with state:
+ * the copy button stacks both of its labels in one cell.
  *
  * `TableFrame` is `overflow-x-auto`, which clips like `overflow-hidden` does:
  * the focus rings on edge-adjacent buttons survive only because every cell's
  * padding (12px+) exceeds the ring's 4px — do not trim it (§2). Below the
  * width the content needs, the table scrolls inside that frame (§5).
  */
-const FIT = "w-px whitespace-nowrap";
 
 export function CreativesTable({
   rows,

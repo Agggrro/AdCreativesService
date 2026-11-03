@@ -49,12 +49,12 @@ const ru = {
     email: "Email",
     password: "Пароль",
     working: "Секунду…",
-    checkoutError: "Не удалось открыть оплату. Попробуйте ещё раз.",
   },
   nav: {
     catalog: "Каталог",
     myCreatives: "Мои креативы",
-    subscriptions: "Подписки",
+    access: "Доступ",
+    accounts: "Аккаунты",
     tools: "Инструменты",
     language: "Язык интерфейса",
     menu: "Меню",
@@ -69,10 +69,10 @@ const ru = {
     title: "Реклама, с которой действительно взаимодействуют",
     subtitle:
       "Выберите шаблон, настройте под кампанию и заберите динамический VAST-тег. SIMID 1.1 и VPAID 2.0 — вставляется в любой DSP без разработчика.",
-    ctaStart: "Начать бесплатно",
+    ctaStart: "Создать аккаунт",
     ctaDashboard: "Перейти в кабинет",
     ctaTemplates: "Смотреть шаблоны",
-    heroNote: "7 дней бесплатно · правка креатива не требует перевыпуска тега",
+    heroNote: "Закрытый бета-тест · правка креатива не требует перевыпуска тега",
 
     howEyebrow: "Как это работает",
     howTitle: "От шаблона до тега в DSP — четыре шага",
@@ -89,7 +89,7 @@ const ru = {
       "Один динамический URL. Формат отдачи выбираете вы — SIMID или VPAID.",
     step4Title: "Вставьте в DSP",
     step4Body:
-      "Тег отдаёт интерактив, пока активна подписка. Дальше — обычная закупка.",
+      "Тег отдаёт интерактив, пока у аккаунта есть доступ. Дальше — обычная закупка.",
     tagLabel: "Ваш тег",
 
     templatesEyebrow: "Шаблоны",
@@ -110,8 +110,46 @@ const ru = {
     toolsTitle: "Инструменты для VAST-тегов",
 
     finalTitle: "Соберите первый креатив сегодня",
-    finalBody: "Семь дней бесплатно, все шаблоны открыты.",
+    finalBody: "Закрытый бета-тест: участникам открыты все шаблоны.",
     ctaCheckTag: "Проверить свой тег",
+  },
+  beta: {
+    strip: "Закрытый бета-тест — доступ выдаётся вручную.",
+    stripLink: "Написать в Telegram",
+  },
+  access: {
+    title: "Доступ",
+    subtitle:
+      "Закрытый бета-тест: отдачу интерактива включает участникам администратор. Условия обсуждаем лично.",
+    granted: "Доступ выдан",
+    notGranted: "Доступа нет",
+    grantedOn: "с",
+    body: "Напишите в Telegram — договоримся об условиях и включим доступ на этот аккаунт.",
+    telegram: "Написать в Telegram",
+    accountLabel: "Аккаунт",
+  },
+  admin: {
+    title: "Аккаунты",
+    subtitle:
+      "Все зарегистрированные аккаунты. Метка участника закрытого бета-теста открывает отдачу интерактива по всем шаблонам.",
+    email: "Email",
+    registered: "Регистрация",
+    lastSignIn: "Последний вход",
+    access: "Доступ",
+    beta: "ЗБТ",
+    subscription: "подписка",
+    grant: "Выдать доступ",
+    revoke: "Отозвать",
+    revokeConfirmTitle: "Отозвать доступ?",
+    revokeConfirmBody:
+      "Теги этого аккаунта перестанут отдавать интерактив в течение двух минут. Повторная выдача вернёт доступ, но не показы, потерянные за это время.",
+    empty: "Зарегистрированных аккаунтов пока нет.",
+    propagation: "Изменение доходит до тега в течение двух минут.",
+    errorGrant: "Не удалось выдать доступ — строка не записана. Попробуйте ещё раз.",
+    errorRevoke: "Не удалось отозвать доступ — строка не изменена. Попробуйте ещё раз.",
+    errorPublish:
+      "Строка записана, но снапшот отдачи не опубликован. Публикация повторится в течение десяти минут; до этого тег не отдаётся.",
+    errorList: "Не удалось получить список аккаунтов.",
   },
   footer: {
     tagline:
@@ -134,27 +172,8 @@ const ru = {
     haveAccount: "Уже есть аккаунт?",
   },
   dashboard: {
-    subscriptions: "Подписки",
-    subscriptionsSubtitle:
-      "План определяет, какие креативы отдаются прямо сейчас. Когда подписка заканчивается, тег перестаёт отдавать интерактивный payload.",
-    singleTemplateHint:
-      "Подписку на отдельный шаблон можно оформить на его странице в каталоге.",
-    noSubscriptions:
-      "Активных подписок нет. Оформите подписку, чтобы начать отдавать креативы.",
-    ultimateTitle: "Ultimate — доступ ко всем шаблонам",
-    ultimateSubtitle: "$30 в месяц · все шаблоны · 7 дней бесплатно",
-    subscribe: "Подписаться",
-    planUltimate: "Ultimate (все шаблоны)",
-    planSingle: "Один шаблон",
-    renews: "продление",
-    endsOn: "завершается",
-    checkoutSuccess:
-      "Оплата получена. Подписка активируется, когда придёт подтверждение от Stripe — обновите страницу через минуту.",
-    checkoutCancelled: "Оплата отменена — ничего не списано.",
     templates: "Шаблоны",
     configure: "Настроить креатив",
-    perWeek: "$2 / неделя",
-    perMonth: "$5 / месяц",
     noTemplates: "Пока ни один шаблон не опубликован.",
     creatives: "Креативы",
     creativesSubtitle:
@@ -164,8 +183,7 @@ const ru = {
     browseCatalog: "Открыть каталог",
     serving: "Отдаётся",
     notServing: "Не отдаётся",
-    notServingHint: "Нужна активная подписка",
-    onTrial: "триал",
+    notServingHint: "Нужен доступ участника бета-теста",
     impressions: "Показы",
     clicks: "Клики",
     clicksHint:
@@ -207,8 +225,6 @@ const ru = {
     description: "Описание",
     format: "Формат",
     status: "Статус",
-    plan: "План",
-    period: "Период",
   },
   // A creative's conversion report (ADR-0023), on its detail page.
   conversions: {
@@ -342,17 +358,6 @@ const ru = {
       unknown: "Неизвестный результат",
     },
   },
-  status: {
-    active: "Live",
-    trialing: "Триал",
-    past_due: "Платёж не прошёл",
-    canceled: "Отменена",
-    incomplete: "Не завершена",
-    unpaid: "Не оплачена",
-    draft: "Черновик",
-    ready: "Готов",
-    paused: "На паузе",
-  },
   configurator: {
     chooseTemplate: "Выберите шаблон",
     notFound: "Шаблон не найден.",
@@ -480,8 +485,6 @@ const ru = {
       "Демо в браузере для этого шаблона пока нет. Механику можно собрать в конфигураторе и проверить в плеере.",
     configure: "Настроить креатив",
     signInToConfigure: "Создать аккаунт",
-    subscribeWeekly: "Подписаться — $2 / неделя",
-    subscribeMonthly: "Подписаться — $5 / месяц",
     backToCatalog: "Вернуться в каталог",
     hint: "Взаимодействуйте с креативом выше — сработавший клик-через появится здесь.",
     funnel: {
@@ -650,12 +653,12 @@ const en: Dict = {
     email: "Email",
     password: "Password",
     working: "One moment…",
-    checkoutError: "Could not open checkout. Try again.",
   },
   nav: {
     catalog: "Catalog",
     myCreatives: "My creatives",
-    subscriptions: "Subscriptions",
+    access: "Access",
+    accounts: "Accounts",
     tools: "Tools",
     language: "Interface language",
     menu: "Menu",
@@ -670,10 +673,10 @@ const en: Dict = {
     title: "Ads your viewer actually touches",
     subtitle:
       "Pick a template, tune it to the campaign, take the dynamic VAST tag. SIMID 1.1 and VPAID 2.0 — it pastes into any DSP, with no developer.",
-    ctaStart: "Start free trial",
+    ctaStart: "Create an account",
     ctaDashboard: "Go to dashboard",
     ctaTemplates: "See the templates",
-    heroNote: "7 days free · editing a creative never reissues the tag",
+    heroNote: "Closed beta · editing a creative never reissues the tag",
 
     howEyebrow: "How it works",
     howTitle: "Template to DSP tag in four steps",
@@ -690,7 +693,7 @@ const en: Dict = {
       "One dynamic URL. You choose the delivery format — SIMID or VPAID.",
     step4Title: "Paste it into your DSP",
     step4Body:
-      "The tag serves the interactive payload while the subscription is active. The rest is ordinary buying.",
+      "The tag serves the interactive payload while the account has access. The rest is ordinary buying.",
     tagLabel: "Your tag",
 
     templatesEyebrow: "Templates",
@@ -712,8 +715,46 @@ const en: Dict = {
     toolsTitle: "Tools for VAST tags",
 
     finalTitle: "Build your first creative today",
-    finalBody: "Seven days free, every template open.",
+    finalBody: "Closed beta: every template is open to participants.",
     ctaCheckTag: "Check your own tag",
+  },
+  beta: {
+    strip: "Closed beta — access is granted by hand.",
+    stripLink: "Message on Telegram",
+  },
+  access: {
+    title: "Access",
+    subtitle:
+      "Closed beta: the administrator switches interactive delivery on for participants. Terms are agreed in person.",
+    granted: "Access granted",
+    notGranted: "No access",
+    grantedOn: "since",
+    body: "Message on Telegram — we agree the terms and switch access on for this account.",
+    telegram: "Message on Telegram",
+    accountLabel: "Account",
+  },
+  admin: {
+    title: "Accounts",
+    subtitle:
+      "Every registered account. The closed-beta participant mark opens interactive delivery on every template.",
+    email: "Email",
+    registered: "Registered",
+    lastSignIn: "Last sign-in",
+    access: "Access",
+    beta: "beta",
+    subscription: "subscription",
+    grant: "Grant access",
+    revoke: "Revoke",
+    revokeConfirmTitle: "Revoke access?",
+    revokeConfirmBody:
+      "This account's tags stop serving the interactive payload within two minutes. Granting again restores access, not the impressions lost meanwhile.",
+    empty: "No registered accounts yet.",
+    propagation: "A change reaches the tag within two minutes.",
+    errorGrant: "Could not grant access — nothing was written. Try again.",
+    errorRevoke: "Could not revoke access — nothing was changed. Try again.",
+    errorPublish:
+      "The row was written but the serving snapshot was not published. Publishing is retried within ten minutes; until then the tag does not serve.",
+    errorList: "Could not load the account list.",
   },
   footer: {
     tagline:
@@ -736,27 +777,8 @@ const en: Dict = {
     haveAccount: "Already have an account?",
   },
   dashboard: {
-    subscriptions: "Subscriptions",
-    subscriptionsSubtitle:
-      "Your plan decides which creatives serve right now. When a subscription lapses, the tag stops serving the interactive payload.",
-    singleTemplateHint:
-      "A single-template subscription is available on that template's catalog page.",
-    noSubscriptions:
-      "No active subscriptions. Subscribe to start serving creatives.",
-    ultimateTitle: "Ultimate — all-access",
-    ultimateSubtitle: "$30 per month · every template · 7-day free trial",
-    subscribe: "Subscribe",
-    planUltimate: "Ultimate (all-access)",
-    planSingle: "Single template",
-    renews: "renews",
-    endsOn: "ends",
-    checkoutSuccess:
-      "Payment received. The subscription activates once Stripe confirms it — refresh in a minute.",
-    checkoutCancelled: "Checkout cancelled — nothing was charged.",
     templates: "Templates",
     configure: "Configure creative",
-    perWeek: "$2 / week",
-    perMonth: "$5 / month",
     noTemplates: "No templates published yet.",
     creatives: "Creatives",
     creativesSubtitle:
@@ -766,8 +788,7 @@ const en: Dict = {
     browseCatalog: "Open the catalog",
     serving: "Serving",
     notServing: "Not serving",
-    notServingHint: "Needs an active subscription",
-    onTrial: "trial",
+    notServingHint: "Needs closed-beta access",
     impressions: "Impressions",
     clicks: "Clicks",
     clicksHint:
@@ -800,8 +821,6 @@ const en: Dict = {
     description: "Description",
     format: "Format",
     status: "Status",
-    plan: "Plan",
-    period: "Period",
   },
   conversions: {
     heading: "Conversions · 30 days",
@@ -928,17 +947,6 @@ const en: Dict = {
       unknown: "Unknown result",
     },
   },
-  status: {
-    active: "Live",
-    trialing: "Trial",
-    past_due: "Payment failed",
-    canceled: "Canceled",
-    incomplete: "Incomplete",
-    unpaid: "Unpaid",
-    draft: "Draft",
-    ready: "Ready",
-    paused: "Paused",
-  },
   configurator: {
     chooseTemplate: "Choose a template",
     notFound: "Template not found.",
@@ -1058,8 +1066,6 @@ const en: Dict = {
       "No in-browser demo for this template yet. You can still configure the mechanic and check it in a player.",
     configure: "Configure creative",
     signInToConfigure: "Create an account",
-    subscribeWeekly: "Subscribe — $2 / week",
-    subscribeMonthly: "Subscribe — $5 / month",
     backToCatalog: "Back to the catalog",
     hint: "Interact with the creative above — the click-through that fires shows up here.",
     funnel: {
@@ -1207,30 +1213,11 @@ export function isLocale(value: unknown): value is Locale {
 }
 
 /**
- * Subscription/creative status → label. Falls back to the raw value so a new
- * status coming from Stripe or the DB is never swallowed silently.
- */
-export function statusLabel(dict: Dict, status: string): string {
-  const labels = dict.status as Record<string, string | undefined>;
-  return labels[status] ?? status;
-}
-
-/**
  * Heading for a `config_schema` group id (ADR-0011). Group ids come from the
  * database, so an unknown one degrades to the raw id rather than rendering a
- * headless section — the same contract `statusLabel` has for statuses.
+ * headless section.
  */
 export function groupLabel(dict: Dict, id: string): string {
   const labels = dict.configurator.groups as Record<string, string | undefined>;
   return labels[id] ?? id;
-}
-
-/** Which semantic vocabulary a status belongs to (docs/design-system.md §3). */
-export function statusTone(status: string): "live" | "info" | "dead" | "idle" {
-  if (status === "active") return "live";
-  if (status === "trialing") return "info";
-  if (status === "past_due" || status === "unpaid" || status === "incomplete")
-    return "dead";
-  if (status === "canceled") return "dead";
-  return "idle";
 }

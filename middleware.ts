@@ -68,6 +68,6 @@ export const config = {
   // redirect is a viewer leaving an ad, and a postback is a network's server —
   // neither can carry a session, and the click is waiting on this response.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|v$|t$|r$|pb$|c/|api/vast(?!/preview)|api/vast/preview/|api/track|api/click|api/postback|api/stripe|api/creative|api/cron|api/dev|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|v$|t$|r$|pb$|c/|api/vast(?!/preview)|api/vast/preview/|api/track|api/click|api/postback|api/creative|api/cron|api/dev|api/preview-unit|api/tools|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

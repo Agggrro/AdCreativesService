@@ -19,7 +19,7 @@ A change requires a doc update when it touches any of:
 | System design / data flow / runtime placement | `docs/architecture.md` |
 | VAST/SIMID/VPAID handling, format adapters, standards | `docs/adtech-standards.md` |
 | DB tables, columns, relationships, RLS | `docs/data-model.md` |
-| Stripe, plans, webhooks, subscription lifecycle | `docs/billing.md` |
+| Access grants, the entitlement lifecycle, the snapshot publish | `docs/billing.md` |
 | Trust boundaries, secrets, public endpoint, RLS scope | `docs/security.md` |
 | What's in/out of the first release | `docs/mvp-scope.md` |
 | A significant or hard-to-reverse decision | **new ADR** in `docs/decisions/` (+ index) |
@@ -36,7 +36,7 @@ explicitly rather than skipping silently.
    - new/renamed/removed DB fields not in `data-model.md`,
    - new env vars / secrets not in `security.md`,
    - new API params or endpoints not in `architecture.md`,
-   - new or changed subscription/webhook behavior not in `billing.md`,
+   - new or changed grant/entitlement behavior not in `billing.md`,
    - a new format adapter / standard not in `adtech-standards.md`,
    - any "code never accessible"-style overclaim (forbidden — see ADR-0003).
 3. **ADR check.** Did this introduce or reverse a significant decision? If yes and no

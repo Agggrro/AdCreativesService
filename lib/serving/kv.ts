@@ -42,8 +42,8 @@ export function bindingNamespace(kv: KvBinding, cacheTtl: number): SnapshotNames
 
 /**
  * KV accepts one write per second per key. The writes that matter most come
- * together for the same user — `checkout.session.completed` with
- * `customer.subscription.created`, a webhook with the reconciler — and a second
+ * together for the same user — a grant and the reconciler, two admin clicks in
+ * one second (and, in the Stripe era, two webhook events of one checkout) — and a second
  * write inside the same second is refused (429). Refused for that reason, a write
  * is tried again a little over a second later, a few times, with jitter so that
  * writers refused together do not collide again together; refused for any other
@@ -83,8 +83,8 @@ export interface RestNamespaceOptions {
 
 /**
  * Short: the REST API answers in well under a second, and its callers run under
- * ceilings of their own — the Stripe webhook's event claim assumes a bounded run
- * (route.ts maxDuration), with a write retried and a clear behind it.
+ * ceilings of their own — a server action, a cron run — each of which assumes a bounded run
+ * with a write retried and a clear behind it.
  */
 const REST_TIMEOUT_MS = 4_000;
 

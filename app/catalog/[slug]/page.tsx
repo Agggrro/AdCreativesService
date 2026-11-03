@@ -7,7 +7,6 @@ import { AppTopBar } from "@/components/AppTopBar";
 import { Section } from "@/components/ui/Section";
 import { Footer } from "@/components/ui/Footer";
 import { VpaidPreview } from "@/components/VpaidPreview";
-import { SubscribeButton } from "@/components/SubscribeButton";
 import { LinkButton } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Field";
 import { Chip } from "@/components/ui/Chip";
@@ -83,26 +82,9 @@ export default async function TemplatePage({
               {dict.catalog.signInToConfigure}
             </LinkButton>
           )}
-          {/* Single-template purchase lived only in the old dashboard table;
-              without it here that revenue path has no entry point (ADR-0008). */}
-          {user && (
-            <>
-              <SubscribeButton
-                planKey="single_weekly"
-                templateId={template.id}
-                variant="secondary"
-              >
-                {dict.catalog.subscribeWeekly}
-              </SubscribeButton>
-              <SubscribeButton
-                planKey="single_monthly"
-                templateId={template.id}
-                variant="ghost"
-              >
-                {dict.catalog.subscribeMonthly}
-              </SubscribeButton>
-            </>
-          )}
+          {/* The single-template purchase buttons that stood here (ADR-0008)
+              went with Stripe: during the closed beta access is granted per
+              account, for every template, on /dashboard/admin (ADR-0034). */}
         </div>
 
       </Section>

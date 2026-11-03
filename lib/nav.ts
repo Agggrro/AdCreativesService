@@ -5,9 +5,16 @@ import { freeTools } from "@/lib/tools";
 /**
  * The product sections for a signed-in user (ADR-0008, extended by ADR-0013).
  * Order is deliberate: the catalog is where a new user starts, "my creatives"
- * is where a returning one lives, billing sits last because it is the least
- * frequent task, and the free tools sit after the product itself because they
- * are a side entrance rather than part of the core loop.
+ * is where a returning one lives, access (once billing — ADR-0034) sits after
+ * them because it is the least frequent task, and the free tools sit after the
+ * product itself because they are a side entrance rather than part of the core
+ * loop.
+ *
+ * An admin (`lib/admin.ts`) gets the accounts section **in place of** access,
+ * not beside it. The bar is full at 768px — a fifth entry overran the language
+ * control there — and the access page tells an admin nothing the accounts list
+ * does not: their own row is in it. The access page stays reachable from the
+ * footer, as it is for everyone.
  *
  * `exact: false` on the creatives entry is what keeps the section underlined
  * while the user is deep in the configurator. Tools carries `tools`, which is
@@ -15,11 +22,13 @@ import { freeTools } from "@/lib/tools";
  * §6 "Nav dropdown") — there's no `/tools` index page to link to any more,
  * only the two tool pages the dropdown lists directly.
  */
-export function mainNav(dict: Dict): TopBarLink[] {
+export function mainNav(dict: Dict, { admin = false }: { admin?: boolean } = {}): TopBarLink[] {
   return [
     { href: "/catalog", label: dict.nav.catalog },
     { href: "/dashboard/creatives", label: dict.nav.myCreatives },
-    { href: "/dashboard/subscriptions", label: dict.nav.subscriptions },
+    admin
+      ? { href: "/dashboard/admin", label: dict.nav.accounts }
+      : { href: "/dashboard/access", label: dict.nav.access },
     { href: "/tools", label: dict.nav.tools, tools: freeTools(dict) },
   ];
 }

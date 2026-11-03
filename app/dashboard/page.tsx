@@ -3,8 +3,8 @@ import { createServerSupabase } from "@/lib/supabase/server";
 
 /**
  * `/dashboard` is no longer a page — the sections are Каталог / Мои креативы /
- * Подписки (ADR-0008). It stays as a redirect because old links, and Stripe's
- * older `success_url`, still point here.
+ * Доступ (ADR-0008, ADR-0034). It stays as a redirect because old links still
+ * point here.
  *
  * A user with no creatives gets the catalog instead of an empty table: an empty
  * list is a bad first screen, and the catalog is where the first creative

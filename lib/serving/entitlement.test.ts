@@ -115,7 +115,7 @@ for (const s of STATUSES) {
 // ---------------------------------------------------------------------------
 
 test("the case this design exists for: active subscription whose period ended, no webhook ever arrived", () => {
-  // Nothing marked this canceled — Stripe's event was missed, delayed, or not
+  // Nothing marked this canceled — the billing event was missed, delayed, or not
   // yet due. The live SQL predicate stops serving here on its own, so this port
   // must too, or the paid payload keeps serving indefinitely for free.
   const snapshot = entitlement({

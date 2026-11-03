@@ -34,6 +34,7 @@ export function TopBar({
   nav = [],
   right,
   mobileAccount,
+  below,
 }: {
   dict: Dict;
   brandHref: string;
@@ -42,6 +43,12 @@ export function TopBar({
   right?: React.ReactNode;
   /** The same actions for the mobile panel, where the bar has no room. */
   mobileAccount?: React.ReactNode;
+  /**
+   * A strip under the bar, inside the sticky header — the closed-beta notice
+   * (§6 "Site strip"). Inside rather than after, so it scrolls with the bar and
+   * the mobile panel hangs below it.
+   */
+  below?: React.ReactNode;
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-ground/90 backdrop-blur-md">
@@ -94,6 +101,7 @@ export function TopBar({
           {nav.length > 0 && <MobileNav items={nav} account={mobileAccount} />}
         </div>
       </Container>
+      {below}
     </header>
   );
 }

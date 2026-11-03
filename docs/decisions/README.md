@@ -15,7 +15,7 @@ We don't delete ADRs; we supersede them with a newer one.
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [0001](0001-tech-stack.md) | Tech stack: Next.js + Supabase + Stripe + Vercel | Accepted |
+| [0001](0001-tech-stack.md) | Tech stack: Next.js + Supabase + Stripe + Vercel | Accepted (billing amended by 0034, hosting by 0029) |
 | [0002](0002-multi-format-creative-delivery.md) | Multi-format creative delivery via adapter layer | Accepted |
 | [0003](0003-access-control-over-code-hiding.md) | Access control over creative-code secrecy | Accepted |
 | [0004](0004-mvp-on-free-tiers.md) | Run the MVP entirely on free tiers | Accepted |
@@ -48,6 +48,8 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0031](0031-step-builder-and-forwarded-picks.md) | Step Builder: the first steps of a landing's flow, and picks that travel with the click | Accepted |
 | [0032](0032-engagement-extends-the-ad.md) | An ad the viewer is engaging with runs longer, up to 30 seconds more | Accepted |
 | [0033](0033-vast-error-statistics.md) | VAST errors, counted per code | Accepted |
+| [0034](0034-closed-beta-manual-entitlement.md) | Closed beta: entitlement granted by hand, Stripe disconnected | Accepted |
+| [0034](0034-closed-beta-manual-entitlement.md) | Closed beta: entitlement granted by hand, Stripe disconnected | Accepted |
 
 ## Template
 

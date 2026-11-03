@@ -59,6 +59,7 @@ export function ConfirmAction({
   triggerSize = "md",
   title,
   subject,
+  subjectMono = false,
   body,
   confirmLabel,
   action,
@@ -77,6 +78,12 @@ export function ConfirmAction({
    * Omitted when there is none: a postback key has no name.
    */
   subject?: string;
+  /**
+   * The subject is an identifier the machine owns — an email on the admin's
+   * accounts list — rather than a name the user wrote, so it is set in mono
+   * (§4). The default stays sans for every user-written label.
+   */
+  subjectMono?: boolean;
   /** One line of consequence. */
   body: string;
   confirmLabel: string;
@@ -195,7 +202,11 @@ export function ConfirmAction({
                   {title}
                 </h2>
                 {subject && (
-                  <p className="truncate type-small font-medium">{subject}</p>
+                  <p
+                    className={`truncate type-small font-medium ${subjectMono ? "data-instr" : ""}`}
+                  >
+                    {subject}
+                  </p>
                 )}
                 <p id={bodyId} className="break-words type-small text-fg-muted">
                   {body}

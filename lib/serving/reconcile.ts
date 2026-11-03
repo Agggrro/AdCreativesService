@@ -19,7 +19,7 @@ import { publishCreativeSnapshot, publishEntitlementSnapshot } from "./publish";
  * compared first, so a run where nothing drifted costs reads and no writes.
  */
 
-/** Four days: past the three days Stripe keeps retrying a live-mode event. */
+/** Four days. Sized when a billing webhook could arrive up to three days late (ADR-0034 removed it); kept, since the window bounds the audit either way. */
 export const RECONCILE_WINDOW_HOURS = 96;
 
 /** How many ids one run looks at, each way — a bound on one run's reads. */

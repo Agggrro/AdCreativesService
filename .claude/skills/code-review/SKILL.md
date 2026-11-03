@@ -74,7 +74,7 @@ angles is not.
     when you can quote both the rule and the line that breaks it. Cite the path.
     This project's rules bite hardest on: no `any` across trust boundaries,
     secrets never in the client bundle, both locales for every user-visible
-    string, tokens instead of literal colours, and no Stripe call or locale
+    string, tokens instead of literal colours, and no billing, auth or locale
     logic on the public VAST path.
 
 ## Phase 2 — Verify

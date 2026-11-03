@@ -2,7 +2,10 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getDict } from "@/lib/i18n/server";
 import { signOut } from "@/app/auth/actions";
 import { mainNav, publicNav } from "@/lib/nav";
+import { isAdminEmail } from "@/lib/admin";
+import { readOwnAccess } from "@/lib/beta-access";
 import { TopBar } from "@/components/TopBar";
+import { ClosedBetaStrip } from "@/components/ClosedBetaStrip";
 import { Button, LinkButton } from "@/components/ui/Button";
 
 /**
@@ -14,6 +17,11 @@ import { Button, LinkButton } from "@/components/ui/Button";
  * A signed-out visitor gets the shorter `publicNav`: the sections behind a
  * login are dropped rather than the whole strip hidden, so the catalog and the
  * free tools stay reachable by the people they exist for (ADR-0013).
+ *
+ * The closed-beta strip (ADR-0034) hangs under the bar for everyone except a
+ * signed-in participant, which costs one owner-scoped read of their own
+ * entitlement rows per page; the admin's accounts section is appended to the
+ * nav for the accounts `lib/admin.ts` names.
  */
 export async function AppTopBar() {
   const supabase = await createServerSupabase();
@@ -21,12 +29,20 @@ export async function AppTopBar() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const admin = user ? isAdminEmail(user.email) : false;
+  const access = user
+    ? await readOwnAccess(supabase, user.id)
+    : { granted: false, since: null };
+  // The strip asks the viewer to write to the admin; the admin and a
+  // participant are the two readers it has nothing to tell.
+  const strip = !(access.granted || admin);
 
   return (
     <TopBar
       dict={dict}
       brandHref="/"
-      nav={user ? mainNav(dict) : publicNav(dict)}
+      nav={user ? mainNav(dict, { admin }) : publicNav(dict)}
+      below={strip ? <ClosedBetaStrip dict={dict} /> : undefined}
       right={
         user ? (
           <>

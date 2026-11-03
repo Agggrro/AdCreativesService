@@ -14,7 +14,7 @@ import staticAssetsIncrementalCache from "@opennextjs/cloudflare/overrides/incre
 /**
  * The build copies these files into the Worker and loads them into the
  * deployed app's `process.env`. Next to `.env.local` that ships the service-role
- * key, the Stripe secret, the deploy token and a real account's password — so
+ * key, the deploy token and a real account's password — so
  * the build refuses to run beside any of them. It runs in CI, where none exists.
  *
  * `fs` is fetched at run time rather than imported: this file is evaluated in

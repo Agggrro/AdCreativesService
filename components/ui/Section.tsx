@@ -60,8 +60,11 @@ export function Section({
     <section
       id={id}
       // `scroll-mt` clears the sticky header, or an anchored section lands
-      // underneath it and reads as the wrong section.
-      className={`scroll-mt-20 ${TONE[tone]} ${bordered ? "border-t border-hairline" : ""} ${className}`}
+      // underneath it and reads as the wrong section. 128px: the 72px bar plus
+      // the closed-beta strip under it (§6 "Site strip", 40px) with room to
+      // spare — sized to the taller of the header's two states, since a visitor
+      // without a grant is the one following the footer's anchors.
+      className={`scroll-mt-32 ${TONE[tone]} ${bordered ? "border-t border-hairline" : ""} ${className}`}
     >
       <Container width={width} className={`${PAD[pad]} ${innerClassName}`}>
         {children}

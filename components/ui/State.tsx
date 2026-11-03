@@ -1,4 +1,3 @@
-import { statusLabel, statusTone, type Dict } from "@/lib/i18n/dictionaries";
 import { chipType } from "@/components/ui/Chip";
 
 export type Tone = "live" | "info" | "warn" | "dead" | "idle";
@@ -83,12 +82,5 @@ export function ServingBadge({
         <span className="type-caption text-fg-muted">{qualifier}</span>
       )}
     </span>
-  );
-}
-
-/** A subscription/creative status word, resolved through the dictionary. */
-export function StateBadge({ status, dict }: { status: string; dict: Dict }) {
-  return (
-    <StateWord tone={statusTone(status)} label={statusLabel(dict, status)} />
   );
 }

@@ -17,7 +17,8 @@ Audit checklist:
    rows to the owning `user_id` (`auth.uid()`). No policy that lets a user read/write
    another user's rows.
 3. **Write restrictions.** `subscriptions` is **read-only to clients** — only the
-   webhook (service role) mutates entitlement. `creative_events` has no direct client
+   admin's grant actions (`app/dashboard/admin/actions.ts`, service role, gated on
+   `ADMIN_EMAILS`) mutate entitlement. `creative_events` has no direct client
    write. `templates` writes are admin-only; authenticated read is fine.
 4. **Service-role usage.** The `SUPABASE_SERVICE_ROLE_KEY` is server-only and must never
    appear in client code or `NEXT_PUBLIC_*`. The serving read must be **narrowly
@@ -25,7 +26,7 @@ Audit checklist:
    service-role query that reads broadly or could be reached from the client.
 5. **Serving view integrity.** The denormalized serving record exposes only
    `template_id`, `selected_format`, `config_json`, and effective subscription status —
-   not extra columns. Refresh triggers on creative change and webhook are present.
+   not extra columns. The snapshot is republished on creative change and on every grant.
 6. **Injection & input.** Parameterized queries only; `creative_id` validated before
    use. No string-concatenated SQL.
 7. **Migrations.** New columns/tables get matching RLS in the same migration; no

@@ -5,27 +5,29 @@
 
 ## The core loop we must prove
 
-> A buyer subscribes → configures a creative from a template → copies a VAST tag →
-> it serves the interactive ad in a DSP/player → when the subscription lapses, it
-> stops serving.
+> A buyer is granted access → configures a creative from a template → copies a VAST tag →
+> it serves the interactive ad in a DSP/player → when access is revoked, it stops
+> serving. (During the closed beta access is granted by hand —
+> [ADR-0034](decisions/0034-closed-beta-manual-entitlement.md); it was a Stripe
+> subscription before.)
 
 If that loop works end-to-end for **one real template in both SIMID and VPAID**, the
 product thesis is validated.
 
 ## In scope (MVP)
 
-1. **Auth** — Supabase email/password (+ OAuth optional). Profiles with Stripe customer id.
+1. **Auth** — Supabase email/password (+ OAuth optional). A profile row per user.
 2. **Template showcase** — public landing + catalog of templates (seeded; admin-curated).
 3. **One real template end-to-end** — e.g. **Shoppable Video**, optimized into both
    **SIMID** and **VPAID** variants.
 4. **Creative configuration** — form driven by the template's `config_schema`
    (video URL, product images, links) + **format picker** (SIMID/VPAID).
 5. **VAST tag URL generation** — copyable URL pointing at `GET /api/vast`.
-6. **Dynamic VAST endpoint** — format-aware (adapter layer), subscription-gated,
+6. **Dynamic VAST endpoint** — format-aware (adapter layer), entitlement-gated,
    fails closed, edge + cache. Empty/fallback VAST when not entitled.
-7. **Billing** — Stripe Checkout for Single + All-Access; webhook as source of truth;
-   denormalized entitlement refresh.
-8. **Dashboard** — my creatives, my subscription/billing status, copy VAST tags.
+7. **Access** — granted by the admin on `/dashboard/admin` (closed beta, ADR-0034);
+   denormalized entitlement refresh on every grant. Billing comes back later.
+8. **Dashboard** — my creatives, my access status, copy VAST tags.
 9. **Minimal serving telemetry** — impression, viewable and click counted into
    `creative_event_counters` ([ADR-0016](decisions/0016-three-events-hourly-counters.md);
    proves the analytics foundation, rich dashboard is post-MVP). Quartiles were part of
@@ -50,8 +52,8 @@ Code-complete and building green:
 - [x] Template showcase (public landing)
 - [x] Creative configuration (format picker + config form)
 - [x] VAST tag generation + dynamic `GET /api/vast` (gated, fail-closed, cached)
-- [x] Billing: Checkout + webhook (source of truth) + idempotency
-- [x] Dashboard (subscriptions, templates, creatives with copyable tags)
+- [x] Access: the closed-beta grant with snapshot publish (billing removed, ADR-0034)
+- [x] Dashboard (access, templates, creatives with copyable tags, the admin's accounts list)
 - [x] Telemetry beacon `GET /api/track` -> `creative_event_counters`
 - [x] UI on the **Midnight** design system ([design-system.md](design-system.md),
       [ADR-0022](decisions/0022-midnight-design-system.md), which superseded the
@@ -74,7 +76,7 @@ Remaining before a true end-to-end demo (needs external setup / assets):
       ([`supabase/seed.sql`](../supabase/seed.sql)).
 - [ ] **Upload assets** to the private `creatives` bucket (see runtime/README.md).
 - [ ] **Live credentials** — Supabase project (apply `schema.sql` + `seed.sql`),
-      Stripe products/prices + webhook secret, env vars.
+      `ADMIN_EMAILS`, env vars.
 - [ ] **Verification** — render the tag in Google IMA (VPAID) + a SIMID player;
       confirm the kill-switch flips on cancel. The dashboard configurator's
       "Launch Ad" panel (any signed-in user, any template, current unsaved
@@ -122,12 +124,12 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 
 ## Definition of done (MVP)
 
-- [ ] A new user can sign up, subscribe via Stripe (test mode), configure the
+- [ ] A new user can sign up, be granted access on `/dashboard/admin`, configure the
       Shoppable Video creative, and copy a VAST tag.
 - [ ] That tag renders the interactive ad in a reference player in **both** SIMID
       and VPAID.
-- [ ] Cancelling/expiring the subscription flips the tag to empty/fallback within the
-      webhook + cache window.
+- [ ] Revoking access flips the tag to empty/fallback within the publish + cache
+      window.
 - [ ] `/security-review` clean on payments, auth, and the VAST endpoint.
 - [ ] Docs in `docs/` reflect the shipped behavior (`doc-sync` clean).
 
@@ -145,11 +147,12 @@ Remaining before a true end-to-end demo (needs external setup / assets):
    ([ADR-0028](decisions/0028-creative-media-on-r2.md)); then the units joined the media
    on R2 and the ad path moved to a Cloudflare Worker
    ([ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md)).
-3. **Billing:** recurring Stripe subscriptions with a **7-day trial** for new accounts
-   that attach a card. Draft prices: **$2/week** & **$5/month** (single template),
-   **$30/month** (Ultimate/all-access). See [billing.md](billing.md).
-4. **VAST cache:** TTL **~60s** + **snapshot republished on the Stripe webhook**.
-   Subscription changes take effect within **~2 minutes worst case** — the 60s response
+3. **Billing:** none during the closed beta — terms are agreed in person and access is
+   granted by hand ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)). The
+   Stripe design that preceded it (recurring subscriptions, 7-day trial, $2/week,
+   $5/month, $30/month) is in git history. See [billing.md](billing.md).
+4. **VAST cache:** TTL **~60s** + **snapshot republished on every grant or revoke**.
+   Access changes take effect within **~2 minutes worst case** — the 60s response
    cache plus up to 60s of snapshot propagation (Workers KV since ADR-0029)
    ([ADR-0015](decisions/0015-serving-snapshots-on-cdn.md); it was ~1 minute while the
    serving view was read live). Acceptable per product.
@@ -157,9 +160,9 @@ Remaining before a true end-to-end demo (needs external setup / assets):
 ## Cost posture (MVP)
 
 Building and testing the MVP runs on **free tiers ($0)**: GitHub, Next.js/Tailwind/
-Lucide, Google IMA, Supabase Free (DB/Auth/Storage), Stripe test mode, Vercel Hobby.
+Lucide, Google IMA, Supabase Free (DB/Auth/Storage), Vercel Hobby.
 **Going commercial** moved hosting to Cloudflare Workers Paid ($5/mo plus about $0.30
 per million requests past ten million — [ADR-0029](decisions/0029-off-vercel-onto-cloudflare-workers.md))
 instead of Vercel Pro, whose per-invocation pricing sat on the impression path. Still to
-add: ~$25/mo for Supabase Pro, to avoid project sleeping, plus Stripe per-transaction
-fees. See [ADR-0004](decisions/0004-mvp-on-free-tiers.md).
+add: ~$25/mo for Supabase Pro, to avoid project sleeping, plus a billing provider's
+per-transaction fees once one returns. See [ADR-0004](decisions/0004-mvp-on-free-tiers.md).

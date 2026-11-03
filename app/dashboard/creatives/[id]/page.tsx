@@ -4,6 +4,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getCdnUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
 import { LOCALE_TAG, type Dict } from "@/lib/i18n/dictionaries";
+import { formatDate } from "@/lib/i18n/format";
 import {
   formatAnswerPath,
   isClickField,
@@ -164,12 +165,7 @@ export default async function CreativePage({
               {creative.selected_format}
             </span>{" "}
             · {dict.dashboard.createdAt}{" "}
-            <span className="data-instr">
-              {new Date(creative.created_at).toLocaleDateString(
-                LOCALE_TAG[locale],
-                { day: "numeric", month: "short", year: "numeric" },
-              )}
-            </span>
+            <span className="data-instr">{formatDate(locale, creative.created_at)}</span>
           </p>
         </div>
         {statsAvailable ? (

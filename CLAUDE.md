@@ -20,7 +20,10 @@ we push after a case is built and verified locally).
 - **App (FE+BE):** Next.js (App Router, TypeScript)
 - **Styling/UI:** Tailwind CSS, Lucide React
 - **DB + Auth:** Supabase (PostgreSQL, RLS)
-- **Billing:** Stripe (webhooks are the source of truth)
+- **Billing:** none during the closed beta — access is granted by hand on
+  `/dashboard/admin` by the accounts in `ADMIN_EMAILS`, as a manual `all_access` row in
+  `subscriptions` ([ADR-0034](docs/decisions/0034-closed-beta-manual-entitlement.md)).
+  Stripe was removed on 2026-11-03; the table and the entitlement predicate are unchanged.
 - **Hosting:** Cloudflare Workers, since 2026-10-03 — `creosmith-web` is the app on
   `creosmith.com`, through OpenNext (`wrangler.jsonc`, `workers/web`), and
   `creosmith-ads` the ad domain (`workers/ads`)
@@ -46,8 +49,8 @@ bug even if the code "works". Details in [docs/adtech-standards.md](docs/adtech-
    obfuscation. See [ADR-0003](docs/decisions/0003-access-control-over-code-hiding.md).
 3. **The VAST endpoint is a public, high-QPS, latency-sensitive ad-serving path.**
    - No user session → **RLS does not apply**; use a scoped service-role read.
-   - **Never call Stripe on this path.** Subscription state is denormalized and
-     refreshed via Stripe webhooks.
+   - **Never call a billing provider or auth on this path.** Entitlement is denormalized
+     into the serving snapshot and republished by whoever writes `subscriptions`.
    - Prefer edge runtime + short-TTL cache with explicit invalidation.
    - **The ad domain is a Worker running the app's own handlers.** `workers/ads` routes
      to `lib/serving/http/`, the same modules the Next routes wrap — change the handler,
@@ -137,13 +140,14 @@ If code and docs disagree, that is a defect to fix, not a discrepancy to ignore.
 - After changing media URL parsing or the R2 layer (`lib/creative-media.ts`, `lib/r2.ts` —
   in R2, which has no RLS, they are the guard against a cross-tenant delete) →
   `npm run test:media`. See [ADR-0028](docs/decisions/0028-creative-media-on-r2.md).
-- After any Stripe/subscription/webhook change → **`billing-integrity-reviewer`** subagent.
+- After any change to the closed-beta grant (`app/dashboard/admin/`), `lib/admin.ts`,
+  subscription rows or the entitlement gate → **`billing-integrity-reviewer`** subagent.
 - After changing **either** copy of the entitlement predicate — `private.is_entitled` in
   `supabase/schema.sql` or `lib/serving/entitlement.ts` — change the other in the same
   commit and run `npm run check:entitlement` (compares Postgres's own verdict against the
   TypeScript port) plus `npm run test:entitlement`. See [ADR-0015](docs/decisions/0015-serving-snapshots-on-cdn.md).
-- After changing anything a serving snapshot projects (creative writers, the Stripe
-  webhook, `templates` via `npm run db:seed`) → run `npm run snapshot:backfill`.
+- After changing anything a serving snapshot projects (creative writers, the admin's
+  grant, `templates` via `npm run db:seed`) → run `npm run snapshot:backfill`.
 - Before **and** after any UI/UX work — new page, component, state, or user-visible
   string → run the **`design-check`** skill, then the **`design-system-reviewer`** subagent.
 - Before pushing anything touching payments, auth, or the public VAST endpoint →
@@ -197,10 +201,10 @@ in Chrome** for those, which drives the user's real browser with its real extens
 
 ## Conventions
 
-- TypeScript strict. No `any` on data crossing trust boundaries (VAST input, webhooks).
+- TypeScript strict. No `any` on data crossing trust boundaries (VAST input, postbacks).
 - Secrets only in env vars; never commit `.env*`. `SUPABASE_SERVICE_ROLE_KEY` is
   server-only and must never reach the client bundle.
-- Validate all external input (VAST query params, Stripe webhook signatures).
+- Validate all external input (VAST query params, postbacks, form data).
 - Conventional Commits. Push to GitHub only after a case is built **and verified locally**.
 - **Trunk-based: commit straight to `main`.** There are no feature branches and no PR
   review step in this pipeline — a push to `main` is what deploys to production (CI
@@ -214,8 +218,18 @@ in Chrome** for those, which drives the user's real browser with its real extens
 - [docs/architecture.md](docs/architecture.md) — system design, the three layers, ad-serving path
 - [docs/adtech-standards.md](docs/adtech-standards.md) — VAST/SIMID/VPAID/MRAID, multi-format strategy, protection reality
 - [docs/data-model.md](docs/data-model.md) — entities, relationships, RLS intent
-- [docs/billing.md](docs/billing.md) — Stripe model, webhooks, subscription lifecycle
+- [docs/billing.md](docs/billing.md) — the closed-beta grant, the snapshot publish, the entitlement lifecycle
 - [docs/security.md](docs/security.md) — trust boundaries, public endpoint, secrets
 - [docs/design-system.md](docs/design-system.md) — Midnight: tokens, typography, components, motion, RU/EN
 - [docs/mvp-scope.md](docs/mvp-scope.md) — what's in/out of MVP
 - [docs/decisions/](docs/decisions/) — Architecture Decision Records (ADRs)
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
