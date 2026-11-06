@@ -313,12 +313,18 @@ surface**, not a variant of the public serving path above:
    read or written. A stateless token was chosen over a server-side cache because the
    stack has no Redis/KV and Vercel functions don't share memory across invocations
    (ADR-0004); see [ADR-0006](decisions/0006-live-preview-token.md).
+   Since [ADR-0039](decisions/0039-html5-banner-template.md) a config that does not fit
+   the token (over 5120 bytes — an HTML5 banner's source) is written to Workers KV
+   under `preview/<pid>` with a 180 s lifetime (`lib/vast/preview-store.ts`), and the
+   token carries the id alone; configs that fit still travel in the token.
 2. `GET /api/vast/preview/[token]` — public by necessity (the third-party player SDKs
    fetch it directly, with no session), but **self-authorizing** via the token's HMAC
    signature + expiry rather than the subscription entitlement gate. It reuses
    `resolveInteractiveUrl()` + `buildInlineVast()` directly (not `generateVast()`,
    which gates on `should_serve`) against a synthetic `CreativeServing`-shaped context
-   built from the token (`lib/vast/preview-context.ts`). Response is
+   built from the token — or, for a token that names a stored config, loaded from KV
+   by that id, failing closed to an empty VAST when nothing is there
+   (`lib/vast/preview-context.ts`, `lib/vast/preview-store.ts`). Response is
    `Cache-Control: no-store` — never cached, unlike the real endpoint. Its CORS headers
    come from the same `lib/vast/cors.ts` as the real endpoint's, so a preview cannot
    pass where the served tag would fail

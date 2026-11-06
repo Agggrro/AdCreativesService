@@ -7,12 +7,21 @@
  * store in `store-kv.ts` does not know which one it holds.
  */
 
+/**
+ * A write's lifetime. A snapshot has none — it is replaced or deleted by the
+ * next publish. A preview's stored config (lib/vast/preview-store.ts) has one:
+ * KV drops the key by itself after `expirationTtl` seconds (60 at least).
+ */
+export interface PutOptions {
+  expirationTtl?: number;
+}
+
 /** The three operations the snapshot store needs. */
 export interface SnapshotNamespace {
   /** The stored text, or null when the key does not exist. Throws when the read itself failed. */
   get(key: string): Promise<string | null>;
   /** Throws on failure — writes fail hard (lib/serving/store.ts). */
-  put(key: string, value: string): Promise<void>;
+  put(key: string, value: string, options?: PutOptions): Promise<void>;
   /** Idempotent: deleting a key that is not there succeeds. */
   delete(key: string): Promise<void>;
 }
@@ -23,7 +32,7 @@ export interface SnapshotNamespace {
  */
 export interface KvBinding {
   get(key: string, options: { type: "text"; cacheTtl?: number }): Promise<string | null>;
-  put(key: string, value: string): Promise<void>;
+  put(key: string, value: string, options?: PutOptions): Promise<void>;
   delete(key: string): Promise<void>;
 }
 
@@ -35,7 +44,12 @@ export interface KvBinding {
 export function bindingNamespace(kv: KvBinding, cacheTtl: number): SnapshotNamespace {
   return {
     get: (key) => kv.get(key, { type: "text", cacheTtl }),
-    put: (key, value) => writeWithRetry(() => kv.put(key, value)),
+    put: (key, value, options) =>
+      writeWithRetry(() =>
+        options?.expirationTtl
+          ? kv.put(key, value, { expirationTtl: options.expirationTtl })
+          : kv.put(key, value),
+      ),
     delete: (key) => writeWithRetry(() => kv.delete(key)),
   };
 }
@@ -120,9 +134,11 @@ export function restNamespace(options: RestNamespaceOptions): SnapshotNamespace 
       return response.text();
     },
 
-    put(key, value) {
+    put(key, value, options) {
       return writeWithRetry(async () => {
-        const response = await doFetch(url(key), {
+        const ttl = options?.expirationTtl;
+        const target = ttl ? `${url(key)}?expiration_ttl=${Math.ceil(ttl)}` : url(key);
+        const response = await doFetch(target, {
           method: "PUT",
           headers: { ...auth, "Content-Type": "text/plain; charset=utf-8" },
           body: value,

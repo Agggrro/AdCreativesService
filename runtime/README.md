@@ -34,6 +34,12 @@ through `/c/s/:token`, which gives it the CSP it runs under and a per-request to
   intervention meters a unit's main-thread time and an ad can sit on screen untouched.
 - `templates/<name>/vpaid.js` — one render module per template, defining `var
   TEMPLATE = { name, duration, onStart }`.
+  A template that hosts input somewhere the slot cannot see it — `html5-banner` runs the
+  advertiser's document in a sandboxed iframe — reports the viewer's gestures through
+  `api.engage()`, so the clock extends as it would for a tap in the slot
+  ([ADR-0039](../docs/decisions/0039-html5-banner-template.md)). That template's
+  `sample.html` is the schema default and the demo; the seed carries a copy, kept in
+  step by hand.
   **The slot is not always in the document the unit runs in.** Fluid Player loads the
   unit into an iframe of its own and builds the slot in the host page
   (`fluid-player/src/modules/vpaid.js` `loadVpaid`, `adsupport.js`
@@ -73,6 +79,7 @@ through `/c/s/:token`, which gives it the CSP it runs under and a per-request to
 | `dist/pick-message/vpaid.js` | `pick-message/vpaid.js` | VPAID 2.0 |
 | `dist/duel/vpaid.js` | `duel/vpaid.js` | VPAID 2.0 |
 | `dist/step-builder/vpaid.js` | `step-builder/vpaid.js` | VPAID 2.0 |
+| `dist/html5-banner/vpaid.js` | `html5-banner/vpaid.js` | VPAID 2.0 |
 
 These keys match `templates.runtime_keys` in [`../supabase/seed.sql`](../supabase/seed.sql)
 and are what `runtime/manifest.ts` maps to real CDN URLs. The **object** key on the

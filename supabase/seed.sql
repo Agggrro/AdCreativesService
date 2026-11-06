@@ -346,6 +346,37 @@ insert into public.templates (
      ]}'::jsonb,
     'standard',
     true
+  ),
+  -- HTML5 Banner (ADR-0039). The advertiser's own HTML5 banner, played in a
+  -- sandboxed iframe inside the slot. `bannerHtml` is capped at 150 KB (the IAB
+  -- HTML5 initial-load figure) because config_json is inlined into
+  -- <AdParameters> on every ad request; its default is
+  -- runtime/templates/html5-banner/sample.html, kept in step by hand. Seeded as
+  -- a draft until its unit was on the CDN and an app that knows its key was
+  -- deployed, and published by this commit (runtime/README.md, "Order matters").
+  (
+    '00000000-0000-4000-8000-000000000009',
+    'HTML5 Banner',
+    'Your own HTML5 banner, played inside the video slot: paste the code, the click goes through the player.',
+    'html5_banner',
+    'interactive',
+    array['vpaid'],
+    '{"vpaid":"html5-banner/vpaid.js"}'::jsonb,
+    '{"groups":[
+       {"id":"bannerCode"},
+       {"id":"bannerFit"},
+       {"id":"bannerClick"}
+     ],"fields":[
+       {"name":"bannerHtml","label":"Banner HTML","type":"textarea","required":true,"rows":14,"maxLength":153600,"group":"bannerCode","help":"One HTML document: CSS and JS inline, images and fonts by https URL. Up to 150 KB. Its size is read from the ad.size meta tag; clickTag is set for you, and every window.open, link and Enabler exit opens the click-through URL below.","default":"<!DOCTYPE html>\n<html lang=''en''>\n<head>\n<meta charset=''utf-8''>\n<meta name=''ad.size'' content=''width=300,height=250''>\n<style>\nhtml,body{margin:0;width:300px;height:250px;overflow:hidden;background:#0f172a;font-family:Arial,Helvetica,sans-serif;color:#fff}\n#ad{position:relative;width:300px;height:250px;cursor:pointer}\n.glow{position:absolute;left:20px;top:-20px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,#f59e0b 0%,rgba(245,158,11,0) 65%);opacity:.5;animation:pulse 3s ease-in-out infinite}\n@keyframes pulse{0%,100%{transform:scale(.9);opacity:.4}50%{transform:scale(1.05);opacity:.65}}\n.eyebrow{position:absolute;left:20px;top:26px;font-size:11px;letter-spacing:.18em;text-transform:uppercase;opacity:.75}\nh1{position:absolute;left:20px;top:48px;margin:0;width:260px;font-size:28px;line-height:1.1;font-weight:700}\np{position:absolute;left:20px;top:126px;margin:0;width:240px;font-size:14px;line-height:1.4;opacity:.85}\n.cta{position:absolute;left:20px;bottom:24px;padding:10px 18px;border-radius:6px;background:#f59e0b;color:#0f172a;font-size:14px;font-weight:700}\n</style>\n</head>\n<body>\n<div id=''ad''>\n<div class=''glow''></div>\n<div class=''eyebrow''>Sample HTML5 banner</div>\n<h1>Your creative, in the player</h1>\n<p>Replace this HTML with your own banner. Keep clickTag for the click.</p>\n<div class=''cta''>Learn more</div>\n</div>\n<script>\ndocument.getElementById(''ad'').addEventListener(''click'',function(){window.open(clickTag,''_blank'');});\n</script>\n</body>\n</html>"},
+       {"name":"bannerWidth","label":"Width (px)","type":"number","default":300,"min":50,"max":4096,"group":"bannerCode","help":"Used when the HTML declares no ad.size."},
+       {"name":"bannerHeight","label":"Height (px)","type":"number","default":250,"min":50,"max":4096,"group":"bannerCode"},
+       {"name":"fit","label":"Fit","type":"select","required":true,"default":"contain","group":"bannerFit","options":[{"value":"contain","label":"Scale to fit"},{"value":"actual","label":"Actual size"}],"help":"Scale to fit shows the whole banner, scaled to the slot. Actual size keeps its pixels, centred, cropped where the slot is smaller."},
+       {"name":"backgroundColor","label":"Background color (hex)","type":"text","default":"#000000","group":"bannerFit","help":"Behind a banner that does not fill the slot."},
+       {"name":"backgroundImageUrl","label":"Background image","type":"image","group":"bannerFit","help":"Instead of the colour: a picture or clip fitted behind the banner."},
+       {"name":"clickThroughUrl","label":"Click-through URL","type":"url","required":true,"group":"bannerClick","help":"Where every click in the banner leads. The banner cannot pick another destination: the tag and the click have to agree."}
+     ]}'::jsonb,
+    'standard',
+    true
   )
 on conflict (id) do update set
   name                = excluded.name,

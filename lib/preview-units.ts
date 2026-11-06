@@ -14,6 +14,7 @@ export const PREVIEW_UNIT_PATHS: Record<string, string> = {
   "pick-message": "pick-message/vpaid.js",
   duel: "duel/vpaid.js",
   "step-builder": "step-builder/vpaid.js",
+  "html5-banner": "html5-banner/vpaid.js",
   shoppable: "shoppable/vpaid/unit.js",
 };
 

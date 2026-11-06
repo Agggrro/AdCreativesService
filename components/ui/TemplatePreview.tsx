@@ -124,6 +124,22 @@ function Mechanic({ type }: { type: string }) {
         </div>
       );
 
+    case "html5_banner":
+      // A banner's own rectangle inside the video slot, letterboxed: the one
+      // mechanic here is that a fixed-size document is fitted into the frame.
+      return (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex h-[72%] w-[52%] flex-col justify-between rounded-ctl border border-line bg-surface p-3">
+            <span className="type-data text-fg-muted">&lt;/&gt;</span>
+            <div className="flex flex-col gap-2">
+              <div className="h-2 w-[80%] bg-fg-disabled" />
+              <div className="h-2 w-[55%] bg-fg-disabled" />
+              <div className="h-5 w-14 rounded-ctl bg-fg-muted" />
+            </div>
+          </div>
+        </div>
+      );
+
     case "age_gate":
       return (
         <div className="absolute inset-0 flex items-center justify-center">

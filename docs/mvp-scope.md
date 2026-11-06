@@ -98,6 +98,10 @@ Remaining before a true end-to-end demo (needs external setup / assets):
       checked only in a local VPAID host, with no database behind `/dev/harness`. It
       still needs the harness sweep, and IMA and Fluid opening the `AdClickThru` URL
       with the picks on it.
+      HTML5 Banner ([ADR-0039](decisions/0039-html5-banner-template.md)) passed the
+      harness sweep and a real browser's clicks through its sandboxed frame (every exit
+      path, the gesture gate); it still needs IMA and Fluid, where the srcdoc frame
+      inherits the host document's CSP, and a real Google Web Designer export.
 - [ ] **`/security-review`** on payments, auth, and the public endpoints before push.
 
 ## Out of scope (post-MVP)

@@ -51,9 +51,11 @@ export async function createCreative(formData: FormData): Promise<void> {
   if (!template) fail("template_not_found");
 
   const { fields } = parseConfigSchema(template!.config_schema);
-  const { config: config_json, missingField } = buildConfigFromValues(fields, (name) =>
-    String(formData.get(name) ?? ""),
+  const { config: config_json, missingField, tooLongField } = buildConfigFromValues(
+    fields,
+    (name) => String(formData.get(name) ?? ""),
   );
+  if (tooLongField) fail("field_too_long", tooLongField);
   if (missingField) fail("field_required", missingField);
 
   // Optional label. Empty stays NULL so the list falls back to the template
@@ -138,9 +140,11 @@ export async function updateCreative(formData: FormData): Promise<void> {
   if (!template) fail("template_not_found");
 
   const { fields } = parseConfigSchema(template!.config_schema);
-  const { config: config_json, missingField } = buildConfigFromValues(fields, (name) =>
-    String(formData.get(name) ?? ""),
+  const { config: config_json, missingField, tooLongField } = buildConfigFromValues(
+    fields,
+    (name) => String(formData.get(name) ?? ""),
   );
+  if (tooLongField) fail("field_too_long", tooLongField);
   if (missingField) fail("field_required", missingField);
 
   const rawName = String(formData.get("name") ?? "").trim();

@@ -361,6 +361,17 @@ and on every serve.
 - **Data minimization:** the token carries only what `resolveInteractiveUrl`/
   `buildInlineVast` need (template id, format, config, runtime key, a random
   preview id, expiry) — nothing tying it to the minting user.
+- **A config past the token ceiling is stored, not carried**
+  ([ADR-0039](decisions/0039-html5-banner-template.md)): written to Workers KV under
+  `preview/<pid>` with a 180 s `expirationTtl`, and the signed token then holds the id
+  alone (`ref: 1`). The same guarantees hold — the id is a random UUID only the signed
+  token names; the stored value is the caller's own unsaved form state, which the
+  stateless token already exposed in full to whoever held it; a token for an id with
+  nothing under it, an expired key, or a store the process cannot reach all fail closed
+  to `emptyVast()`. The route's own ceiling on a stored config is 640 KB (the schema's
+  153,600-character cap at three UTF-8 bytes a character), above which it refuses before
+  writing; a process with no KV refuses the large config with the 413 it
+  always gave.
 
 ## Outbound fetches to untrusted URLs (`/api/tools/vast/*`)
 
@@ -535,6 +546,38 @@ loads into a sandboxed context the *video player* manages, not into the
 creative's own iframe, so there is no path by which the vendor's script
 reaches `runtime/shoppable/simid/index.html`. The "never advertiser-controlled
 today" statement above stays literally true after this change.
+
+## An advertiser's own code in the slot (ADR-0039)
+
+The HTML5 Banner template runs a document the advertiser wrote, so it is the one place
+untrusted script is executed on purpose — and the boundary around it is the browser's,
+not ours ([ADR-0039](decisions/0039-html5-banner-template.md)):
+
+- The banner runs in an iframe with `sandbox="allow-scripts"` and no `allow-same-origin`:
+  an opaque origin, with no access to the embedding document (in a same-document player,
+  the publisher's page), no top-frame navigation, no forms, no popups, no storage.
+  **Never add `allow-same-origin` or `allow-popups`** — the first gives the banner the
+  player's origin, the second a way to open a destination the player never counted.
+- The banner can post messages to its parent. The unit accepts four kinds (`exit`,
+  `unload`, `engage`, and `error` for its own diagnostics), only from the frame's own
+  `contentWindow`, and acts on an exit only by raising `AdClickThru` with the **creative's**
+  click-through URL — never a URL from the message. The banner's own `clickTag` is a
+  sentinel that resolves nowhere, so nothing it does by itself — a self-navigation, a
+  fetch, a pixel — can reach `/r`; only the player is handed the real link.
+- The gesture gate is the browser's, not the banner's word: an `exit` or `engage` counts
+  only while `navigator.userActivation.isActive` holds in the slot's window, which a
+  gesture inside the frame sets on every ancestor document. A banner cannot forge a click
+  or extend the ad by posting the message itself outside the browser's activation window
+  (about five seconds after a gesture anywhere in that window's document — in a
+  same-document player, the publisher's page); inside it, a forged exit is narrowed, not
+  excluded, and shows in the `tpl:exit` records. The browser cannot stop a banner from
+  navigating its own frame; that is de-fanged (the sentinel, the frame hidden until it
+  reloads, one reload without a gesture) rather than prevented.
+- Nothing of ours renders the HTML: the dashboard shows it in a `textarea` as text, the
+  catalog and harness run the seeded sample only through the same sandboxed frame, and the
+  VAST carries it inside the CDATA-wrapped `<AdParameters>` JSON like any other field.
+- The field is capped at 150 KB (`maxLength`), enforced by `buildConfigFromValues` at
+  save and at preview.
 
 ## RLS scope
 

@@ -53,6 +53,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0036](0036-public-tool-that-saves.md) | A public tool that saves: sign in at the end, the draft kept in the browser | Accepted |
 | [0037](0037-reduced-navigation-and-copy.md) | Reduced navigation, one account menu, a leaner landing and text that earns its place | Accepted |
 | [0038](0038-creative-workspace.md) | A creative as a workspace: Settings and Stats, an inspector, a template sheet | Accepted |
+| [0039](0039-html5-banner-template.md) | HTML5 Banner: an advertiser's own banner in a sandboxed frame inside the slot | Accepted |
 
 ## Template
 

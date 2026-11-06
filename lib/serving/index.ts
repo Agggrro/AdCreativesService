@@ -7,22 +7,38 @@
 // The ad Worker (workers/ads) does not come through here: it builds its store
 // from its own KV binding and hands it to the handlers in lib/serving/http.
 import { kvSnapshotStore } from "./store-kv";
-import { restNamespaceFromEnv } from "./kv";
+import { restNamespaceFromEnv, type SnapshotNamespace } from "./kv";
 import { registeredSnapshotNamespace } from "./registry";
 import { SnapshotReadError, type SnapshotStore } from "./store";
 
 export { registerSnapshotNamespace } from "./registry";
 
 /** `undefined` until first asked; `null` once the environment has said "no KV". */
+let restNamespace: SnapshotNamespace | null | undefined;
 let restStore: SnapshotStore | null | undefined;
 
 /** Throws on a partial or malformed configuration — see restNamespaceFromEnv. */
+function kvOverRestNamespace(): SnapshotNamespace | null {
+  if (restNamespace === undefined) restNamespace = restNamespaceFromEnv();
+  return restNamespace;
+}
+
 function kvOverRest(): SnapshotStore | null {
   if (restStore === undefined) {
-    const namespace = restNamespaceFromEnv();
+    const namespace = kvOverRestNamespace();
     restStore = namespace ? kvSnapshotStore(() => namespace) : null;
   }
   return restStore;
+}
+
+/**
+ * The KV namespace this process can reach, for a key that is not a snapshot —
+ * a preview's stored config (lib/vast/preview-store.ts) — chosen the way
+ * `currentStore` chooses: the registered binding, else KV over REST, else
+ * null. A caller with null has nowhere to keep such a key and says so.
+ */
+export function snapshotNamespace(): SnapshotNamespace | null {
+  return registeredSnapshotNamespace() ?? kvOverRestNamespace();
 }
 
 /**

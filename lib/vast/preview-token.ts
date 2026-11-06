@@ -22,9 +22,14 @@ const PREVIEW_TTL_SECONDS = 120;
  */
 const MAX_PAYLOAD_BYTES = 5600;
 
-export interface PreviewTokenPayload extends PreviewServingInput {
-  exp: number;
-}
+/**
+ * Either the whole preview, or — for a config past the ceiling above — a
+ * reference to one kept under its id in KV (lib/vast/preview-store.ts,
+ * ADR-0039). Both carry the same expiry and the same signature.
+ */
+export type PreviewTokenPayload =
+  | (PreviewServingInput & { exp: number; ref?: undefined })
+  | { pid: string; exp: number; ref: 1 };
 
 function secret(): string {
   const s = process.env.PREVIEW_TOKEN_SECRET;
@@ -57,6 +62,27 @@ export function signPreviewToken(input: Omit<PreviewServingInput, "pid">): {
 }
 
 /**
+ * Mint a token that names a stored preview rather than carrying it. The caller
+ * stores the config under `pid` first (storePreviewInput); a token for an id
+ * nothing was stored under verifies fine and then finds nothing, which the
+ * route answers with an empty VAST.
+ */
+export function signPreviewRefToken(pid: string): {
+  token: string;
+  previewId: string;
+  expiresInSeconds: number;
+} {
+  const exp = Math.floor(Date.now() / 1000) + PREVIEW_TTL_SECONDS;
+  const payload: PreviewTokenPayload = { pid, exp, ref: 1 };
+  const payloadB64 = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  return {
+    token: `${payloadB64}.${sign(payloadB64)}`,
+    previewId: pid,
+    expiresInSeconds: PREVIEW_TTL_SECONDS,
+  };
+}
+
+/**
  * Verify a token's signature and expiry. Returns null on ANY problem — callers
  * must fail closed (empty VAST), exactly like the real /api/vast endpoint does
  * for a bad creative_id.
@@ -82,20 +108,21 @@ export function verifyPreviewToken(token: string): PreviewTokenPayload | null {
   try {
     const parsed = JSON.parse(
       Buffer.from(payloadB64, "base64url").toString("utf8"),
-    ) as Partial<PreviewTokenPayload>;
+    ) as Partial<PreviewServingInput> & { exp?: unknown; ref?: unknown };
+    if (!parsed || typeof parsed.pid !== "string" || typeof parsed.exp !== "number") {
+      return null;
+    }
+    if (parsed.exp < Math.floor(Date.now() / 1000)) return null;
+    if (parsed.ref === 1) return { pid: parsed.pid, exp: parsed.exp, ref: 1 };
     if (
-      !parsed ||
-      typeof parsed.pid !== "string" ||
       typeof parsed.tid !== "string" ||
       typeof parsed.fmt !== "string" ||
-      typeof parsed.exp !== "number" ||
       !parsed.cfg ||
       typeof parsed.cfg !== "object" ||
       Array.isArray(parsed.cfg)
     ) {
       return null;
     }
-    if (parsed.exp < Math.floor(Date.now() / 1000)) return null;
     return parsed as PreviewTokenPayload;
   } catch {
     return null;

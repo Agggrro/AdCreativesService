@@ -349,7 +349,9 @@ export function ConfiguratorWorkspace({
                 <Notice tone="dead" live>
                   {invalid.fault === "required"
                     ? dict.configurator.errFieldRequired
-                    : dict.configurator.errFieldInvalid}
+                    : invalid.fault === "length"
+                      ? dict.configurator.errFieldTooLong
+                      : dict.configurator.errFieldInvalid}
                   : {missingText}
                 </Notice>
               )}

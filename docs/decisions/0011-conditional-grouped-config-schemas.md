@@ -148,6 +148,11 @@ token to a query string buys nothing; it is the same request-line bytes.
 Production serving is unaffected: `/api/vast` reads `config_json` from the database
 and has no such cap.
 
+*Amended by [ADR-0039](0039-html5-banner-template.md):* the opaque id now exists. A config
+past the 5120-byte ceiling is kept under its preview id in Workers KV with a lifetime KV
+enforces (`lib/vast/preview-store.ts`), and the token names the id alone. Configs that fit
+the token still travel in it.
+
 ## Consequences
 
 - **Every future template inherits this vocabulary.** That is the point, and it is

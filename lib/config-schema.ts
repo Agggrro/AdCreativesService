@@ -35,6 +35,16 @@ export interface ConfigField {
   help?: string;
   min?: number;
   max?: number;
+  /**
+   * Longest value a `text` or `textarea` field takes, in characters. Enforced
+   * at save, not only by the input: `config_json` is inlined into
+   * `<AdParameters>` on every ad request, so a field that carries a document —
+   * the HTML5 banner's source (ADR-0039) — has to have a ceiling the serving
+   * path can count on.
+   */
+  maxLength?: number;
+  /** Visible lines of a `textarea`; three when absent. */
+  rows?: number;
   default?: string | number;
   options?: { value: string; label: string }[];
   /**
@@ -156,6 +166,9 @@ export function parseConfigSchema(json: unknown): ConfigSchema {
       help: typeof o.help === "string" ? o.help : undefined,
       min: typeof o.min === "number" ? o.min : undefined,
       max: typeof o.max === "number" ? o.max : undefined,
+      maxLength:
+        typeof o.maxLength === "number" && o.maxLength > 0 ? Math.floor(o.maxLength) : undefined,
+      rows: typeof o.rows === "number" && o.rows > 0 ? Math.floor(o.rows) : undefined,
       default:
         typeof o.default === "string" || typeof o.default === "number"
           ? o.default
@@ -306,10 +319,21 @@ export function visibleFieldNames(
   return out;
 }
 
+/** A `text`/`textarea` value past the field's `maxLength`. */
+export function isTooLong(field: ConfigField, raw: string): boolean {
+  return (
+    field.maxLength !== undefined &&
+    (field.type === "text" || field.type === "textarea") &&
+    (raw ?? "").trim().length > field.maxLength
+  );
+}
+
 export interface BuiltConfig {
   config: Record<string, Exclude<Json, null>>;
   /** Label of the first required-but-empty *active* field, if any. */
   missingField?: string;
+  /** Label of the first *active* field whose value is past its `maxLength`. */
+  tooLongField?: string;
 }
 
 /**
@@ -331,7 +355,11 @@ export function buildConfigFromValues(
   const config: Record<string, Exclude<Json, null>> = {};
   for (const field of fields) {
     if (!visible.has(field.name)) continue;
-    const value = coerceFieldValue(field, read(field.name));
+    const raw = read(field.name);
+    // Refused outright rather than truncated: a banner cut at 150 KB is a
+    // broken banner, and the owner should hear which field and why.
+    if (isTooLong(field, raw)) return { config, tooLongField: field.label };
+    const value = coerceFieldValue(field, raw);
     if (value === undefined) {
       if (field.required) return { config, missingField: field.label };
       continue;

@@ -2,6 +2,7 @@ import { getRequestOrigin } from "@/lib/site";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { buildPreviewServing } from "@/lib/vast/preview-context";
 import { verifyPreviewToken } from "@/lib/vast/preview-token";
+import { loadPreviewInput } from "@/lib/vast/preview-store";
 import {
   buildInlineVast,
   emptyVast,
@@ -58,7 +59,13 @@ export async function GET(
 ): Promise<Response> {
   const { token } = await params;
 
-  const payload = verifyPreviewToken(token);
+  const verified = verifyPreviewToken(token);
+  if (!verified) return vastResponse(emptyVast(), request);
+
+  // A token past the stateless ceiling names its config rather than carrying
+  // it (lib/vast/preview-store.ts, ADR-0039); one whose config is gone — or
+  // was never stored — fails closed like a bad token.
+  const payload = verified.ref ? await loadPreviewInput(verified.pid) : verified;
   if (!payload) return vastResponse(emptyVast(), request);
 
   try {

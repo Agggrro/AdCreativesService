@@ -138,8 +138,14 @@ export function InspectorField({
         placeholder={field.placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        rows={3}
-        className={inputClass}
+        rows={field.rows ?? 3}
+        maxLength={field.maxLength}
+        // Source, when the field holds a document: the text a person wrote is
+        // not the text a browser should tidy.
+        spellCheck={field.rows !== undefined && field.rows >= 8 ? false : undefined}
+        // Vertical only: a sideways drag would push a tall source field past the
+        // inspector column and scroll the page sideways (§5).
+        className={`${inputClass} resize-y`}
       />
     );
   } else if (field.type === "select" && isSegmentedSelect(field)) {
@@ -214,6 +220,7 @@ export function InspectorField({
         type={field.type === "number" ? "number" : field.type === "url" ? "url" : "text"}
         min={field.type === "number" ? field.min : undefined}
         max={field.type === "number" ? field.max : undefined}
+        maxLength={field.type === "text" ? field.maxLength : undefined}
         placeholder={field.placeholder ?? (bare ? field.label : undefined)}
         value={value}
         onChange={(e) => onChange(e.target.value)}

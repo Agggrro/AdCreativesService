@@ -215,7 +215,10 @@ surface that shows the working copy.
 
 Bugs that reproduce **only** with an ad blocker, or only inside the user's own signed-in
 session, are the exception this cannot cover — the in-app browser has neither. Use **Claude
-in Chrome** for those, which drives the user's real browser with its real extensions.
+in Chrome** for those, which drives the user's real browser with its real extensions — and
+for anything inside the HTML5 banner's sandboxed frame
+([ADR-0039](docs/decisions/0039-html5-banner-template.md)): the in-app browser cannot
+click into it, and its gesture gate needs a trusted click.
 
 ## Conventions
 

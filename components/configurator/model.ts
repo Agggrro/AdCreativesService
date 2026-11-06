@@ -1,4 +1,4 @@
-import type { ConfigField, ConfigGroup } from "@/lib/config-schema";
+import { isTooLong, type ConfigField, type ConfigGroup } from "@/lib/config-schema";
 
 /**
  * The configurator's shape, derived from a template's `config_schema` — pure, so
@@ -84,8 +84,8 @@ export function isSectionComplete(
   );
 }
 
-/** Why a field would be refused: nothing in a required one, or a value the browser's own check would reject. */
-export type FieldFault = "required" | "url" | "number";
+/** Why a field would be refused: nothing in a required one, a value the browser's own check would reject, or one past the schema's `maxLength`. */
+export type FieldFault = "required" | "url" | "number" | "length";
 
 export interface InvalidField {
   field: ConfigField;
@@ -126,6 +126,9 @@ export function firstInvalid(
       continue;
     }
     if (field.type === "url" && !isAbsoluteUrl(value)) return { field, fault: "url" };
+    // The input's own maxLength only constrains typing; a paste past it is
+    // clipped by some browsers and kept by others.
+    if (isTooLong(field, value)) return { field, fault: "length" };
     if (field.type === "number") {
       const n = Number(value);
       if (

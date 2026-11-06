@@ -5,12 +5,13 @@ export type CreativeError =
   | "format_required"
   | "template_not_found"
   | "field_required"
+  | "field_too_long"
   | "name_too_long"
   | "save_failed"
   | "delete_failed"
   | "duplicate_failed";
 
-/** Error code → copy, in the reader's language (§8). Shared by the create and edit pages. */
+/** Error code → copy, in the reader's language (§10). Shared by the create and edit pages. */
 export function creativeErrorMessage(
   dict: Dict,
   code: string | undefined,
@@ -24,6 +25,8 @@ export function creativeErrorMessage(
       return c.errTemplateNotFound;
     case "field_required":
       return field ? `${c.errFieldRequired}: ${field}` : c.errFieldRequired;
+    case "field_too_long":
+      return field ? `${c.errFieldTooLong}: ${field}` : c.errFieldTooLong;
     case "name_too_long":
       return c.errNameTooLong;
     case "save_failed":

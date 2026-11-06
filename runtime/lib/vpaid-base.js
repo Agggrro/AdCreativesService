@@ -13,7 +13,8 @@
  * viewer engages with it, by up to ADINTERACT_EXTEND_MAX seconds (ADR-0032).
  *
  * `api` given to onStart: { params, slot, videoSlot, clickThrough(url?), emit(e,a),
- * stop(), debug(name, data), volume(), onStop(fn), onPause(fn), onResume(fn) }
+ * stop(), debug(name, data), volume(), onStop(fn), onPause(fn), onResume(fn),
+ * engage() }
  * Config arrives via VAST <AdParameters> (creativeData.AdParameters). ADR-0005.
  */
 
@@ -517,6 +518,13 @@ CreoSmithVpaid.prototype._api = function () {
     },
     onResume: function (fn) {
       if (typeof fn === "function") self._onResume.push(fn);
+    },
+    // The viewer acted on the ad somewhere the base cannot see — inside a frame
+    // a template hosts (the HTML5 banner's sandboxed document), whose events
+    // never reach the slot. Extends the ad as a tap in the slot would
+    // (ADR-0032); nothing else, and nothing after the ad ends.
+    engage: function () {
+      self._extend();
     },
   };
 };

@@ -355,6 +355,7 @@ const ru = {
     errFieldRequired: "Заполните обязательное поле",
     errFieldInvalid: "Проверьте значение",
     errNameTooLong: "Название длиннее 200 символов — сократите его.",
+    errFieldTooLong: "Значение длиннее допустимого — сократите его",
     errSaveFailed:
       "Не удалось сохранить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
     errDeleteFailed:
@@ -405,6 +406,9 @@ const ru = {
       sbStep3Options: "Варианты шага 3",
       sbFinish: "Финальный экран",
       sbClick: "Переход по клику",
+      bannerCode: "Код баннера",
+      bannerFit: "Размещение в слоте",
+      bannerClick: "Переход по клику",
       viewability: "Верификация просмотра (OMID)",
     },
     outcomes: {
@@ -1096,6 +1100,7 @@ const en: Dict = {
     errFieldRequired: "Fill in the required field",
     errFieldInvalid: "Check the value",
     errNameTooLong: "The name is longer than 200 characters — shorten it.",
+    errFieldTooLong: "The value is longer than allowed — shorten it",
     errSaveFailed:
       "Could not save the creative. Try again; if it keeps failing, contact us.",
     errDeleteFailed:
@@ -1140,6 +1145,9 @@ const en: Dict = {
       sbStep3Options: "Step 3 options",
       sbFinish: "Final screen",
       sbClick: "Click-through",
+      bannerCode: "Banner code",
+      bannerFit: "Placement in the slot",
+      bannerClick: "Click-through",
       viewability: "Viewability verification (OMID)",
     },
     outcomes: {

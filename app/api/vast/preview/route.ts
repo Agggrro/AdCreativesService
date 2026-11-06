@@ -3,7 +3,9 @@ import { getRequestOrigin } from "@/lib/site";
 import { resolveInteractiveUrl } from "@/lib/storage";
 import { parseConfigSchema, buildConfigFromValues } from "@/lib/config-schema";
 import { buildPreviewServing } from "@/lib/vast/preview-context";
-import { signPreviewToken } from "@/lib/vast/preview-token";
+import { signPreviewRefToken, signPreviewToken } from "@/lib/vast/preview-token";
+import { canStorePreview, storePreviewInput } from "@/lib/vast/preview-store";
+import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +20,14 @@ export const dynamic = "force-dynamic";
 // perfectly willing to build. See ADR-0011 for the ~5.6KB architectural limit
 // this sits under.
 const MAX_PREVIEW_CONFIG_BYTES = 5120;
+// Past the token, a config is kept in KV under its preview id and the token
+// names it (lib/vast/preview-store.ts, ADR-0039). An HTML5 banner's source is
+// capped at 153,600 *characters* by its schema (`maxLength`), which is up to
+// three times that in UTF-8 bytes for a banner written in Cyrillic or CJK; this
+// is the route's own ceiling on the whole config, above that and well under
+// what KV holds, so a body that no schema could have produced is refused before
+// anything is written.
+const MAX_STORED_CONFIG_BYTES = 640 * 1024;
 
 /**
  * Mint a short-TTL preview for a template using the CALLER'S CURRENT, unsaved
@@ -83,24 +93,46 @@ export async function POST(request: Request): Promise<Response> {
   // fields the user has since switched off, and preview must not show a
   // configuration Save would refuse to write.
   const { fields } = parseConfigSchema(template.config_schema);
-  const { config, missingField } = buildConfigFromValues(fields, (name) =>
+  const { config, missingField, tooLongField } = buildConfigFromValues(fields, (name) =>
     name === "selected_format" ? format : String(fieldsInput[name] ?? ""),
   );
+  if (tooLongField) {
+    return Response.json({ error: `${tooLongField} is too long` }, { status: 400 });
+  }
   if (missingField) {
     return Response.json({ error: `${missingField} is required` }, { status: 400 });
   }
 
   const payloadSize = Buffer.byteLength(JSON.stringify(config), "utf8");
-  if (payloadSize > MAX_PREVIEW_CONFIG_BYTES) {
+  if (payloadSize > MAX_STORED_CONFIG_BYTES) {
     return Response.json({ error: "preview config too large" }, { status: 413 });
   }
 
-  const minted = signPreviewToken({
+  const input = {
     tid: template.id,
     fmt: format,
     cfg: config,
     rk: template.runtime_keys,
-  });
+  };
+  let minted: ReturnType<typeof signPreviewToken>;
+  if (payloadSize <= MAX_PREVIEW_CONFIG_BYTES) {
+    minted = signPreviewToken(input);
+  } else if (canStorePreview()) {
+    // Stored first, under the id the token will name: a token minted before
+    // the write landed could be fetched by a fast player and find nothing.
+    const pid = randomUUID();
+    try {
+      await storePreviewInput({ ...input, pid });
+    } catch (err) {
+      console.error("preview config store failed", err);
+      return Response.json({ error: "preview could not be stored" }, { status: 503 });
+    }
+    minted = signPreviewRefToken(pid);
+  } else {
+    // A process without KV (`npm run dev` without the SNAPSHOT_KV_* variables)
+    // has only the token, and this config does not fit it.
+    return Response.json({ error: "preview config too large" }, { status: 413 });
+  }
 
   // Resolve the unit URL once (same helper as production) so the Sandbox tab
   // can use it directly without a second round trip through VAST XML. No
