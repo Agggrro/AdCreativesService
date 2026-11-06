@@ -52,6 +52,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0035](0035-vast-video-creatives.md) | VAST video creatives: a system template, a version-aware builder, and quartiles counted | Accepted |
 | [0036](0036-public-tool-that-saves.md) | A public tool that saves: sign in at the end, the draft kept in the browser | Accepted |
 | [0037](0037-reduced-navigation-and-copy.md) | Reduced navigation, one account menu, a leaner landing and text that earns its place | Accepted |
+| [0038](0038-creative-workspace.md) | A creative as a workspace: Settings and Stats, an inspector, a template sheet | Accepted |
 
 ## Template
 

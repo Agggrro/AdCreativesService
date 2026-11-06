@@ -5,8 +5,8 @@ import { createCreative } from "@/app/dashboard/creatives/actions";
 import { creativeErrorMessage } from "@/lib/creative-errors";
 import { parseConfigSchema } from "@/lib/config-schema";
 import { getDict } from "@/lib/i18n/server";
-import { ConfiguratorForm } from "@/components/ConfiguratorForm";
-import { Notice } from "@/components/ui/Field";
+import { ConfiguratorWorkspace } from "@/components/configurator/ConfiguratorWorkspace";
+import { DashboardShell } from "@/components/DashboardShell";
 
 export default async function NewCreativePage({
   searchParams,
@@ -14,9 +14,9 @@ export default async function NewCreativePage({
   searchParams: Promise<{ template?: string; error?: string; field?: string }>;
 }) {
   const sp = await searchParams;
-  // Picking a template is the catalog's job now — there is no second picker
-  // to keep in sync with it (ADR-0008).
-  if (!sp.template) redirect("/catalog");
+  // Picking a template is the new-creative sheet's job (ADR-0038), and an address
+  // that names none opens it on the list.
+  if (!sp.template) redirect("/dashboard/creatives?new=1");
 
   const supabase = await createServerSupabase();
   const { dict } = await getDict();
@@ -33,17 +33,17 @@ export default async function NewCreativePage({
 
   if (!template) {
     return (
-      <div className="flex flex-col gap-3">
-        <p className="type-small text-fg-muted">
-          {dict.configurator.notFound}
-        </p>
-        <Link
-          href="/catalog"
-          className="type-small font-medium text-fg underline underline-offset-4"
-        >
-          {dict.catalog.backToCatalog}
-        </Link>
-      </div>
+      <DashboardShell>
+        <div className="flex flex-col gap-3">
+          <p className="type-small text-fg-muted">{dict.configurator.notFound}</p>
+          <Link
+            href="/catalog"
+            className="type-small font-medium text-fg underline underline-offset-4"
+          >
+            {dict.catalog.backToCatalog}
+          </Link>
+        </div>
+      </DashboardShell>
     );
   }
 
@@ -51,22 +51,14 @@ export default async function NewCreativePage({
   const message = creativeErrorMessage(dict, sp.error, sp.field);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="type-h2">
-          {dict.configurator.configureTitle}: {template.name}
-        </h1>
-      </div>
-
-      {message && <Notice tone="dead">{message}</Notice>}
-
-      <ConfiguratorForm
-        template={template}
-        fields={fields}
-        groups={groups}
-        action={createCreative}
-        submitLabel={dict.dashboard.createCreative}
-      />
-    </div>
+    <ConfiguratorWorkspace
+      mode="create"
+      heading={`${dict.configurator.configureTitle}: ${template.name}`}
+      template={template}
+      fields={fields}
+      groups={groups}
+      action={createCreative}
+      message={message}
+    />
   );
 }

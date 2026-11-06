@@ -12,7 +12,7 @@ import { chipType } from "@/components/ui/Chip";
  * what had already happened, the three copies having drifted to three different
  * paddings for want of a shared line-height.
  *
- * The configurator's format picker (`ConfiguratorForm.tsx`) is deliberately NOT
+ * The workspace bar's format picker (`ConfiguratorWorkspace.tsx`) is deliberately NOT
  * migrated: it wraps an `sr-only` radio group so the browser enforces
  * single-selection inside a form and the value posts natively. That is a
  * genuinely different control wearing the same clothes, and folding it in would

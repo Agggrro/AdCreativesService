@@ -6,6 +6,7 @@ import { hasAllAccess, isLive, type AccessRow } from "@/lib/beta-access";
 import { AccountsTable, type AccountRow } from "@/components/AccountsTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Notice, Panel } from "@/components/ui/Field";
+import { DashboardShell } from "@/components/DashboardShell";
 
 /**
  * The closed-beta admin page (ADR-0034): every registered account, and the
@@ -104,24 +105,26 @@ export default async function AdminAccountsPage({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader title={dict.admin.title} />
+    <DashboardShell>
+      <div className="flex flex-col gap-6">
+        <PageHeader title={dict.admin.title} />
 
-      {actionError && <Notice tone="dead">{actionError}</Notice>}
-      {rows === null && <Notice tone="dead">{dict.admin.errorList}</Notice>}
+        {actionError && <Notice tone="dead">{actionError}</Notice>}
+        {rows === null && <Notice tone="dead">{dict.admin.errorList}</Notice>}
 
-      {rows && rows.length > 0 && (
-        <AccountsTable rows={rows} dict={dict} locale={locale} />
-      )}
-      {rows && rows.length === 0 && (
-        <Panel className="p-6">
-          <p className="type-small text-fg-muted">{dict.admin.empty}</p>
-        </Panel>
-      )}
+        {rows && rows.length > 0 && (
+          <AccountsTable rows={rows} dict={dict} locale={locale} />
+        )}
+        {rows && rows.length === 0 && (
+          <Panel className="p-6">
+            <p className="type-small text-fg-muted">{dict.admin.empty}</p>
+          </Panel>
+        )}
 
-      {rows && rows.length > 0 && (
-        <p className="type-caption text-fg-muted">{dict.admin.propagation}</p>
-      )}
-    </div>
+        {rows && rows.length > 0 && (
+          <p className="type-caption text-fg-muted">{dict.admin.propagation}</p>
+        )}
+      </div>
+    </DashboardShell>
   );
 }

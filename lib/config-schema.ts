@@ -183,7 +183,7 @@ export function parseConfigSchema(json: unknown): ConfigSchema {
   // but wrong in a way someone can see.
   //
   // "selected_format" is always a valid controller even though it's never a
-  // declared field: it's the sibling delivery-format radio (ConfiguratorForm's
+  // declared field: it's the sibling delivery-format radio (ConfiguratorWorkspace's
   // own state, not part of config_schema/config_json), the one thing a
   // template-wide schema needs to gate a field by per format — e.g. an OMID
   // verification field that only applies to SIMID (ADR-0012).

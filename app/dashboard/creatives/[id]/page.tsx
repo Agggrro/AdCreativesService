@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { vastTagUrl } from "@/lib/site";
 import { getDict } from "@/lib/i18n/server";
 import { LOCALE_TAG, type Dict } from "@/lib/i18n/dictionaries";
-import { formatDate } from "@/lib/i18n/format";
 import {
   formatAnswerPath,
   isClickField,
@@ -19,13 +19,19 @@ import { asJsonObject } from "@/lib/json";
 import { UUID_RE } from "@/lib/uuid";
 import { CopyButton } from "@/components/CopyButton";
 import {
-  ConversionReport,
+  conversionParts,
   REPORT_DAYS,
   type ExitLabel,
 } from "@/components/ConversionReport";
-import { VastErrorReport } from "@/components/VastErrorReport";
-import { LinkButton } from "@/components/ui/Button";
-import { Panel } from "@/components/ui/Field";
+import { vastErrorParts } from "@/components/VastErrorReport";
+import { StatStrip, type StatTile } from "@/components/stats/StatStrip";
+import { CreativeTabs } from "@/components/workspace/CreativeTabs";
+import { MoreMenu } from "@/components/workspace/MoreMenu";
+import { WorkspaceBar } from "@/components/workspace/WorkspaceBar";
+import { buttonClass } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
+import { Container } from "@/components/ui/Container";
+import { Notice } from "@/components/ui/Field";
 import { ServingBadge } from "@/components/ui/State";
 import { VIDEO_FORMAT } from "@/lib/vast-gen/kind";
 import { supports } from "@/lib/vast-gen/spec";
@@ -68,6 +74,13 @@ const PROGRESS = [
   { key: "completes", label: "complete" },
 ] as const satisfies readonly { key: string; label: keyof Dict["dashboard"]["progressSteps"] }[];
 
+/**
+ * A creative's Stats: the other half of its workspace (docs/design-system.md §6,
+ * "Workspace" and "Stats"; ADR-0038). Everything a returning owner opens a
+ * creative for — delivery, viewability, errors, conversions — in one screen at
+ * 1280×720, with the tag's *Copy* always in the bar; the long tables are one click
+ * deeper, in place.
+ */
 export default async function CreativePage({
   params,
 }: {
@@ -188,194 +201,182 @@ export default async function CreativePage({
           ? dict.dashboard.viewableNoVersion
           : dict.dashboard.viewableNotApplicable;
 
+  const name = creative.name ?? template?.name ?? dict.dashboard.template;
+  const formatLabel = isVideo
+    ? videoVersion
+      ? `VAST ${videoVersion}`
+      : "—"
+    : creative.selected_format;
+
+  const conv = conversionParts({
+    dict,
+    locale,
+    rows: conversions ?? [],
+    goals: goals ?? [],
+    available: !conversionsError && !goalsError,
+    exits,
+    exitsMissingMacro,
+    editHref: `/dashboard/creatives/${creative.id}/edit`,
+  });
+  const errs = vastErrorParts({
+    dict,
+    locale,
+    rows: vastErrors ?? [],
+    available: !vastErrorsError,
+  });
+
+  const heading = (text: string) => <h2 className="label-instr">{text}</h2>;
+
+  // Impressions → clicks, then the ratio that closes the strip (§6): the counts
+  // are a sequence of things that happened, CTR is a reading about them, and its
+  // caption names the denominator because impressions and viewable impressions
+  // give different numbers.
+  const delivery: StatTile[] = [
+    ...DELIVERY.map((step) => ({
+      key: step.key,
+      label: dict.catalog.funnel[step.label],
+      values: [statsAvailable ? number.format(counts[step.key]) : "—"],
+      caption: step.hint && statsAvailable ? dict.dashboard[step.hint] : undefined,
+    })),
+    {
+      key: "ctr",
+      label: dict.dashboard.ctr,
+      // Not `0%` when nothing has been delivered — that would claim nobody
+      // clicked. No denominator means not measurable yet.
+      values: [
+        statsAvailable && counts.impressions > 0
+          ? percent.format(counts.clicks / counts.impressions)
+          : "—",
+      ],
+      caption: dict.dashboard.ctrOfImpressions,
+    },
+  ];
+
+  // Viewability (ADR-0012) is its own reading, not a third delivery tile: it is
+  // not part of the sequential, always-applicable delivery set (§6) — VPAID
+  // reports it itself, a VAST video creative from 4.0 has the player report it
+  // (ADR-0035), and it is structurally absent for SIMID. Colour and caption are
+  // driven by *applicability alone*, never by `statsAvailable`: §6 gives the two
+  // dashes opposite meanings — `text-fg` for a transient outage, `text-fg-disabled`
+  // for a permanent, row-specific absence.
+  const viewable: StatTile = {
+    key: "viewable",
+    label: dict.dashboard.viewable,
+    values: [statsAvailable && viewableApplicable ? number.format(counts.viewable) : "—"],
+    caption: viewableCaption,
+    disabled: !viewableApplicable,
+  };
+
+  const progress: StatTile[] = isVideo
+    ? [
+        ...PROGRESS.map((step) => ({
+          key: step.key,
+          label: dict.dashboard.progressSteps[step.label],
+          values: [funnelAvailable ? number.format(funnel?.[step.key] ?? 0) : "—"],
+        })),
+        {
+          key: "vtr",
+          label: dict.dashboard.vtr,
+          // No impressions: not measurable yet, never 0%. And no ratio while the
+          // impressions tile it is "of" shows a dash (§6).
+          values: [
+            statsAvailable && funnelAvailable && funnel && funnel.impressions > 0
+              ? percent.format(funnel.completes / funnel.impressions)
+              : "—",
+          ],
+          caption: dict.dashboard.vtrOfImpressions,
+        },
+      ]
+    : [];
+
+  const panels = [errs.panel, conv.exitsPanel].filter(Boolean);
+
   return (
-    <div className="flex flex-col gap-6">
-      <Link
-        href="/dashboard/creatives"
-        className="self-start type-small text-fg-muted underline underline-offset-4 hover:text-fg"
-      >
-        {dict.dashboard.creatives}
-      </Link>
+    <div className="flex min-h-0 flex-1 flex-col lg:h-dvh lg:flex-none">
+      <h1 className="sr-only">{name}</h1>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="type-h2">
-            {creative.name ?? template?.name ?? dict.dashboard.template}
-          </h1>
-          <p className="type-small text-fg-muted">
-            {isVideo ? dict.dashboard.videoKind : template?.name} ·{" "}
-            <span className="data-instr uppercase">
-              {isVideo ? (videoVersion ? `VAST ${videoVersion}` : "—") : creative.selected_format}
-            </span>{" "}
-            · {dict.dashboard.createdAt}{" "}
-            <span className="data-instr">{formatDate(locale, creative.created_at)}</span>
-          </p>
-        </div>
-        {statsAvailable ? (
-          <ServingBadge
-            serving={serving}
-            label={serving ? dict.dashboard.serving : dict.dashboard.notServing}
-            qualifier={serving ? undefined : dict.dashboard.notServingHint}
-          />
-        ) : (
-          <span className="type-caption text-fg-muted">
-            {dict.dashboard.statsUnavailable}
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <h2 className="label-instr">{dict.dashboard.funnel}</h2>
-        {/*
-          A clipping parent would erase a 2px-offset focus ring (§2). Safe here
-          and only here: every cell is a static metric readout with no focusable
-          descendant. Put a control in one and the rounding moves to the cells.
-        */}
-        <div className="grid gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-3">
-          {DELIVERY.map((step) => (
-            <div key={step.key} className="flex flex-col gap-2 bg-surface p-4">
-              <span className="label-instr">
-                {dict.catalog.funnel[step.label]}
-              </span>
-              <span className="type-metric">
-                {statsAvailable ? number.format(counts[step.key]) : "—"}
-              </span>
-              {step.hint && statsAvailable && (
-                <span className="type-caption text-fg-muted">
-                  {dict.dashboard[step.hint]}
-                </span>
-              )}
-            </div>
-          ))}
-          {/*
-            The ratio closes the strip rather than sitting inside it (§6): the
-            counts are a sequence of things that happened, this is a reading
-            about them. Its qualifier names the denominator because impressions
-            and viewable impressions give different numbers and an unlabelled
-            percentage invites the reader to assume the worse one.
-          */}
-          <div className="flex flex-col gap-2 bg-surface p-4">
-            <span className="label-instr">{dict.dashboard.ctr}</span>
-            <span className="type-metric">
-              {/* Not `0%` when nothing has been delivered — that would claim
-                  nobody clicked. No denominator means not measurable yet. */}
-              {statsAvailable && counts.impressions > 0
-                ? percent.format(counts.clicks / counts.impressions)
-                : "—"}
+      <WorkspaceBar
+        back={
+          <Link href="/dashboard/creatives" className={buttonClass("ghost", "sm", "pl-2")}>
+            <ChevronLeft size={14} aria-hidden />
+            {dict.dashboard.creatives}
+          </Link>
+        }
+        title={
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 lg:flex-nowrap">
+            <span className="min-w-0 max-w-full truncate text-[14px] font-medium lg:max-w-56">
+              {name}
             </span>
-            <span className="type-caption text-fg-muted">
-              {dict.dashboard.ctrOfImpressions}
-            </span>
+            <Chip>{formatLabel}</Chip>
+            {statsAvailable && (
+              <ServingBadge
+                serving={serving}
+                label={serving ? dict.dashboard.serving : dict.dashboard.notServing}
+              />
+            )}
           </div>
-        </div>
-      </div>
-
-      {isVideo && (
-        <div className="flex flex-col gap-2">
-          <h2 className="label-instr">{dict.dashboard.progress}</h2>
-          {/* Static readouts only, like the delivery strip, so the clipping
-              parent cannot cut a focus ring (§2). */}
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-3 lg:grid-cols-6">
-            {PROGRESS.map((step) => (
-              <div key={step.key} className="flex flex-col gap-2 bg-surface p-4">
-                <span className="label-instr">{dict.dashboard.progressSteps[step.label]}</span>
-                <span className="type-metric">
-                  {funnelAvailable ? number.format(funnel?.[step.key] ?? 0) : "—"}
-                </span>
-              </div>
-            ))}
-            <div className="flex flex-col gap-2 bg-surface p-4">
-              <span className="label-instr">{dict.dashboard.vtr}</span>
-              <span className="type-metric">
-                {/* No impressions: not measurable yet, never 0%. And no ratio
-                    while the impressions tile it is "of" shows a dash (§6). */}
-                {statsAvailable && funnelAvailable && funnel && funnel.impressions > 0
-                  ? percent.format(funnel.completes / funnel.impressions)
-                  : "—"}
-              </span>
-              <span className="type-caption text-fg-muted">{dict.dashboard.vtrOfImpressions}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/*
-        Viewability (ADR-0012) is deliberately its own strip, not a third
-        delivery tile: it isn't part of the sequential, always-applicable
-        delivery set (§6) — VPAID reports it itself, a VAST video creative from
-        4.0 has the player report it (ADR-0035), and it is structurally absent
-        for SIMID. A SIMID row prints the em dash in `text-fg-disabled`
-        (not the default `text-fg` the outage/unmeasurable dash above uses) so
-        the two "—" readings stay visually distinct even without reading the
-        caption.
-      */}
-      <div className="flex flex-col gap-2">
-        <h2 className="label-instr">{dict.dashboard.viewabilityHeading}</h2>
-        <Panel className="flex max-w-xs flex-col gap-2 p-4">
-          <span className="label-instr">{dict.catalog.funnel.viewable}</span>
-          {/*
-            Colour and caption are driven by *applicability alone*, never by
-            `statsAvailable`. §6 assigns the two dashes opposite meanings —
-            `text-fg` for a transient page-wide outage, `text-fg-disabled` for a
-            permanent row-specific absence — so keying the disabled tone off the
-            outage made a VPAID creative's outage dash read as "never
-            measurable", disagreeing with the delivery strip's outage dash four
-            lines above, on the same screen, in the same outage. And a SIMID
-            creative lost its caption exactly when the page-level banner was
-            offering it the wrong explanation.
-          */}
-          <span
-            className={`type-metric ${
-              viewableApplicable ? "text-fg" : "text-fg-disabled"
-            }`}
-          >
-            {statsAvailable && viewableApplicable
-              ? number.format(counts.viewable)
-              : "—"}
-          </span>
-          <span className="type-caption text-fg-muted">{viewableCaption}</span>
-        </Panel>
-      </div>
-
-      <VastErrorReport
-        dict={dict}
-        locale={locale}
-        rows={vastErrors ?? []}
-        available={!vastErrorsError}
+        }
+        tabs={<CreativeTabs creativeId={creative.id} current="stats" dict={dict} />}
+        actions={
+          <>
+            <MoreMenu creativeId={creative.id} creativeName={name} tag={tag} />
+            {/* The one action of the screen, so the one accent (§3). Below `lg` it
+                moves to the strip at the foot of the page. */}
+            <CopyButton value={tag} size="sm" variant="primary" className="max-lg:hidden" />
+          </>
+        }
       />
 
-      <div className="flex flex-col gap-2">
-        <h2 className="label-instr">{dict.dashboard.vastTag}</h2>
-        <Panel className="flex flex-wrap items-center justify-between gap-3 p-4">
-          <code className="data-instr min-w-0 flex-1 truncate type-small text-fg-secondary">
-            {tag}
-          </code>
-          <CopyButton value={tag} />
-          {/* The validator fetches the live tag with its pixels held back
-              (dry run), so checking it counts nothing. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <Container width="wide" className="flex flex-col gap-6 py-6">
+          {!statsAvailable && <Notice tone="dead">{dict.dashboard.statsUnavailable}</Notice>}
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <StatStrip
+              heading={heading(dict.dashboard.funnel)}
+              tiles={delivery}
+              className="grid-cols-1 sm:grid-cols-3"
+            />
+            <StatStrip
+              heading={heading(dict.dashboard.viewabilityHeading)}
+              tiles={[viewable]}
+              className="grid-cols-1"
+            />
+            <StatStrip
+              heading={heading(dict.vastErrors.heading)}
+              tiles={[errs.tile]}
+              className="grid-cols-1"
+            />
+          </div>
+
           {isVideo && (
-            <LinkButton href={`/tools/vast-validator?tag=${encodeURIComponent(tag)}`} variant="secondary">
-              {dict.dashboard.checkInValidator}
-            </LinkButton>
+            <StatStrip
+              heading={heading(dict.dashboard.progress)}
+              tiles={progress}
+              className="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"
+            />
           )}
-        </Panel>
+
+          {errs.notice}
+          {conv.strip}
+
+          {panels.length > 0 && (
+            <div
+              className={`grid items-start gap-6 ${panels.length > 1 ? "lg:grid-cols-2" : ""}`}
+            >
+              {errs.panel}
+              {conv.exitsPanel}
+            </div>
+          )}
+
+          {conv.goalsPanel}
+          {conv.dayPanel}
+        </Container>
       </div>
 
-      {/* Last on the page: a report read after the tag is copied, and the one
-          section here with tables long enough to push the tag out of view. */}
-      {/* One reading, so one availability: a report whose goal split failed
-          to load would otherwise show totals the missing table cannot
-          explain, with nothing saying anything is missing. */}
-      <ConversionReport
-        dict={dict}
-        locale={locale}
-        rows={conversions ?? []}
-        goals={goals ?? []}
-        available={!conversionsError && !goalsError}
-        exits={exits}
-        exitsMissingMacro={exitsMissingMacro}
-        editHref={`/dashboard/creatives/${creative.id}/edit`}
-      />
+      <div className="sticky bottom-0 z-10 border-t border-hairline bg-ground p-4 lg:hidden">
+        <CopyButton value={tag} size="md" variant="primary" className="w-full" />
+      </div>
     </div>
   );
 }

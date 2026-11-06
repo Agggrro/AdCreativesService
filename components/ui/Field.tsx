@@ -53,7 +53,7 @@ export function Field({
  * unusable for anything containing a focusable child: §2's focus ring is drawn at
  * 2px offset, so a clipping parent erases it. Four call sites had already refused
  * `Panel` and hand-rolled the same box with a comment explaining why — `Table`,
- * `ValidatorReport`, `OutcomeMatrix` and the creatives list. Four workarounds is
+ * `ValidatorReport`, the outcome matrix and the creatives list. Four workarounds is
  * the signal that the primitive was wrong, not the call sites.
  *
  * The cost is that a child with its own background no longer gets clipped to the

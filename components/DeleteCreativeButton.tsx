@@ -7,9 +7,12 @@ import { deleteCreative } from "@/app/dashboard/creatives/actions";
 export function DeleteCreativeButton({
   creativeId,
   creativeName,
+  rowClassName,
 }: {
   creativeId: string;
   creativeName: string;
+  /** Renders the trigger as a row of a menu, with this look, instead of an `sm` button. */
+  rowClassName?: string;
 }) {
   const dict = useDict();
 
@@ -24,6 +27,7 @@ export function DeleteCreativeButton({
       // A row action: §6 puts this at `sm`, and the default would push the row
       // past the 44px §2 fixes for a data table.
       triggerSize="sm"
+      triggerClassName={rowClassName}
       title={dict.dashboard.deleteConfirmTitle}
       subject={creativeName}
       body={dict.dashboard.deleteConfirmBody}

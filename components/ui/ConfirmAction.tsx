@@ -57,6 +57,7 @@ export function ConfirmAction({
   triggerIcon,
   triggerTitle,
   triggerSize = "md",
+  triggerClassName,
   title,
   subject,
   subjectMono = false,
@@ -72,6 +73,12 @@ export function ConfirmAction({
   triggerTitle?: string;
   /** `sm` in a table row or a panel, where the default would be oversized (§6). */
   triggerSize?: ButtonSize;
+  /**
+   * The trigger's whole look, for a caller that is not a button — a row of a menu
+   * (the creative's *More* menu). Replaces the secondary button; the dialog it
+   * opens is the same.
+   */
+  triggerClassName?: string;
   title: string;
   /**
    * The affected item's own name — a label the user wrote, so sans, not mono.
@@ -154,7 +161,7 @@ export function ConfirmAction({
         type="button"
         onClick={() => setOpen(true)}
         title={triggerTitle}
-        className={buttonClass("secondary", triggerSize)}
+        className={triggerClassName ?? buttonClass("secondary", triggerSize)}
       >
         {triggerIcon}
         {triggerLabel}

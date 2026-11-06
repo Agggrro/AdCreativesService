@@ -33,6 +33,7 @@ export function MediaUploadField({
   onChange,
   variant = "full",
   tileLabel,
+  thumb = "md",
 }: {
   field: ConfigField;
   value: string;
@@ -40,10 +41,16 @@ export function MediaUploadField({
   /**
    * `tile` is the compact stage of a scenario group (docs/design-system.md §6,
    * "Scenario"): the same upload, URL and replace paths in a 112px box.
+   *
+   * `row` and `stack` are the inspector's (§6, "Workspace"): a thumbnail with its
+   * controls beside it, or under it where three sit side by side in 340px. Same
+   * paths again, drawn as the thumbnail and one or two quiet buttons.
    */
-  variant?: "full" | "tile";
+  variant?: "full" | "tile" | "row" | "stack";
   /** The tile's accessible name — its block and stage, e.g. `A · Vote`. */
   tileLabel?: string;
+  /** Thumbnail edge for `row`: 44px, or 36px inside an option's row. */
+  thumb?: "md" | "sm";
 }) {
   const dict = useDict();
   const m = dict.configurator.media;
@@ -175,6 +182,78 @@ export function MediaUploadField({
       {error}
     </p>
   );
+
+  if (variant === "row" || variant === "stack") {
+    const stacked = variant === "stack";
+    const box = thumb === "sm" ? "size-9" : "size-11";
+    const wide = stacked ? "w-full" : "";
+    return (
+      <div ref={rootRef} className="flex min-w-0 flex-col gap-1">
+        <input type="hidden" name={field.name} value={value} />
+        <div
+          role="group"
+          aria-label={tileLabel ?? field.label}
+          className={
+            stacked ? "flex flex-col items-start gap-2" : "flex min-w-0 items-center gap-2"
+          }
+        >
+          <div
+            className={`flex ${box} shrink-0 overflow-hidden rounded-ctl border ${
+              filled ? "border-line bg-surface-2" : "border-dashed border-line"
+            }`}
+          >
+            {filled && <Thumb key={value} value={value} fallback={valueLabel} />}
+          </div>
+          {filled && <span className="sr-only">{valueLabel}</span>}
+
+          {filled ? (
+            <button
+              type="button"
+              data-focus="replace"
+              onClick={clear}
+              className={buttonClass("ghost", "sm", wide)}
+            >
+              {m.replace}
+            </button>
+          ) : uploading ? (
+            <span
+              role="status"
+              className="flex items-center gap-1.5 type-caption text-fg-secondary"
+            >
+              <Loader2 size={14} className="animate-spin" aria-hidden />
+              {m.uploading}
+            </span>
+          ) : mode === "url" ? (
+            <div className={`flex min-w-0 items-center gap-2 ${stacked ? "w-full" : "flex-1"}`}>
+              <div className="min-w-0 flex-1">{urlInput}</div>
+              <button
+                type="button"
+                onClick={() => switchMode("upload")}
+                className={buttonClass("ghost", "sm", "shrink-0")}
+              >
+                {m.uploadTab}
+              </button>
+            </div>
+          ) : (
+            <div className={`flex items-center gap-2 ${wide}`}>
+              <label className={uploadLabelClass(stacked ? "flex-1" : "")}>
+                {fileInput}
+                {m.uploadTab}
+              </label>
+              <button
+                type="button"
+                onClick={() => switchMode("url")}
+                className={buttonClass("ghost", "sm")}
+              >
+                {m.urlTab}
+              </button>
+            </div>
+          )}
+        </div>
+        {errorLine}
+      </div>
+    );
+  }
 
   if (variant === "tile") {
     return (

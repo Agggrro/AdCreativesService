@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/Table";
 import type { ConversionStatus } from "@/types/database.types";
 import { rotatePostbackKey } from "./actions";
+import { DashboardShell } from "@/components/DashboardShell";
 
 /**
  * The account's postback settings (ADR-0023): the URL a partner network calls
@@ -113,200 +114,202 @@ export default async function PostbackPage({
       : null;
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader title={t.title} />
+    <DashboardShell>
+      <div className="flex flex-col gap-8">
+        <PageHeader title={t.title} />
 
-      {/* `live`: the rotation lands back on this same page after a soft
-          navigation that moves no focus, so without it a screen reader hears
-          nothing about the key it just replaced. */}
-      {sp.rotate === "done" && (
-        <Notice tone="info" live>
-          {t.rotated}
-        </Notice>
-      )}
-      {sp.rotate === "failed" && (
-        <Notice tone="dead" live>
-          {t.rotateFailed}
-        </Notice>
-      )}
-
-      <section className="flex flex-col gap-3">
-        <h2 className="label-instr">{t.howHeading}</h2>
-        <ol className="flex max-w-prose list-decimal flex-col gap-2 pl-5 type-small text-fg-secondary">
-          <li>
-            <MacroText text={t.step1} />
-          </li>
-          <li>
-            <MacroText text={t.step2} />
-          </li>
-          <li>{t.step3}</li>
-        </ol>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="label-instr">{t.urlHeading}</h2>
-        {url ? (
-          <Panel className="flex flex-col gap-4 p-4">
-            {/* Wraps rather than truncates: the key sits in the middle of the
-                URL, and a clipped key is the one thing the reader must see
-                whole to check it against what their network holds. */}
-            <code className="data-instr break-all type-small text-fg-secondary">
-              {url}
-            </code>
-            {/* `sm`: controls inside a panel (§6). */}
-            <div className="flex flex-wrap items-center gap-3">
-              <CopyButton
-                value={url}
-                size="sm"
-                labels={{ copy: dict.common.copyUrl, copied: dict.common.urlCopied }}
-              />
-              <ConfirmAction
-                triggerLabel={t.rotate}
-                triggerIcon={<RefreshCw size={14} aria-hidden />}
-                triggerSize="sm"
-                title={t.rotateTitle}
-                body={t.rotateBody}
-                confirmLabel={t.rotateConfirm}
-                action={rotatePostbackKey}
-              />
-            </div>
-            <p className="type-caption text-fg-muted">{t.keyWarning}</p>
-          </Panel>
-        ) : (
-          <Notice tone="dead">{t.keyUnavailable}</Notice>
+        {/* `live`: the rotation lands back on this same page after a soft
+            navigation that moves no focus, so without it a screen reader hears
+            nothing about the key it just replaced. */}
+        {sp.rotate === "done" && (
+          <Notice tone="info" live>
+            {t.rotated}
+          </Notice>
         )}
-      </section>
+        {sp.rotate === "failed" && (
+          <Notice tone="dead" live>
+            {t.rotateFailed}
+          </Notice>
+        )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="label-instr">{t.paramsHeading}</h2>
-        {/* Reference rows carry no state, so no rail (§6). */}
-        <TableFrame>
-          <table className="w-full border-collapse type-small">
-            <TableHead>
-              <th className={HEAD}>{t.param}</th>
-              <th className={`${HEAD} w-full`}>{t.meaning}</th>
-            </TableHead>
-            <tbody>
-              {PARAM_ROWS.map((name) => (
-                <tr key={name} className={ROW}>
-                  <td className={`${CELL} data-instr whitespace-nowrap`}>{name}</td>
-                  <td className={`${CELL} text-fg-secondary`}>
-                    <MacroText text={t.params[name]} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableFrame>
-      </section>
+        <section className="flex flex-col gap-3">
+          <h2 className="label-instr">{t.howHeading}</h2>
+          <ol className="flex max-w-prose list-decimal flex-col gap-2 pl-5 type-small text-fg-secondary">
+            <li>
+              <MacroText text={t.step1} />
+            </li>
+            <li>
+              <MacroText text={t.step2} />
+            </li>
+            <li>{t.step3}</li>
+          </ol>
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="label-instr">{t.statusesHeading}</h2>
-        <TableFrame>
-          <table className="w-full border-collapse type-small">
-            <TableHead>
-              <th className={HEAD}>{t.statusCol}</th>
-              <th className={`${HEAD} w-full`}>{t.acceptedCol}</th>
-            </TableHead>
-            <tbody>
-              {STATUS_ORDER.map((status) => (
-                <tr key={status} className={ROW}>
-                  <td className={`${CELL} whitespace-nowrap`}>
-                    <StateWord tone={STATUS_TONE[status]} label={t.statuses[status]} />
-                  </td>
-                  <td className={`${CELL} data-instr text-fg-secondary`}>
-                    {STATUS_ALIASES[status].join(", ")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableFrame>
-      </section>
+        <section className="flex flex-col gap-3">
+          <h2 className="label-instr">{t.urlHeading}</h2>
+          {url ? (
+            <Panel className="flex flex-col gap-4 p-4">
+              {/* Wraps rather than truncates: the key sits in the middle of the
+                  URL, and a clipped key is the one thing the reader must see
+                  whole to check it against what their network holds. */}
+              <code className="data-instr break-all type-small text-fg-secondary">
+                {url}
+              </code>
+              {/* `sm`: controls inside a panel (§6). */}
+              <div className="flex flex-wrap items-center gap-3">
+                <CopyButton
+                  value={url}
+                  size="sm"
+                  labels={{ copy: dict.common.copyUrl, copied: dict.common.urlCopied }}
+                />
+                <ConfirmAction
+                  triggerLabel={t.rotate}
+                  triggerIcon={<RefreshCw size={14} aria-hidden />}
+                  triggerSize="sm"
+                  title={t.rotateTitle}
+                  body={t.rotateBody}
+                  confirmLabel={t.rotateConfirm}
+                  action={rotatePostbackKey}
+                />
+              </div>
+              <p className="type-caption text-fg-muted">{t.keyWarning}</p>
+            </Panel>
+          ) : (
+            <Notice tone="dead">{t.keyUnavailable}</Notice>
+          )}
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="label-instr">{t.logHeading}</h2>
-          <span className="type-caption text-fg-muted">{t.logRetention}</span>
-        </div>
-        {logError ? (
-          <Notice tone="dead">{t.logUnavailable}</Notice>
-        ) : !log || log.length === 0 ? (
-          <Panel className="p-6">
-            <p className="type-small text-fg-muted">{t.logEmpty}</p>
-          </Panel>
-        ) : (
-          // Readout density (§6): rows the system emits and the reader scans,
-          // none of them actionable. The rail is the one thing a failure must
-          // show at a glance, so it is real state — landed or not.
+        <section className="flex flex-col gap-3">
+          <h2 className="label-instr">{t.paramsHeading}</h2>
+          {/* Reference rows carry no state, so no rail (§6). */}
           <TableFrame>
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse type-small">
               <TableHead>
-                <th className={HEAD_TIGHT}>{t.time}</th>
-                {/* 288px: a landed postback's reason stays one line, a long one
-                    wraps under its word — and eight columns still fit the
-                    1,072px the content is at its narrowest desktop width. */}
-                <th className={`${HEAD_TIGHT} min-w-72`}>{t.result}</th>
-                {POSTBACK_PARAMS.map((name) => (
-                  <th
-                    key={name}
-                    className={name === "payout" ? NUM_HEAD_TIGHT : HEAD_TIGHT}
-                  >
-                    {name}
-                  </th>
-                ))}
+                <th className={HEAD}>{t.param}</th>
+                <th className={`${HEAD} w-full`}>{t.meaning}</th>
               </TableHead>
               <tbody>
-                {log.map((row, i) => {
-                  const ok = isPostbackSuccess(row.result);
-                  const params = asJsonObject(row.params);
-                  return (
-                    <tr key={`${row.received_at}-${i}`} className={ROW}>
-                      <td
-                        className={railCellTight(
-                          ok ? "live" : "dead",
-                          "data-instr whitespace-nowrap",
-                        )}
-                      >
-                        {utcTime(row.received_at)}
-                      </td>
-                      <td className={CELL_TIGHT}>
-                        {/* One line where it fits, so a landed postback stays
-                            a 32px row; a long reason wraps under its word. */}
-                        <span className="flex flex-wrap items-baseline gap-x-2">
-                          <StateWord
-                            tone={ok ? "live" : "dead"}
-                            label={ok ? t.ok : t.failed}
-                          />
-                          <span className="type-caption text-fg-muted">
-                            <MacroText text={resultText(dict, row.result)} />
-                          </span>
-                        </span>
-                      </td>
-                      {POSTBACK_PARAMS.map((name) => {
-                        const value = params[name];
-                        return (
-                          <td
-                            key={name}
-                            className={`${CELL_TIGHT} data-instr ${logWrap(name, value)} ${
-                              name === "payout" ? "text-right" : ""
-                            } ${
-                              typeof value === "string" ? "" : "text-fg-muted"
-                            }`}
-                          >
-                            {/* Not sent is not the same as sent empty. */}
-                            {typeof value === "string" ? value : "—"}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
+                {PARAM_ROWS.map((name) => (
+                  <tr key={name} className={ROW}>
+                    <td className={`${CELL} data-instr whitespace-nowrap`}>{name}</td>
+                    <td className={`${CELL} text-fg-secondary`}>
+                      <MacroText text={t.params[name]} />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </TableFrame>
-        )}
-      </section>
-    </div>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="label-instr">{t.statusesHeading}</h2>
+          <TableFrame>
+            <table className="w-full border-collapse type-small">
+              <TableHead>
+                <th className={HEAD}>{t.statusCol}</th>
+                <th className={`${HEAD} w-full`}>{t.acceptedCol}</th>
+              </TableHead>
+              <tbody>
+                {STATUS_ORDER.map((status) => (
+                  <tr key={status} className={ROW}>
+                    <td className={`${CELL} whitespace-nowrap`}>
+                      <StateWord tone={STATUS_TONE[status]} label={t.statuses[status]} />
+                    </td>
+                    <td className={`${CELL} data-instr text-fg-secondary`}>
+                      {STATUS_ALIASES[status].join(", ")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableFrame>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="label-instr">{t.logHeading}</h2>
+            <span className="type-caption text-fg-muted">{t.logRetention}</span>
+          </div>
+          {logError ? (
+            <Notice tone="dead">{t.logUnavailable}</Notice>
+          ) : !log || log.length === 0 ? (
+            <Panel className="p-6">
+              <p className="type-small text-fg-muted">{t.logEmpty}</p>
+            </Panel>
+          ) : (
+            // Readout density (§6): rows the system emits and the reader scans,
+            // none of them actionable. The rail is the one thing a failure must
+            // show at a glance, so it is real state — landed or not.
+            <TableFrame>
+              <table className="w-full border-collapse">
+                <TableHead>
+                  <th className={HEAD_TIGHT}>{t.time}</th>
+                  {/* 288px: a landed postback's reason stays one line, a long one
+                      wraps under its word — and eight columns still fit the
+                      1,072px the content is at its narrowest desktop width. */}
+                  <th className={`${HEAD_TIGHT} min-w-72`}>{t.result}</th>
+                  {POSTBACK_PARAMS.map((name) => (
+                    <th
+                      key={name}
+                      className={name === "payout" ? NUM_HEAD_TIGHT : HEAD_TIGHT}
+                    >
+                      {name}
+                    </th>
+                  ))}
+                </TableHead>
+                <tbody>
+                  {log.map((row, i) => {
+                    const ok = isPostbackSuccess(row.result);
+                    const params = asJsonObject(row.params);
+                    return (
+                      <tr key={`${row.received_at}-${i}`} className={ROW}>
+                        <td
+                          className={railCellTight(
+                            ok ? "live" : "dead",
+                            "data-instr whitespace-nowrap",
+                          )}
+                        >
+                          {utcTime(row.received_at)}
+                        </td>
+                        <td className={CELL_TIGHT}>
+                          {/* One line where it fits, so a landed postback stays
+                              a 32px row; a long reason wraps under its word. */}
+                          <span className="flex flex-wrap items-baseline gap-x-2">
+                            <StateWord
+                              tone={ok ? "live" : "dead"}
+                              label={ok ? t.ok : t.failed}
+                            />
+                            <span className="type-caption text-fg-muted">
+                              <MacroText text={resultText(dict, row.result)} />
+                            </span>
+                          </span>
+                        </td>
+                        {POSTBACK_PARAMS.map((name) => {
+                          const value = params[name];
+                          return (
+                            <td
+                              key={name}
+                              className={`${CELL_TIGHT} data-instr ${logWrap(name, value)} ${
+                                name === "payout" ? "text-right" : ""
+                              } ${
+                                typeof value === "string" ? "" : "text-fg-muted"
+                              }`}
+                            >
+                              {/* Not sent is not the same as sent empty. */}
+                              {typeof value === "string" ? value : "—"}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableFrame>
+          )}
+        </section>
+      </div>
+    </DashboardShell>
   );
 }

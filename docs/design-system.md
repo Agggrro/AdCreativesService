@@ -816,106 +816,158 @@ what sits in it, because its job is to make something rather than to judge it.
   the well returns to its idle screen, saying the tag changed since the check, and the
   verdict and recommendations leave with it.
 
-### Configurator sections and the outcome matrix
+### Workspace
 
-A template's `config_schema` can group its fields
-([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)), and a group renders one
-of four ways.
+A creative's own screens — Settings, Stats, and a creative not yet created — are a workspace
+rather than a page of the product: they take the whole viewport and bring a bar of their own
+([ADR-0038](decisions/0038-creative-workspace.md)). It is the one exception to "page shells go
+through `ui/Container`" (§5) and to the product bar being persistent: what these screens need
+from a bar is the creative, and the product is one click away behind *Creatives*. The list
+pages — Creatives, the postback, the accounts — keep the product bar and the container
+(`DashboardShell`).
 
-**Section** (the default) — a `<fieldset>` whose legend is the `h3` role, separated by
-`border-t border-hairline`. Deliberately not `label-instr`: that role belongs to the field
-labels *inside* the section, and reusing it flattens the two levels into one. **Every
-section takes the rule, including the first.** The legend needs `float-left w-full`, or the
-fieldset's border-notch algorithm cuts a gap in the rule around the heading.
+- **The bar** (`WorkspaceBar`) is 48px with `sm` controls, in three clusters. Left: the way back
+  (a `ghost` *Creatives* with a chevron — the only way out of the workspace, and so the only
+  place the product's navigation is reached from), the creative's name, its format and, once it
+  exists, its serving state. Middle: the **Settings | Stats** switch. Right: *More*, *Copy tag*
+  and the screen's one primary — *Save* or *Create* on Settings, *Copy tag* on Stats. The name is
+  an input on Settings (a dashed underline says so) and plain text on Stats. A template that offers
+  more than one delivery format shows them as a segmented choice beside the name; one format is a
+  chip.
+- **Below `lg` the bar re-stacks instead of squeezing**: the way back and *More* (and *Copy tag*
+  where it is not the primary) on a 48px row, then the name with its chips, then the switch. The
+  screen's primary moves to a full-width 72px strip at the foot of the page (`sticky bottom-0`, a
+  hairline above it). One DOM for both: the name is a form field and cannot exist twice.
+- **The tabs are links** (`CreativeTabs`), each its own address — `/dashboard/creatives/[id]/edit`
+  and `/dashboard/creatives/[id]` — so the back button, a bookmark and a pasted URL all land where
+  they should. Drawn as a segmented control (§6, "Segmented controls"): the current one on
+  `surface-2`, never the accent.
+- **Dimensions.** From `lg` the screen is the viewport high (`h-dvh`) and scrolls inside its parts,
+  never as a page: outline 216px, inspector 340px, the stage the rest. They are the workspace's own
+  measures and not tokens — no other screen has an outline.
+- **More** (`NavDropdown`, §6, "Nav dropdown"): the actions that are not the screen's one action —
+  check the tag in the validator, duplicate, delete (through the destructive confirmation, §6). Rows
+  are plain text, 44px, never coloured; the panel is not closed by a click on a form row (it would
+  unmount before it submitted) and keeps its children mounted while closed (the dialog's mousedown is
+  "outside" the panel). In a row of the Creatives list the panel is portalled, because the table's
+  scroll frame would clip it, and it closes if the page scrolls under it.
 
-**Matrix** — for a group whose blocks are variants of one thing, such as the quiz's eight
-answer-path exits. Rendering 24 inputs flat is the wall this exists to avoid.
+#### Settings
 
-- It carries the **data-table row treatment** — 44px rows, a 3px semantic rail — not a card
-  grid and not an ad-hoc accordion. The markup is a disclosure list rather than a real
-  `<table>`, which is the right choice for expandable rows; take the treatment, not the
-  element.
-- The rail carries a **real** state — configured (`live`) or empty (`idle`) — never a
-  decorative one. Not `dead`: an unfinished row is incomplete, not an alarm.
-- The row's label is machine text (the answer path, `A → A → B`) in mono, so it is identical
-  in both locales and needs no dictionary entry (§9).
-- **One block open at a time**, marked with `bg-surface-2` so the row merges into the panel
-  it opens. **Accent budget spent: zero** — the page's single warm element stays the submit
-  button.
-- The container must not be `overflow-hidden`, or the 2px-offset focus ring on a row is
-  clipped away. Round the first and last row instead.
-- A chevron may accompany the row, `aria-hidden`, because the row's accessible name is the
-  path itself — an icon is never the whole action (§10).
-- A completion counter (`ЗАПОЛНЕНО N / 8`) sits below in `label-instr`, because closed rows
-  submit through hidden inputs and so cannot use native `required`.
+Left to right: the **outline**, the **stage**, the **inspector**. At 1280×720 a section is one
+screen; the long form this replaced ran from one screen to six.
 
-**Scenario** — for media that plays in a fixed order per block, such as Duel's
-vote → win → after clips for each side
-([ADR-0030](decisions/0030-duel-template.md)). Six labelled upload controls stacked one
-under another read as a form to wade through; the order they play in is the thing the
-user is configuring, so the layout draws that order.
+- **The outline** lists a template's sections: a schema group is a section, except that an
+  `options` or a `matrix` group belongs to the group before it — Step Builder's step 1 is the title
+  with its four options under it, the quiz's *Result* is the result screen with every path's exit.
+  44px rows, a 3px rail — `live` when every required field in the section has a value, `idle` when
+  not, never `dead` (an unfinished section is incomplete, not an alarm) — the current one on
+  `surface-2`. It appears only where a template has three sections or more and over eight active
+  fields (Duel, the quiz, Step Builder, Pick & Message); six or eight fields are one inspector. Below
+  `lg` it is a row of chips above the inspector, a dot for the rail.
+- **The stage** is the player well (§7) as large as the screen leaves it: the largest 16:9 screen that
+  fits, taken from the well's own size (container query units) and centred. The player — Sandbox,
+  Google IMA, Fluid Player — is chosen from a menu in the stage's corner. Below `lg` the screen takes
+  the width and the stage sticks to the top while the parameters scroll under it.
+- **The inspector** holds one section's fields in a 340px column under a 48px header that names it, and
+  scrolls inside itself. A field is a mono label and a 44px control, 16px apart. Text and URL fields
+  are inputs; a select of up to three short options is a segmented control and a longer one a select;
+  a range is a slider with its value at the right of the label; a colour is a swatch beside its hex
+  input; a picture or a clip is `MediaUploadField` in its `row` form. A field's `help` is behind its
+  label (§6, "Help tooltip"), the click-through macros behind *{ } Macros* at the right of the label of
+  a click field, and a required field is marked `*` and nothing else (§10). Accent budget of the
+  inspector: zero — the one warm element is the bar's primary.
+- **What posts.** Every active field posts under its own name, shown or not: the inspector shows one
+  section and the rest ride along as hidden inputs. `visibleFieldNames` is the walk the Server Action
+  makes, so what the form hides is what the action prunes. A save with a required field empty in a
+  section the inspector is not showing is stopped before it is sent — a hidden input is exempt from
+  the browser's validation, and the server's redirect would throw away everything typed: the section
+  opens, the field takes focus and a cold-red notice names it with where it is (`A → B · Heading`).
 
-- **One row per block, one column per stage.** The row head holds the block's other
-  fields (Duel: the side's name), drawn by the form's own field renderer with the block id
-  prefixed to the label (`A · NAME` — machine text, no dictionary entry). The stages are
-  the block's media fields in schema order; past four the columns stop lining up, so a
-  schema keeps to four (every stage still renders and submits).
-- **Column headers carry the explanation, and come from the first block.** Each header is
-  `label-instr`, numbered in play order (`1 · VOTE`), and is the `HelpLabel` trigger for
-  that field's help text — the inline paragraph each field had goes behind it (§6, "Help
-  tooltip"). Because every block shares the header, a schema writes stage help that holds
-  for every block. A required stage puts the required word on its own line under the
-  header, in `fg-muted`: beside the help icon, Russian's `ОБЯЗАТЕЛЬНОЕ` outgrows a 106px
-  column.
-- **A stage is a compact tile, not a card**: 112px high, `--radius-ctl`, `border-line`
-  on `surface`, 6px padding. Its state is its content, in form as well as colour. Empty:
-  an `sm` secondary and an `sm` ghost button, each a word and nothing else (`Upload` /
-  `URL`) — `Загрузить` fills the 94px inside a 106px tile. URL entry: the 44px input and
-  an `sm` ghost word back to upload; the tile turns filled on blur or Enter, never on a
-  keystroke. Uploading: a spinner beside the word, as a `status`. Filled: a frame one
-  second into the clip (`#t=1` — a clip's first frame is often a fade from black;
-  `preload="metadata"`, never autoplaying, since the page's one live unit stays in the
-  preview well, §7), or the picture itself, above an `sm` ghost `Replace`. A medium that
-  will not render names its host in mono instead of a broken image.
-- **Focus follows the state.** Each state swaps whole controls, so the one with focus
-  unmounts: focus moves to the URL input, back to the upload control, or to `Replace`
-  after an upload. The upload control's real `<input type="file">` sits inside its label,
-  so the label's `has-[:focus-visible]` ring shows.
-- Consecutive stages are joined by a chevron in the gap, `aria-hidden`: the order is
-  already carried by the numbered headers.
-- **Accent budget spent: zero.** No rail either. A missing required clip is reported as
-  for every media field: the server's `field_required` on save, named in the form's error.
-- From 640px the row head is a 10rem column; below it the head spans the row above its
-  stages, which stay three across (106px each at 390). The narrowest case is not the
-  phone but the two-column configurator just past `lg`, where the form shares the page
-  with the 380px preview. The tile's focusable controls are never inside an
-  `overflow-hidden` box; only the thumbnail's own wrapper clips.
+#### Inspector sections
 
-**Options** — the scenario table for media that are variants rather than stages, such as
-Step Builder's options per step, each with a clip and, from step 2, a variant for step 1's
-pick B ([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)). Ten or twenty clips
-behind collapsed matrix rows means one row opened at a time. As tiles in view, the whole
-step can be read and filled in one pass.
+A group renders one of four ways in the inspector
+([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)).
 
-- **The scenario table with the order taken out.** Column headers are the field label
-  alone, with no `1 ·`, and no chevron joins the tiles. The tile, its states, focus and
-  the zero accent budget are the scenario's.
-- **At least two columns.** A step with one clip per option (Step Builder's step 1) still
-  lays out two tracks and leaves the second empty, so the tile is as wide as its
-  neighbours' rather than a bar across the form.
-- **Every tile names its column under it**, in `label-instr` `fg-muted`, with `· required`
-  when that tile is required. Variants have no order to read them by: below 640px the
-  header is rows away, and a header cannot say which rows require it.
-- **A row head is short and carries no help.** The label (`A · LABEL`), and the value when
-  the template needs one. Their help would run a dozen caption lines down the 10rem
-  column, so it is dropped there and the schema explains them in the step's full-width
-  fields.
-- **The column header says `required` only when every row requires it.** The optional
-  rows (C and D) would otherwise sit under a header that says they are required. The
-  caption under each tile, and its accessible name, carry its own requirement.
-- **Nothing the user must act on lives in the column header's help.** It is a hover
-  panel (§6, "Help tooltip"), so a limit such as a size budget goes in a visible caption
-  of the step's own fields.
+- **Section** — the fields, stacked.
+- **Options** — Step Builder's options per step ([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)):
+  one row per option. Its letter in a chip beside its label; its value beneath, when the template needs
+  one; then its clips as 36px thumbnails, the column's name in `label-instr` above each — two across,
+  one where a step has one. The clips are variants of the option, not stages, so they are not numbered.
+- **Scenario** — Duel's vote → win → after for each side ([ADR-0030](decisions/0030-duel-template.md)):
+  one block per side, the letter and the name, then the clips across in play order, each a 44px thumbnail
+  with its button under it (three across a 340px column leave no room beside a thumbnail). The order is
+  the columns', so their captions carry no number.
+- **Outcome matrix** — the quiz's answer-path exits ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)),
+  as a **drill-down**: the list of paths (44px rows, a 3px rail `live` or `idle`, the path in mono, the first
+  text field's value muted, a chevron), then one path's fields with *All paths*, its place (`3 / 8`) and
+  *Previous* / *Next*. The paths not open post through hidden inputs. `FILLED 3 / 8` under the list is the
+  only progress signal. The list is not `overflow-hidden`; its rows round their own first and last corners
+  (§2).
+
+A **media field** in the inspector is a thumbnail and one or two quiet buttons: empty, an `sm` secondary
+*Upload* and an `sm` ghost *URL*; URL entry, the input and a ghost word back to upload (the field turns
+filled on blur or Enter, never on a keystroke); uploading, a spinner and the word, as a `status`; filled, a
+frame one second into the clip (`#t=1` — the first frame is often a fade from black; `preload="metadata"`,
+never autoplaying, since the page's one live unit stays in the stage, §7) or the picture, beside an `sm`
+ghost *Replace*. A medium that will not render names its host in mono. Each state swaps whole controls, so
+focus moves with it: to the URL input, back to the upload control, to *Replace* after an upload; the real
+`<input type="file">` sits inside its label so the label's `has-[:focus-visible]` ring shows. A missing
+required clip is reported as for every field: on save.
+
+### Stats
+
+A creative's Stats is the other half of its workspace, and one screen at 1280×720: the **delivery** strip
+(impressions, clicks, CTR), **viewability** and **VAST errors** beside it; for a VAST video creative its
+**progress** strip; the **conversions** strip; and two **expandable panels** side by side — errors by code,
+conversions by exit — with the by-goal and by-day tables behind disclosures. The bar's primary is *Copy tag*,
+always there; the way to the numbers is a click on a row of the list, and no scroll.
+
+- Every reading follows §6, "Metrics": a dash for what cannot be read (never a zero), a muted dash for what
+  structurally does not apply, the denominator named under a ratio. A caption is there only where the number
+  alone would mislead — what CTR is *of*, what the conversions add up from, which revenue counts — and the
+  explanation of why errors carry no rate is behind the label of their tile (§6, "Help tooltip").
+- A section that could not be read says so in a notice at the top of its row and shows dashes; the rest of the
+  screen is unaffected.
+- The by-goal and by-day tables are native disclosures (`<details>`): they announce their state, need no script
+  and carry the `summary` focus ring (§2). The panel is not `overflow-hidden`; the table scrolls in a frame of its
+  own under the heading (§5).
+
+### Metric strip
+
+A hairline strip of readings (`StatStrip`): a label, one value line per currency, and what it is measured against.
+It is the one implementation of the delivery, progress and conversions strips and of the single tiles beside the
+delivery strip. A clipping parent is safe on it and only on it: every cell is a static readout with no focusable
+descendant (§2). Put a control in a cell and the rounding moves to the cells.
+
+### Expandable panel
+
+A panel with a heading, a table and, when there are more rows than fit, *Show all* in its corner
+(`ExpandablePanel`): the first three rows, the rest in place on a click, the button saying it is open
+(`aria-expanded`, *Show less*). The rows are server-rendered; the panel owns which of them show. Not
+`overflow-hidden` (the button's ring, §2); the table scrolls in its own frame (§5).
+
+### Creatives list
+
+The Creatives page (`CreativesList`) is the list a returning owner opens the product for: the title with the
+number of rows **shown**, a search by name, a filter by state (*All* / *Serving* / *Not serving*, hidden while the
+aggregate is down) and the page's one primary, *New creative*. The rows are the data-table treatment (§6, "Data
+tables"): 44px, a 3px rail for the serving state, the name, a format chip, impressions, clicks, CTR, the state, and
+three actions with words — *Copy tag*, *Edit*, *More* (the validator, duplicate, delete). Search and filter are
+client-side over the rows the page has: an account's creatives are dozens, and a round trip per keystroke would be
+the slower way to the same list. With no creatives the page is the title and one panel with one button.
+
+### Template sheet
+
+*New creative* opens a dialog over the list (`NewCreativeSheet`; [ADR-0038](decisions/0038-creative-workspace.md)): the
+templates on the left, the selected one on the right — its static preview in a well, its name, its standards and its
+description — and *Cancel* / *Configure creative* in the footer. The VAST video generator is the last row, set apart: a
+creative of a kind of its own, built in its own tool. A modal like the destructive confirmation (§6) and built the
+same way: portalled to `<body>`, Escape closes it, Tab stays inside the card, focus returns to where it was opened
+from. Pick, *Configure*, and the workspace opens on the first field: three clicks and one page load, where
+catalog → template page → *Configure creative* was three of each. Below `md` the preview pane gives way and the
+selected row opens to show its description. `/dashboard/creatives/new` without a template opens the list with the
+sheet already open (`?new=1`).
 
 ### Inputs
 

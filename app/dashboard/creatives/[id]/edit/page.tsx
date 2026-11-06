@@ -5,15 +5,20 @@ import { updateCreative } from "@/app/dashboard/creatives/actions";
 import { creativeErrorMessage } from "@/lib/creative-errors";
 import { parseConfigSchema } from "@/lib/config-schema";
 import { getDict } from "@/lib/i18n/server";
-import { ConfiguratorForm } from "@/components/ConfiguratorForm";
+import { ConfiguratorWorkspace } from "@/components/configurator/ConfiguratorWorkspace";
+import { DashboardShell } from "@/components/DashboardShell";
+import { CopyButton } from "@/components/CopyButton";
+import { CreativeTabs } from "@/components/workspace/CreativeTabs";
+import { MoreMenu } from "@/components/workspace/MoreMenu";
 import { Notice } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { ServingBadge } from "@/components/ui/State";
 import { withNext } from "@/lib/safe-next";
 import { UUID_RE } from "@/lib/uuid";
 import { VideoTagGenerator } from "@/components/vast-gen/VideoTagGenerator";
 import { configToDraft } from "@/components/vast-gen/draft";
 import { updateVideoCreative } from "@/app/dashboard/creatives/video-actions";
-import { getCdnUrl } from "@/lib/site";
+import { getCdnUrl, vastTagUrl } from "@/lib/site";
 import { VIDEO_FORMAT } from "@/lib/vast-gen/kind";
 import { parseVideoConfig } from "@/lib/vast-gen/validate";
 
@@ -52,62 +57,73 @@ export default async function EditCreativePage({
     const parsed = parseVideoConfig(creative.config_json, { mode: "serve", ownerId: user?.id });
     if (!parsed.ok) {
       return (
-        <div className="flex flex-col gap-3">
-          <Notice tone="dead">{dict.vastGen.errStoredConfig}</Notice>
-          <Link
-            href={`/dashboard/creatives/${creative.id}`}
-            className="type-small font-medium text-fg underline underline-offset-4"
-          >
-            {dict.vastGen.backToCreative}
-          </Link>
-        </div>
+        <DashboardShell>
+          <div className="flex flex-col gap-3">
+            <Notice tone="dead">{dict.vastGen.errStoredConfig}</Notice>
+            <Link
+              href={`/dashboard/creatives/${creative.id}`}
+              className="type-small font-medium text-fg underline underline-offset-4"
+            >
+              {dict.vastGen.backToCreative}
+            </Link>
+          </div>
+        </DashboardShell>
       );
     }
     const strict = parseVideoConfig(creative.config_json, { mode: "save", ownerId: user?.id });
     const droppedCount = strict.ok ? 0 : strict.issues.length;
     return (
-      <div className="flex flex-col gap-6">
-        <PageHeader
-          title={`${dict.vastGen.editTitle}: ${creative.name ?? parsed.config.adTitle}`}
-        />
-        {droppedCount > 0 && (
-          <Notice tone="warn">{dict.vastGen.editDroppedNotice.replace("{n}", String(droppedCount))}</Notice>
-        )}
-        <VideoTagGenerator
-          mode="edit"
-          signedIn
-          cdnUrl={getCdnUrl()}
-          signInHref={withNext("/login", `/dashboard/creatives/${creative.id}/edit`)}
-          action={updateVideoCreative}
-          creativeId={creative.id}
-          initialDraft={configToDraft(parsed.config, creative.name)}
-          cancelHref={`/dashboard/creatives/${creative.id}`}
-        />
-      </div>
+      <DashboardShell>
+        <div className="flex flex-col gap-6">
+          <PageHeader
+            title={`${dict.vastGen.editTitle}: ${creative.name ?? parsed.config.adTitle}`}
+          />
+          {droppedCount > 0 && (
+            <Notice tone="warn">
+              {dict.vastGen.editDroppedNotice.replace("{n}", String(droppedCount))}
+            </Notice>
+          )}
+          <VideoTagGenerator
+            mode="edit"
+            signedIn
+            cdnUrl={getCdnUrl()}
+            signInHref={withNext("/login", `/dashboard/creatives/${creative.id}/edit`)}
+            action={updateVideoCreative}
+            creativeId={creative.id}
+            initialDraft={configToDraft(parsed.config, creative.name)}
+            cancelHref={`/dashboard/creatives/${creative.id}`}
+          />
+        </div>
+      </DashboardShell>
     );
   }
 
-  const { data: template } = await supabase
-    .from("templates")
-    .select("id, name, supported_standards, config_schema")
-    .eq("id", creative.template_id)
-    .eq("is_published", true)
-    .eq("in_catalog", true)
-    .maybeSingle();
+  const [{ data: template }, { data: overview, error: overviewError }] = await Promise.all([
+    supabase
+      .from("templates")
+      .select("id, name, supported_standards, config_schema")
+      .eq("id", creative.template_id)
+      .eq("is_published", true)
+      .eq("in_catalog", true)
+      .maybeSingle(),
+    // The serving state for the bar: the same owner-scoped aggregate the list
+    // reads, and absent rather than wrong when it is unreachable (§6).
+    supabase.rpc("get_creative_overview"),
+  ]);
 
   if (!template) {
     return (
-      <div className="flex flex-col gap-3">
-        <p className="type-small text-fg-muted">
-          {dict.configurator.notFound}
-        </p>
-        <Link
-          href="/dashboard/creatives"
-          className="type-small font-medium text-fg underline underline-offset-4"
-        >
-          {dict.dashboard.creatives}
-        </Link>
-      </div>
+      <DashboardShell>
+        <div className="flex flex-col gap-3">
+          <p className="type-small text-fg-muted">{dict.configurator.notFound}</p>
+          <Link
+            href="/dashboard/creatives"
+            className="type-small font-medium text-fg underline underline-offset-4"
+          >
+            {dict.dashboard.creatives}
+          </Link>
+        </div>
+      </DashboardShell>
     );
   }
 
@@ -139,28 +155,40 @@ export default async function EditCreativePage({
     }
   }
 
+  const row = (overview ?? []).find((r) => r.creative_id === creative.id);
+  const serving = row?.should_serve ?? false;
+  const tag = vastTagUrl(creative.id);
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="type-h2">
-          {dict.configurator.configureTitle}: {creative.name ?? template.name}
-        </h1>
-      </div>
-
-      {message && <Notice tone="dead">{message}</Notice>}
-
-      <ConfiguratorForm
-        template={template}
-        fields={fields}
-        groups={groups}
-        action={updateCreative}
-        submitLabel={dict.dashboard.saveChanges}
-        cancelHref={`/dashboard/creatives/${creative.id}`}
-        creativeId={creative.id}
-        initialName={creative.name ?? ""}
-        initialFormat={creative.selected_format}
-        initialFieldValues={initialFieldValues}
-      />
-    </div>
+    <ConfiguratorWorkspace
+      mode="edit"
+      heading={`${dict.configurator.configureTitle}: ${creative.name ?? template.name}`}
+      template={template}
+      fields={fields}
+      groups={groups}
+      action={updateCreative}
+      creativeId={creative.id}
+      initialName={creative.name ?? ""}
+      initialFormat={creative.selected_format}
+      initialFieldValues={initialFieldValues}
+      message={message}
+      tabs={<CreativeTabs creativeId={creative.id} current="settings" dict={dict} />}
+      state={
+        overviewError ? undefined : (
+          <ServingBadge
+            serving={serving}
+            label={serving ? dict.dashboard.serving : dict.dashboard.notServing}
+          />
+        )
+      }
+      moreMenu={
+        <MoreMenu
+          creativeId={creative.id}
+          creativeName={creative.name ?? template.name}
+          tag={tag}
+        />
+      }
+      copyTag={<CopyButton value={tag} size="sm" />}
+    />
   );
 }

@@ -1,17 +1,23 @@
 import { LOCALE_TAG, type Dict, type Locale } from "@/lib/i18n/dictionaries";
 import { UNKNOWN_ERROR_CODE } from "@/lib/vast/error-codes";
 import { lookupIabError } from "@/lib/vast-inspect/errors-iab";
-import { Notice, Panel } from "@/components/ui/Field";
+import { Notice } from "@/components/ui/Field";
 import { MacroText } from "@/components/ui/MacroText";
-import { CELL, HEAD, NUM_HEAD, ROW, TableFrame, TableHead } from "@/components/ui/Table";
+import { ExpandablePanel } from "@/components/stats/ExpandablePanel";
+import type { StatTile } from "@/components/stats/StatStrip";
+import { HelpLabel } from "@/components/ui/Tooltip";
+import { CELL, HEAD, NUM_HEAD, ROW, TableHead } from "@/components/ui/Table";
 import type { Database } from "@/types/database.types";
 
 /**
  * A creative's VAST errors (ADR-0033): what players reported through the
  * `<Error>` beacon, per error code, all-time — the same window as the delivery
- * strip above it.
+ * strip beside it.
  *
- * Server-only rendering of the rows `get_creative_errors()` already summed.
+ * Server-only rendering of the rows `get_creative_errors()` already summed, in two
+ * parts because a creative's Stats places them apart (docs/design-system.md §6,
+ * "Stats"; ADR-0038): the total, a reading of its own beside the delivery strip,
+ * and the per-code table in a panel under it.
  */
 
 type ErrorRow = Database["public"]["Functions"]["get_creative_errors"]["Returns"][number];
@@ -29,7 +35,7 @@ function describe(dict: Dict, locale: Locale, code: number): string {
 /** Below the format's precision, a share is "under 0.1%", never a false `0 %`. */
 const SHARE_FLOOR = 0.001;
 
-export function VastErrorReport({
+export function vastErrorParts({
   dict,
   locale,
   rows,
@@ -54,61 +60,60 @@ export function VastErrorReport({
       ? `<${percent.format(SHARE_FLOOR)}`
       : percent.format(count / total);
 
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="label-instr">{e.heading}</h2>
-      {!available && <Notice tone="dead">{e.unavailable}</Notice>}
-      {/*
-        The total stands alone, like the viewability tile, rather than closing
-        the delivery strip: that strip is the sequence impression → click, and
-        an error is not a step in it. Neutral, not `dead`: errors are a count
-        of what players reported, not a state of the creative, and every
-        creative served at scale has some.
-      */}
-      <Panel className="flex max-w-xs flex-col gap-2 p-4">
-        <span className="label-instr">{e.total}</span>
-        <span className="type-metric">{available ? number.format(total) : "—"}</span>
-        <span className="type-caption text-fg-muted">
-          <MacroText text={e.totalHint} />
-        </span>
-      </Panel>
+  /*
+    The total stands alone, like the viewability tile, rather than closing the
+    delivery strip: that strip is the sequence impression → click, and an error
+    is not a step in it. Neutral, not `dead`: errors are a count of what players
+    reported, not a state of the creative, and every creative served at scale has
+    some. Why there is no rate — an error often comes with no impression at all,
+    and we count no ad requests to divide by (§6) — is behind the label.
+  */
+  const tile: StatTile = {
+    key: "errors",
+    label: <HelpLabel label={e.total} help={<MacroText text={e.totalHint} />} />,
+    values: [available ? number.format(total) : "—"],
+  };
 
-      {available &&
-        (rows.length === 0 ? (
-          <p className="type-small text-fg-muted">{e.none}</p>
-        ) : (
-          // 44px, no rail: a handful of summary rows, not a stream (§6), and
-          // a code has no state to encode — a rail on every row would be the
-          // decorative kind §6 forbids.
-          <TableFrame>
-            <table className="w-full min-w-[480px] border-collapse type-small">
-              <TableHead>
-                <th className={`${HEAD} w-px`}>{e.code}</th>
-                <th className={HEAD}>{e.description}</th>
-                <th className={`${NUM_HEAD} w-px`}>{e.count}</th>
-                {/* The denominator is named in the header (§6): a bare
-                    percentage here would be read as a share of impressions. */}
-                <th className={`${NUM_HEAD} w-px`}>{e.share}</th>
-              </TableHead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.code} className={ROW}>
-                    <td className={`${CELL} data-instr whitespace-nowrap`}>{row.code}</td>
-                    <td className={CELL}>
-                      <MacroText text={describe(dict, locale, row.code)} />
-                    </td>
-                    <td className={`${CELL} data-instr whitespace-nowrap text-right`}>
-                      {number.format(row.count)}
-                    </td>
-                    <td className={`${CELL} data-instr whitespace-nowrap text-right`}>
-                      {share(row.count)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableFrame>
-        ))}
+  const notice = available ? null : <Notice tone="dead">{e.unavailable}</Notice>;
+
+  // 44px, no rail: a handful of summary rows, not a stream (§6), and a code has
+  // no state to encode — a rail on every row would be the decorative kind §6
+  // forbids.
+  const panel = !available ? null : rows.length === 0 ? (
+    <section className="flex min-w-0 flex-col gap-2 rounded-panel border border-hairline bg-surface p-4">
+      <h2 className="label-instr">{e.heading}</h2>
+      <p className="type-small text-fg-muted">{e.none}</p>
     </section>
+  ) : (
+    <ExpandablePanel
+      heading={e.heading}
+      minWidth="min-w-[480px]"
+      head={
+        <TableHead>
+          <th className={`${HEAD} w-px`}>{e.code}</th>
+          <th className={HEAD}>{e.description}</th>
+          <th className={`${NUM_HEAD} w-px`}>{e.count}</th>
+          {/* The denominator is named in the header (§6): a bare percentage here
+              would be read as a share of impressions. */}
+          <th className={`${NUM_HEAD} w-px`}>{e.share}</th>
+        </TableHead>
+      }
+      rows={rows.map((row) => (
+        <tr key={row.code} className={ROW}>
+          <td className={`${CELL} data-instr whitespace-nowrap`}>{row.code}</td>
+          <td className={CELL}>
+            <MacroText text={describe(dict, locale, row.code)} />
+          </td>
+          <td className={`${CELL} data-instr whitespace-nowrap text-right`}>
+            {number.format(row.count)}
+          </td>
+          <td className={`${CELL} data-instr whitespace-nowrap text-right`}>
+            {share(row.count)}
+          </td>
+        </tr>
+      ))}
+    />
   );
+
+  return { tile, notice, panel };
 }

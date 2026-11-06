@@ -4,6 +4,8 @@ import { LOCALE_TAG, type Dict, type Locale } from "@/lib/i18n/dictionaries";
 import { asJsonObject } from "@/lib/json";
 import { MacroText } from "@/components/ui/MacroText";
 import { Notice } from "@/components/ui/Field";
+import { ExpandablePanel } from "@/components/stats/ExpandablePanel";
+import { StatStrip, type StatTile } from "@/components/stats/StatStrip";
 import {
   CELL,
   CELL_TIGHT,
@@ -12,7 +14,6 @@ import {
   NUM_HEAD,
   NUM_HEAD_TIGHT,
   ROW,
-  TableFrame,
   TableHead,
 } from "@/components/ui/Table";
 import type { Database } from "@/types/database.types";
@@ -25,6 +26,11 @@ import type { Database } from "@/types/database.types";
  * Server-only rendering of rows `get_creative_conversions()` and
  * `get_creative_conversion_goals()` already aggregated; the database does the
  * counting, this does the reading.
+ *
+ * It returns the report in parts rather than as one block, because a creative's
+ * Stats places them apart (docs/design-system.md §6, "Stats"; ADR-0038): the strip
+ * of totals on a row of its own, the by-exit table beside the errors, and the by-goal and by-day
+ * tables behind a disclosure — read when needed, not scrolled past.
  */
 
 /** One row of get_creative_conversions(): a UTC day and an exit. */
@@ -97,7 +103,38 @@ function lastDays(days: number, now: Date = new Date()): string[] {
   return out;
 }
 
-export function ConversionReport({
+/**
+ * A disclosure panel for a table that is read on demand. Native `<details>`: it
+ * needs no script, announces its state, and `summary` is already in the global
+ * focus rule (§2). The panel is not `overflow-hidden` — the summary's ring would
+ * be clipped; the table scrolls in a frame of its own below it (§5).
+ */
+function Disclosure({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-panel border border-hairline bg-surface">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-panel px-4 py-1.5 [&::-webkit-details-marker]:hidden">
+        <h2 className="label-instr">{title}</h2>
+        <span aria-hidden className="text-fg-secondary transition-transform duration-150 group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+      <div className="border-t border-hairline">
+        {note && <p className="max-w-prose px-4 py-3 type-caption text-fg-muted">{note}</p>}
+        <div className="overflow-x-auto">{children}</div>
+      </div>
+    </details>
+  );
+}
+
+export function conversionParts({
   dict,
   locale,
   rows,
@@ -199,23 +236,15 @@ export function ConversionReport({
   const exitLabel = (exit: ExitLabel) =>
     exit.machine ? <code className="data-instr">{exit.label}</code> : exit.label;
 
-  // The grid is six columns from `lg` so the strip reads as two rows: the three
-  // counts on the first, the two ratios closing it on the second (§6). Five
-  // equal columns were too narrow for money at 26px — a large RUB amount ran
-  // out of its cell below ~1270px.
-  const strip: {
-    key: string;
-    label: string;
-    values: string[];
-    hint: React.ReactNode;
-    span: string;
-  }[] = [
+  // Five readings, each naming only what the number alone would not say: what
+  // the conversions add up from, which of them is paid. The ratios close the
+  // strip and each names its denominator (§6) — no clicks means not measurable
+  // yet, a dash, never a claimed 0%.
+  const tiles: StatTile[] = [
     {
       key: "clicks",
       label: c.clicks,
       values: [available ? count.format(total.clicks) : dash],
-      hint: <MacroText text={c.clicksHint} />,
-      span: "lg:col-span-2",
     },
     {
       key: "conversions",
@@ -223,24 +252,20 @@ export function ConversionReport({
       values: [available ? count.format(converted(total)) : dash],
       // The parts are named so they add up to the number above: rejected ones
       // are shown, and said not to count.
-      hint: available ? (
+      caption: available ? (
         <>
           {n(total.approved)} {c.approved} · {n(total.pending)} {c.pending} ·{" "}
           {n(total.rejected)} {c.rejectedNotCounted}
         </>
-      ) : null,
-      span: "lg:col-span-2",
+      ) : undefined,
     },
     {
       key: "revenue",
       label: c.revenue,
       values: available ? moneyLines(total.revenue, money) : [dash],
-      hint: c.revenueHint,
-      span: "lg:col-span-2",
+      caption: c.revenueHint,
     },
     {
-      // Ratios close the strip, and each names its denominator (§6). No clicks
-      // means not measurable yet — a dash, never a claimed 0%.
       key: "cr",
       label: c.cr,
       values: [
@@ -248,8 +273,7 @@ export function ConversionReport({
           ? percent.format(converted(total) / total.clicks)
           : dash,
       ],
-      hint: c.crOfClicks,
-      span: "lg:col-span-3",
+      caption: c.crOfClicks,
     },
     {
       key: "epc",
@@ -258,210 +282,167 @@ export function ConversionReport({
         available && total.clicks > 0
           ? moneyLines(total.revenue, perClick, total.clicks)
           : [dash],
-      hint: c.epcHint,
-      // Spans the two-column row it would otherwise leave half-empty, since an
-      // empty grid slot here shows as a block of hairline colour.
-      span: "sm:col-span-2 lg:col-span-3",
     },
   ];
 
-  return (
-    <section className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="label-instr">{c.heading}</h2>
-          <Link
-            href="/dashboard/creatives/postback"
-            className="type-small text-fg-muted underline underline-offset-4 hover:text-fg"
-          >
-            {c.setUp}
+  const strip = (
+    <section className="flex min-w-0 flex-col gap-3">
+      {exitsMissingMacro.length > 0 && (
+        <Notice tone="warn">
+          <MacroText text={c.missingMacro} />{" "}
+          <Link href={editHref} className="underline underline-offset-4">
+            {dict.dashboard.edit}
           </Link>
-        </div>
-
-        {exitsMissingMacro.length > 0 && (
-          <Notice tone="warn">
-            <MacroText text={c.missingMacro} />{" "}
-            <Link href={editHref} className="underline underline-offset-4">
-              {dict.dashboard.edit}
+          <span className="mt-1 block type-caption">
+            {exitsMissingMacro.map((exit, i) => (
+              <Fragment key={exit.field}>
+                {i > 0 && " · "}
+                {exitLabel(exit)}
+              </Fragment>
+            ))}
+          </span>
+        </Notice>
+      )}
+      {!available && <Notice tone="dead">{c.unavailable}</Notice>}
+      <StatStrip
+        heading={
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="label-instr">{c.heading}</h2>
+            <Link
+              href="/dashboard/creatives/postback"
+              className="type-small text-fg-muted underline underline-offset-4 hover:text-fg"
+            >
+              {c.setUp}
             </Link>
-            <span className="mt-1 block type-caption">
-              {exitsMissingMacro.map((exit, i) => (
-                <Fragment key={exit.field}>
-                  {i > 0 && " · "}
-                  {exitLabel(exit)}
-                </Fragment>
-              ))}
-            </span>
-          </Notice>
-        )}
-        {!available && <Notice tone="dead">{c.unavailable}</Notice>}
-
-        {/*
-          Hairline strip, the delivery strip's form (§6). A clipping parent is
-          safe for the same reason it is there: every cell is a static readout
-          with no focusable descendant.
-        */}
-        <div className="grid gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-2 lg:grid-cols-6">
-          {strip.map((cell) => (
-            <div key={cell.key} className={`flex flex-col gap-2 bg-surface p-4 ${cell.span}`}>
-              <span className="label-instr">{cell.label}</span>
-              <span className="flex flex-col">
-                {cell.values.map((value) => (
-                  <span key={value} className="type-metric">
-                    {value}
-                  </span>
-                ))}
-              </span>
-              {cell.hint && (
-                <span className="type-caption text-fg-muted">{cell.hint}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {available && hasGoals && (
-        <div className="flex flex-col gap-2">
-          <h3 className="label-instr">{c.byGoal}</h3>
-          <p className="max-w-prose type-caption text-fg-muted">
-            <MacroText text={c.byGoalNote} />
-          </p>
-          {/* 44px, like the by-exit table below it: a handful of rows read
-              against the network's own report, not a stream (§6). No rail — a
-              goal has no state. No clicks column either: every goal would
-              repeat the same number, since a click has no goal. Rejected has a
-              column here, unlike in the tables below it: a goal the advertiser
-              declined outright is a row of zeros, and without the count the
-              reader cannot tell why the row is there at all. */}
-          <TableFrame>
-            <table className="w-full min-w-[640px] border-collapse type-small">
-              <TableHead>
-                <th className={HEAD}>{c.goal}</th>
-                <th className={NUM_HEAD}>{c.conversions}</th>
-                <th className={NUM_HEAD}>{c.approved}</th>
-                <th className={NUM_HEAD}>{c.rejected}</th>
-                {/* Not the by-exit table's "CR of clicks": there the
-                    denominator is the row's own clicks, here it is all of
-                    them, and the header is where the reader learns which. */}
-                <th className={NUM_HEAD}>{c.crOfAllClicksColumn}</th>
-                <th className={NUM_HEAD}>{c.revenue}</th>
-              </TableHead>
-              <tbody>
-                {goalRows.map(({ goal, totals: t }) => (
-                  <tr key={goal} className={ROW}>
-                    <td className={CELL}>
-                      {/* The network's label is machine text, the same in both
-                          locales; the absence of one is our copy. */}
-                      {goal ? <code className="data-instr">{goal}</code> : c.noGoal}
-                    </td>
-                    <td className={`${CELL} data-instr text-right`}>
-                      {count.format(converted(t))}
-                    </td>
-                    <td className={`${CELL} data-instr text-right`}>
-                      {count.format(t.approved)}
-                    </td>
-                    <td className={`${CELL} data-instr text-right`}>
-                      {count.format(t.rejected)}
-                    </td>
-                    <td className={`${CELL} data-instr text-right`}>
-                      {total.clicks > 0 ? percent.format(converted(t) / total.clicks) : dash}
-                    </td>
-                    <td className={`${CELL} data-instr text-right whitespace-nowrap`}>
-                      {moneyLines(t.revenue, money).join(" · ")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableFrame>
-        </div>
-      )}
-
-      {available && hasActivity && exitRows.length > 1 && (
-        <div className="flex flex-col gap-2">
-          <h3 className="label-instr">{c.byExit}</h3>
-          {/* One row per exit the creative has — a thing the user configured,
-              so the full 44px (§6). No rail: an exit has no state. */}
-          <TableFrame>
-            <table className="w-full min-w-[560px] border-collapse type-small">
-              <TableHead>
-                <th className={HEAD}>{c.exit}</th>
-                <th className={NUM_HEAD}>{c.clicks}</th>
-                <th className={NUM_HEAD}>{c.conversions}</th>
-                <th className={NUM_HEAD}>{c.crColumn}</th>
-                <th className={NUM_HEAD}>{c.revenue}</th>
-              </TableHead>
-              <tbody>
-                {exitRows.map((exit) => {
-                  const t = byExit.get(exit.field) ?? emptyTotals();
-                  return (
-                    <tr key={exit.field} className={ROW}>
-                      <td className={CELL}>{exitLabel(exit)}</td>
-                      <td className={`${CELL} data-instr text-right`}>
-                        {count.format(t.clicks)}
-                      </td>
-                      <td className={`${CELL} data-instr text-right`}>
-                        {count.format(converted(t))}
-                      </td>
-                      <td className={`${CELL} data-instr text-right`}>
-                        {t.clicks > 0 ? percent.format(converted(t) / t.clicks) : dash}
-                      </td>
-                      <td className={`${CELL} data-instr text-right whitespace-nowrap`}>
-                        {moneyLines(t.revenue, money).join(" · ")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </TableFrame>
-        </div>
-      )}
-
-      {available && hasActivity && (
-        <div className="flex flex-col gap-2">
-          <h3 className="label-instr">{c.byDay}</h3>
-          <p className="max-w-prose type-caption text-fg-muted">{c.byDayNote}</p>
-          {/* Readout density (§6): system-emitted, scanned for its shape, no
-              row actions. Every day of the window, zeros included — a gap in
-              the series is information, and hiding it would redraw the curve. */}
-          <TableFrame>
-            <table className="w-full min-w-[560px] border-collapse">
-              <TableHead>
-                <th className={HEAD_TIGHT}>{c.day}</th>
-                <th className={NUM_HEAD_TIGHT}>{c.clicks}</th>
-                <th className={NUM_HEAD_TIGHT}>{c.conversions}</th>
-                <th className={NUM_HEAD_TIGHT}>{c.approved}</th>
-                <th className={NUM_HEAD_TIGHT}>{c.revenue}</th>
-              </TableHead>
-              <tbody>
-                {lastDays(REPORT_DAYS).map((day) => {
-                  const t = byDay.get(day) ?? emptyTotals();
-                  return (
-                    <tr key={day} className={ROW}>
-                      <td className={`${CELL_TIGHT} data-instr whitespace-nowrap`}>
-                        {day}
-                      </td>
-                      <td className={`${CELL_TIGHT} data-instr text-right`}>
-                        {count.format(t.clicks)}
-                      </td>
-                      <td className={`${CELL_TIGHT} data-instr text-right`}>
-                        {count.format(converted(t))}
-                      </td>
-                      <td className={`${CELL_TIGHT} data-instr text-right`}>
-                        {count.format(t.approved)}
-                      </td>
-                      <td className={`${CELL_TIGHT} data-instr text-right whitespace-nowrap`}>
-                        {moneyLines(t.revenue, money).join(" · ")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </TableFrame>
-        </div>
-      )}
+          </div>
+        }
+        tiles={tiles}
+        className="sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(0,1fr)]"
+      />
     </section>
   );
+
+  // One row per exit the creative has — a thing the user configured, so the
+  // full 44px (§6). No rail: an exit has no state.
+  const exitsPanel =
+    available && hasActivity && exitRows.length > 1 ? (
+      <ExpandablePanel
+        heading={c.byExit}
+        minWidth="min-w-[520px]"
+        head={
+          <TableHead>
+            <th className={HEAD}>{c.exit}</th>
+            <th className={NUM_HEAD}>{c.clicks}</th>
+            <th className={NUM_HEAD}>{c.conversions}</th>
+            <th className={NUM_HEAD}>{c.crColumn}</th>
+            <th className={NUM_HEAD}>{c.revenue}</th>
+          </TableHead>
+        }
+        rows={exitRows.map((exit) => {
+          const t = byExit.get(exit.field) ?? emptyTotals();
+          return (
+            <tr key={exit.field} className={ROW}>
+              <td className={CELL}>{exitLabel(exit)}</td>
+              <td className={`${CELL} data-instr text-right`}>{count.format(t.clicks)}</td>
+              <td className={`${CELL} data-instr text-right`}>
+                {count.format(converted(t))}
+              </td>
+              <td className={`${CELL} data-instr text-right`}>
+                {t.clicks > 0 ? percent.format(converted(t) / t.clicks) : dash}
+              </td>
+              <td className={`${CELL} data-instr text-right whitespace-nowrap`}>
+                {moneyLines(t.revenue, money).join(" · ")}
+              </td>
+            </tr>
+          );
+        })}
+      />
+    ) : null;
+
+  // 44px, like the by-exit table: a handful of rows read against the network's
+  // own report, not a stream (§6). No rail — a goal has no state. No clicks
+  // column: every goal would repeat the same number, since a click has no goal.
+  // Rejected has a column here, unlike in the tables beside it: a goal the
+  // advertiser declined outright is a row of zeros, and without the count the
+  // reader cannot tell why the row is there at all.
+  const goalsPanel =
+    available && hasGoals ? (
+      <Disclosure title={c.byGoal} note={<MacroText text={c.byGoalNote} />}>
+        <table className="w-full min-w-[640px] border-collapse type-small">
+          <TableHead>
+            <th className={HEAD}>{c.goal}</th>
+            <th className={NUM_HEAD}>{c.conversions}</th>
+            <th className={NUM_HEAD}>{c.approved}</th>
+            <th className={NUM_HEAD}>{c.rejected}</th>
+            {/* Not the by-exit table's "CR of clicks": there the denominator is the
+                row's own clicks, here it is all of them, and the header is where
+                the reader learns which. */}
+            <th className={NUM_HEAD}>{c.crOfAllClicksColumn}</th>
+            <th className={NUM_HEAD}>{c.revenue}</th>
+          </TableHead>
+          <tbody>
+            {goalRows.map(({ goal, totals: t }) => (
+              <tr key={goal} className={ROW}>
+                <td className={CELL}>
+                  {/* The network's label is machine text, the same in both
+                      locales; the absence of one is our copy. */}
+                  {goal ? <code className="data-instr">{goal}</code> : c.noGoal}
+                </td>
+                <td className={`${CELL} data-instr text-right`}>{count.format(converted(t))}</td>
+                <td className={`${CELL} data-instr text-right`}>{count.format(t.approved)}</td>
+                <td className={`${CELL} data-instr text-right`}>{count.format(t.rejected)}</td>
+                <td className={`${CELL} data-instr text-right`}>
+                  {total.clicks > 0 ? percent.format(converted(t) / total.clicks) : dash}
+                </td>
+                <td className={`${CELL} data-instr text-right whitespace-nowrap`}>
+                  {moneyLines(t.revenue, money).join(" · ")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Disclosure>
+    ) : null;
+
+  // Readout density (§6): system-emitted, scanned for its shape, no row actions.
+  // Every day of the window, zeros included — a gap in the series is
+  // information, and hiding it would redraw the curve.
+  const dayPanel =
+    available && hasActivity ? (
+      <Disclosure title={c.byDay} note={c.byDayNote}>
+        <table className="w-full min-w-[560px] border-collapse">
+          <TableHead>
+            <th className={HEAD_TIGHT}>{c.day}</th>
+            <th className={NUM_HEAD_TIGHT}>{c.clicks}</th>
+            <th className={NUM_HEAD_TIGHT}>{c.conversions}</th>
+            <th className={NUM_HEAD_TIGHT}>{c.approved}</th>
+            <th className={NUM_HEAD_TIGHT}>{c.revenue}</th>
+          </TableHead>
+          <tbody>
+            {lastDays(REPORT_DAYS).map((day) => {
+              const t = byDay.get(day) ?? emptyTotals();
+              return (
+                <tr key={day} className={ROW}>
+                  <td className={`${CELL_TIGHT} data-instr whitespace-nowrap`}>{day}</td>
+                  <td className={`${CELL_TIGHT} data-instr text-right`}>
+                    {count.format(t.clicks)}
+                  </td>
+                  <td className={`${CELL_TIGHT} data-instr text-right`}>
+                    {count.format(converted(t))}
+                  </td>
+                  <td className={`${CELL_TIGHT} data-instr text-right`}>
+                    {count.format(t.approved)}
+                  </td>
+                  <td className={`${CELL_TIGHT} data-instr text-right whitespace-nowrap`}>
+                    {moneyLines(t.revenue, money).join(" · ")}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Disclosure>
+    ) : null;
+
+  return { strip, exitsPanel, goalsPanel, dayPanel };
 }

@@ -90,7 +90,7 @@ export async function createCreative(formData: FormData): Promise<void> {
  * Same schema-driven build as createCreative, but updates an existing row in
  * place. The template a creative was built from never changes on edit — only
  * its name, delivery format, and field values do — so template_id here is
- * read-only context (the hidden field ConfiguratorForm already sends),
+ * read-only context (the hidden field the workspace already sends),
  * never picked from a second template.
  */
 export async function updateCreative(formData: FormData): Promise<void> {

@@ -47,8 +47,9 @@ Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture
 | `/catalog`, `/catalog/[slug]` | public | Template catalog and a detail page with one live in-browser demo. Replaces the old `/preview` fixtures; `/preview` is a permanent redirect |
 | `/login`, `/signup`, `/auth/*` | public | Email/password auth; [`middleware.ts`](../middleware.ts) refreshes the session |
 | `/dashboard` | session | Redirect only — to `/dashboard/creatives`, or `/catalog` for a user with none |
-| `/dashboard/creatives`, `/dashboard/creatives/[id]` | session | The user's creatives, their VAST tags, and delivery counts |
-| `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
+| `/dashboard/creatives` | session | The user's creatives — delivery counts, serving state, a search and a filter — and the *New creative* sheet that picks a template ([ADR-0038](decisions/0038-creative-workspace.md)) |
+| `/dashboard/creatives/[id]` | session | A creative's **Stats**, in its workspace: delivery, viewability, errors, conversions, and *Copy tag* ([ADR-0038](decisions/0038-creative-workspace.md)) |
+| `/dashboard/creatives/[id]/edit`, `/dashboard/creatives/new?template=` | session | A creative's **Settings**, and a new creative: the workspace — outline, live player stage, inspector — over the schema-driven fields. `new` with no template opens the list with the sheet open |
 | `/dashboard/access`, `/dashboard/subscriptions` | session | Redirect to `/dashboard/creatives`. The closed-beta state is a row of the account menu and, for an account without access, a notice at the top of Creatives ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md), [ADR-0037](decisions/0037-reduced-navigation-and-copy.md)) |
 | `/dashboard/admin` | session + `ADMIN_EMAILS` | Every registered account and the grant/revoke action; 404 for anyone else |
 | `/tools/vast-validator` | public | Free tool ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read |
@@ -293,10 +294,10 @@ snapshot and the entitlement predicate are the ones every creative has.
 
 ### Live preview: `POST /api/vast/preview` + `GET /api/vast/preview/[token]`
 
-The dashboard configurator ([`components/ConfiguratorForm.tsx`](../components/ConfiguratorForm.tsx),
+The dashboard configurator ([`components/configurator/ConfiguratorWorkspace.tsx`](../components/configurator/ConfiguratorWorkspace.tsx),
 shared by [`app/dashboard/creatives/new`](../app/dashboard/creatives/new) and
 [`app/dashboard/creatives/[id]/edit`](../app/dashboard/creatives/[id]/edit)) has a
-"Launch Ad" panel ([`components/PreviewPanel.tsx`](../components/PreviewPanel.tsx))
+stage with a "Launch ad" control ([`components/PreviewPanel.tsx`](../components/PreviewPanel.tsx))
 that runs a template with whatever is **currently typed into the form** — before the
 creative is saved (or the edit committed) — in three player backends: an in-house
 sandbox harness, Google IMA SDK, and Fluid Player. This is a **separate, authenticated

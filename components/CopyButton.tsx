@@ -13,10 +13,15 @@ import { useDict } from "@/components/i18n/LocaleProvider";
 export function CopyButton({
   value,
   size = "md",
+  variant = "secondary",
+  className,
   labels,
 }: {
   value: string;
   size?: ButtonSize;
+  /** `primary` where copying the tag is the screen's one action (the creative's Stats tab). */
+  variant?: "primary" | "secondary";
+  className?: string;
   /**
    * What is being copied, when it is not a tag — the postback URL (ADR-0023).
    * A control names what happens (§10), and "Copy tag" under a postback URL
@@ -39,7 +44,7 @@ export function CopyButton({
   }
 
   return (
-    <button type="button" onClick={copy} className={buttonClass("secondary", size)}>
+    <button type="button" onClick={copy} className={buttonClass(variant, size, className)}>
       {/* Both labels are stacked in the same grid cell so the button's
           width is always the wider of the two — swapping "Copy tag" for
           "Tag copied" never resizes the button (or the column it sits in). */}

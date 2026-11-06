@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle, Loader2, Play, RotateCcw } from "lucide-react";
+import { AlertCircle, Check, Loader2, Play, RotateCcw } from "lucide-react";
 import type { PreviewMint, StatusTone } from "@/components/players/types";
 import { Notice } from "@/components/ui/Field";
 import { SandboxPlayer } from "@/components/players/SandboxPlayer";
 import { ImaPlayer } from "@/components/players/ImaPlayer";
+import { NavDropdown } from "@/components/NavDropdown";
 import { useDict } from "@/components/i18n/LocaleProvider";
 import { buttonClass } from "@/components/ui/Button";
-import { Segmented } from "@/components/ui/Segmented";
 
 // Fluid Player only ever runs in the browser, and it brings dash.js, hls.js and
 // three.js with it — three megabytes that, imported statically, sat in the
@@ -30,23 +30,30 @@ const PLAYERS: { key: PlayerKey; label: string }[] = [
 ];
 
 /**
- * The "player + Launch Ad" panel on the template configurator. Mints a fresh,
- * short-TTL VAST preview from whatever is currently typed into the form
- * (nothing saved to the DB) and runs it in whichever of the three player
- * backends is selected — same VAST tag, three different players.
+ * The stage of a creative's Settings (docs/design-system.md §6, "Workspace"; §7,
+ * "Well"): the creative, as large as the screen leaves it, and one control to
+ * run it. Mints a fresh, short-TTL VAST preview from whatever is currently typed
+ * into the inspector (nothing saved to the DB) and runs it in whichever of the
+ * three player backends is selected — same VAST tag, three different players,
+ * chosen from a menu in the stage's corner rather than a strip above it.
  *
- * The well: a creative is judged against black (docs/design-system.md §7). It is no
- * longer "the one dark surface" — the whole product is dark — so it is separated
- * by elevation and a hairline instead.
+ * The well: a creative is judged against black (§7). It is not "the one dark
+ * surface" — the whole product is dark — so it is separated by elevation and a
+ * hairline instead. From `lg` it fills the stage and the 16:9 screen is the
+ * largest that fits it, from the well's own size (container query units); below
+ * it the screen takes the width and the well its height, and the stage sticks to
+ * the top of the screen while the parameters scroll under it.
  */
 export function PreviewPanel({
   templateId,
   format,
   fields,
+  className = "",
 }: {
   templateId: string;
   format: string;
   fields: Record<string, string>;
+  className?: string;
 }) {
   const dict = useDict();
   const [tab, setTab] = useState<PlayerKey>("sandbox");
@@ -112,94 +119,87 @@ export function PreviewPanel({
   const commonProps = mint
     ? { mint, onStatus: report, onClickThrough: setClickThrough }
     : null;
+  const player = PLAYERS.find((p) => p.key === tab) ?? PLAYERS[0];
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2">
-        <Segmented
-          fill
-          label={dict.preview.player}
-          value={tab}
-          onChange={setTab}
-          options={PLAYERS.map((p) => ({ value: p.key, label: p.label }))}
-        />
-        <p className="type-caption text-fg-muted">
-          {dict.preview.sameTag}
-        </p>
+    <section
+      className={`flex min-w-0 flex-col gap-4 bg-surface p-4 max-lg:sticky max-lg:top-0 max-lg:z-10 max-lg:border-b max-lg:border-hairline lg:min-h-0 lg:flex-1 lg:px-8 lg:py-6 ${className}`}
+    >
+      <div className="flex items-center justify-end gap-3">
+        <NavDropdown
+          align="right"
+          closeOnClick
+          triggerClassName={buttonClass("secondary", "sm")}
+          panelClassName="w-48 divide-y divide-hairline"
+          label={
+            <>
+              <span className="type-caption text-fg-muted">{dict.preview.player}</span>
+              <span className="data-instr">{player.label}</span>
+            </>
+          }
+        >
+          {PLAYERS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              aria-pressed={p.key === tab}
+              onClick={() => setTab(p.key)}
+              className="focus-inset flex h-11 w-full items-center justify-between gap-3 px-5 text-left type-small text-fg transition-colors duration-150 first:rounded-t-ctl last:rounded-b-ctl hover:bg-surface-2"
+            >
+              <span className="data-instr">{p.label}</span>
+              {p.key === tab && <Check size={14} aria-hidden className="text-fg-secondary" />}
+            </button>
+          ))}
+        </NavDropdown>
       </div>
 
       {/* Hairline plus a lifted surround is what separates the well; the tone step alone is 1.06:1 (docs/design-system.md §2, §7). */}
-      <div className="rounded-well border border-well-line bg-well p-3">
-        {/* Instrument strip: what a buyer checks before pressing play */}
-        <div className="chip-instr flex items-center justify-between gap-3 pb-3 text-well-fg">
-          <span className="data-instr">
-            {dict.preview.format} · {format || "—"}
-          </span>
-          {launched && !error && (
-            <span className="inline-flex items-center gap-1.5 text-well-live">
-              <span className="size-1.5 rounded-full bg-well-live" />
-              <span className="data-instr">
-                {dict.preview.served}
-                {latencyMs !== null ? ` · ${latencyMs} ${dict.preview.ms}` : ""}
-              </span>
-            </span>
-          )}
-        </div>
-
-        {/*
-          The ad slot clips — a creative may not paint outside it — but the launch
-          control is a **sibling** of the clipped rect, not a child of it.
-          Sitting inside, its focus ring (2px solid, 2px offset) fell entirely
-          outside the clipping box and was erased, leaving the configurator's
-          primary preview control with no visible focus state at all. §2 names
-          this as the single most repeated way focus disappears here. Out here the
-          ring lands in the well's own 12px padding and is visible.
-        */}
-        <div className="relative">
-          <div
-            /* Isolated for the same reason as `VpaidPreview`'s screen: a
-               creative's chrome would otherwise paint over the page's own. */
-            className="relative isolate w-full overflow-hidden rounded-ctl bg-well-screen"
-            style={{ aspectRatio: "16 / 9" }}
-          >
-            {commonProps && (tab === "sandbox" ? (
-              <SandboxPlayer key={launchToken} {...commonProps} />
-            ) : tab === "ima" ? (
-              <ImaPlayer key={launchToken} {...commonProps} />
-            ) : (
-              <FluidPlayer key={launchToken} {...commonProps} />
-            ))}
-          </div>
-
-          {!launched && (
-            <button
-              type="button"
-              onClick={launch}
-              disabled={minting || !format}
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-ctl text-well-fg transition-colors duration-150 hover:bg-well-fg/5 disabled:cursor-wait"
+      <div className="rounded-well border border-well-line bg-well p-3 lg:relative lg:min-h-0 lg:flex-1 lg:p-0 lg:[container-type:size]">
+        <div className="lg:absolute lg:inset-3 lg:flex lg:items-center lg:justify-center">
+          {/*
+            The ad slot clips — a creative may not paint outside it — but the launch
+            control is a **sibling** of the clipped rect, not a child of it.
+            Sitting inside, its focus ring (2px solid, 2px offset) fell entirely
+            outside the clipping box and was erased, leaving the preview's primary
+            control with no visible focus state at all. §2 names this as the single
+            most repeated way focus disappears here.
+          */}
+          <div className="relative aspect-video w-full lg:w-[min(calc(100cqw_-_24px),calc((100cqh_-_24px)_*_16/9))]">
+            <div
+              /* Isolated for the same reason as `VpaidPreview`'s screen: a
+                 creative's chrome would otherwise paint over the page's own. */
+              className="absolute inset-0 isolate overflow-hidden rounded-ctl bg-well-screen"
             >
-              {minting ? (
-                <Loader2 className="animate-spin" size={26} aria-hidden />
+              {commonProps && (tab === "sandbox" ? (
+                <SandboxPlayer key={launchToken} {...commonProps} />
+              ) : tab === "ima" ? (
+                <ImaPlayer key={launchToken} {...commonProps} />
               ) : (
-                <span className="flex size-12 items-center justify-center rounded-ctl border border-well-line bg-well">
-                  <Play size={20} className="fill-well-fg" aria-hidden />
-                </span>
-              )}
-              <span className="type-small font-medium">
-                {minting ? dict.preview.building : dict.preview.launch}
-              </span>
-            </button>
-          )}
-        </div>
+                <FluidPlayer key={launchToken} {...commonProps} />
+              ))}
+            </div>
 
-        {launched && expiresAt && (
-          <ExpiryHint
-            expiresAt={expiresAt}
-            validFor={dict.preview.validFor}
-            seconds={dict.preview.seconds}
-            expired={dict.preview.expired}
-          />
-        )}
+            {!launched && (
+              <button
+                type="button"
+                onClick={launch}
+                disabled={minting || !format}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-ctl text-well-fg transition-colors duration-150 hover:bg-well-fg/5 disabled:cursor-wait"
+              >
+                {minting ? (
+                  <Loader2 className="animate-spin" size={26} aria-hidden />
+                ) : (
+                  <span className="flex size-12 items-center justify-center rounded-ctl border border-well-line bg-well">
+                    <Play size={20} className="fill-well-fg" aria-hidden />
+                  </span>
+                )}
+                <span className="type-small font-medium">
+                  {minting ? dict.preview.building : dict.preview.launch}
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/*
@@ -214,39 +214,52 @@ export function PreviewPanel({
         </Notice>
       )}
 
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 type-caption text-fg-muted">
-          {error ? (
-            <span
-              role="alert"
-              className="inline-flex items-start gap-1 text-dead"
+      {(launched || error) && (
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-w-0 flex-1 type-caption text-fg-muted">
+            {error ? (
+              <span role="alert" className="inline-flex items-start gap-1 text-dead">
+                <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+                {error}
+              </span>
+            ) : clickThrough ? (
+              <>
+                {dict.preview.clickThrough} →{" "}
+                <code className="data-instr break-all text-fg-secondary">{clickThrough}</code>
+              </>
+            ) : statusTone ? null : (
+              (status ?? (
+                <span className="data-instr inline-flex flex-wrap items-center gap-x-3">
+                  <span className="inline-flex items-center gap-1.5 text-well-live">
+                    <span className="size-1.5 rounded-full bg-well-live" />
+                    {dict.preview.served}
+                    {latencyMs !== null ? ` · ${latencyMs} ${dict.preview.ms}` : ""}
+                  </span>
+                  {expiresAt && (
+                    <ExpiryHint
+                      expiresAt={expiresAt}
+                      validFor={dict.preview.validFor}
+                      seconds={dict.preview.seconds}
+                      expired={dict.preview.expired}
+                    />
+                  )}
+                </span>
+              ))
+            )}
+          </p>
+          {launched && (
+            <button
+              type="button"
+              onClick={launch}
+              disabled={minting}
+              className={buttonClass("secondary", "sm", "shrink-0")}
             >
-              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
-              {error}
-            </span>
-          ) : clickThrough ? (
-            <>
-              {dict.preview.clickThrough} →{" "}
-              <code className="data-instr break-all text-fg-secondary">
-                {clickThrough}
-              </code>
-            </>
-          ) : statusTone ? null : (
-            status ?? dict.preview.idleHint
+              <RotateCcw size={13} aria-hidden /> {dict.preview.restart}
+            </button>
           )}
-        </p>
-        {launched && (
-          <button
-            type="button"
-            onClick={launch}
-            disabled={minting}
-            className={buttonClass("secondary", "md", "shrink-0")}
-          >
-            <RotateCcw size={13} aria-hidden /> {dict.preview.restart}
-          </button>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -268,9 +281,5 @@ function ExpiryHint({
   }, []);
 
   const remaining = Math.max(0, Math.round((expiresAt - now) / 1000));
-  return (
-    <p className="type-data pt-3 text-well-fg">
-      {remaining > 0 ? `${validFor} ${remaining}${seconds}` : expired}
-    </p>
-  );
+  return <span>{remaining > 0 ? `${validFor} ${remaining}${seconds}` : expired}</span>;
 }

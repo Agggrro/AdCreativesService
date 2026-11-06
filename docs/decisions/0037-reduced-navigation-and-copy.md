@@ -56,11 +56,12 @@ the accounts list, sign-in and sign-up) and `PageHeader` loses its subtitle prop
 with the dictionary strings only they used. The rule is written into
 [design-system.md](../design-system.md) §10.
 
-**Planned, not delivered by the first step.** Each gets its own amendment when it ships: a
+**Planned, not delivered by the first step.** Each gets its own amendment when it ships. A
 template picker sheet in place of catalog → template page → configure; a creative as one
 workspace with *Settings | Stats* tabs, an outline and a one-section inspector, replacing the
-long configurator form; search and filter on Creatives; the two tools inside the same
-workspace shell; the matching phone layouts.
+long configurator form; search and filter on Creatives — **delivered by
+[ADR-0038](0038-creative-workspace.md)**. Still planned: the two tools inside the same
+workspace shell, and the matching phone layouts of the tools.
 
 ## Consequences
 

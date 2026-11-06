@@ -1,3 +1,5 @@
+import { Play } from "lucide-react";
+
 /**
  * A static, abstract preview of what a template's mechanic looks like.
  *
@@ -129,6 +131,17 @@ function Mechanic({ type }: { type: string }) {
           <div className="relative flex flex-col items-center gap-2 rounded-ctl border border-line bg-surface px-5 py-3">
             <span className="type-data font-medium text-well-fg">18+</span>
             <div className="h-5 w-16 rounded-ctl bg-fg-disabled" />
+          </div>
+        </div>
+      );
+
+    // Not a catalog template: the VAST video generator's row in the new-creative
+    // sheet (ADR-0035, ADR-0038) — a plain video, so a frame with a play mark.
+    case "video":
+      return (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex size-14 items-center justify-center rounded-ctl border border-line bg-surface">
+            <Play size={22} aria-hidden className="fill-fg-disabled text-fg-disabled" />
           </div>
         </div>
       );
