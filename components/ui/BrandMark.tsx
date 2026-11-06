@@ -65,8 +65,7 @@
  * reader announces, so the glyph is hidden rather than given a second label.
  */
 /**
- * The glyph's geometry, exported so the large stage (`ui/BrandStage.tsx`), the
- * favicon and the OG card render the same drawing rather than a second copy of
+ * The glyph's geometry, exported so the favicon and the OG card render the same drawing rather than a second copy of
  * it. A second drawing is how two versions of a logo start diverging.
  *
  * Every path is one closed filled loop, so `fill-rule` never enters into it.

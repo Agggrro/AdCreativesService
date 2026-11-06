@@ -69,7 +69,6 @@ export default async function EditCreativePage({
       <div className="flex flex-col gap-6">
         <PageHeader
           title={`${dict.vastGen.editTitle}: ${creative.name ?? parsed.config.adTitle}`}
-          subtitle={dict.vastGen.subtitle}
         />
         {droppedCount > 0 && (
           <Notice tone="warn">{dict.vastGen.editDroppedNotice.replace("{n}", String(droppedCount))}</Notice>
@@ -146,9 +145,6 @@ export default async function EditCreativePage({
         <h1 className="type-h2">
           {dict.configurator.configureTitle}: {creative.name ?? template.name}
         </h1>
-        <p className="type-small max-w-[66ch] text-fg-secondary">
-          {dict.configurator.configureSubtitle}
-        </p>
       </div>
 
       {message && <Notice tone="dead">{message}</Notice>}

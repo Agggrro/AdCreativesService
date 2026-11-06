@@ -39,17 +39,17 @@ Standard authenticated Next.js app. All data access goes through Supabase with R
 so a user can only ever see/modify their own creatives and subscriptions. This layer
 is **not** performance-critical and may use the Node runtime freely.
 
-Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture.md):
+Surfaces, after [ADR-0008](decisions/0008-catalog-first-information-architecture.md) and [ADR-0037](decisions/0037-reduced-navigation-and-copy.md):
 
 | Route | Access | What it does |
 | --- | --- | --- |
-| `/` | public | Landing. Brand stage, one live demo well with a template switcher, how-it-works, the full template grid, standards and the free tools, closing CTA, footer. Exactly one VPAID unit is mounted at a time — the grid below it is static previews ([design-system.md](design-system.md) §6) |
+| `/` | public | Landing. The first screen is the headline, one call to action and one live demo well with a template switcher; below it four steps, the template grid (previews and names), the standards and the free tools by name, one closing call to action, a footer. Exactly one VPAID unit is mounted at a time — the grid below it is static previews ([design-system.md](design-system.md) §6, [ADR-0037](decisions/0037-reduced-navigation-and-copy.md)) |
 | `/catalog`, `/catalog/[slug]` | public | Template catalog and a detail page with one live in-browser demo. Replaces the old `/preview` fixtures; `/preview` is a permanent redirect |
 | `/login`, `/signup`, `/auth/*` | public | Email/password auth; [`middleware.ts`](../middleware.ts) refreshes the session |
 | `/dashboard` | session | Redirect only — to `/dashboard/creatives`, or `/catalog` for a user with none |
 | `/dashboard/creatives`, `/dashboard/creatives/[id]` | session | The user's creatives, their VAST tags, and delivery counts |
 | `/dashboard/creatives/new?template=` | session | The schema-driven configurator with the live player panel |
-| `/dashboard/access` | session | The account's closed-beta status and the Telegram link ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)); `/dashboard/subscriptions` redirects here |
+| `/dashboard/access`, `/dashboard/subscriptions` | session | Redirect to `/dashboard/creatives`. The closed-beta state is a row of the account menu and, for an account without access, a notice at the top of Creatives ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md), [ADR-0037](decisions/0037-reduced-navigation-and-copy.md)) |
 | `/dashboard/admin` | session + `ADMIN_EMAILS` | Every registered account and the grant/revoke action; 404 for anyone else |
 | `/tools/vast-validator` | public | Free tool ([ADR-0013](decisions/0013-public-free-tools-section.md)), reached via the top-bar dropdown — no `/tools` index page. No session, no database read |
 | `/tools/vast-generator` | public; saving needs a session | The VAST generator ([ADR-0035](decisions/0035-vast-video-creatives.md), [ADR-0036](decisions/0036-public-tool-that-saves.md)): builds a VAST video creative — version 2.0–4.3, an uploaded or linked spot, the buyer's pixels, companion banners, AdChoices — with the XML built in the browser by the same validator and builder the ad path runs, and played through the validator's isolated well. Reads the session only to choose between *Create* and *Sign in and create*; a signed-out visitor's draft stays in their browser across the sign-in and comes back on `?resume=1`, the sign-in's return (and the dashboard's link here), never on a plain visit. Saves through `createVideoCreative`; editing a video creative at `/dashboard/creatives/[id]/edit` renders the same form |

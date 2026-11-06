@@ -90,7 +90,10 @@ binding on every page, component, state, and user-visible string. The short vers
    `max-w-[…]` is a defect. Full-bleed colour with contained prose is what owns a wide
    monitor.
 7. **Every user-visible string is RU + EN** through the i18n layer, at the moment it is
-   written. No locale logic on the public VAST path.
+   written, and earns its place first — the five questions in
+   [docs/design-system.md](docs/design-system.md) §10
+   ([ADR-0037](docs/decisions/0037-reduced-navigation-and-copy.md)). No locale logic on the
+   public VAST path.
 
 **Creative templates are the one exemption.** `runtime/templates/**` and
 `runtime/lib/vpaid-base.js` sit outside the palette, type scale, radius scale and depth

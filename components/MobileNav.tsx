@@ -24,6 +24,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 export function MobileNav({
   items,
   account,
+  language = true,
 }: {
   items: TopBarLink[];
   /**
@@ -32,6 +33,12 @@ export function MobileNav({
    * way to sign out at all, which the desktop-only guard in `AppTopBar` caused.
    */
   account?: React.ReactNode;
+  /**
+   * The panel's own language row, for a signed-out visitor. A signed-in viewer's
+   * language control is among the account rows (ADR-0037), and showing it twice
+   * would be two placements of one control.
+   */
+  language?: boolean;
 }) {
   const dict = useDict();
   const pathname = usePathname();
@@ -95,7 +102,12 @@ export function MobileNav({
       {open && (
         <div
           id={panelId}
-          className="absolute inset-x-0 top-full z-20 border-y border-hairline bg-surface"
+          // The bar is sticky, so the sheet hangs from a fixed place and nothing
+          // below the fold can be scrolled to: a signed-in sheet is 385–430px,
+          // taller than a landscape phone. It takes what is left of the viewport
+          // under the bar (`100%` is the bar it is positioned against) and
+          // scrolls inside itself.
+          className="absolute inset-x-0 top-full z-20 max-h-[calc(100dvh_-_100%)] overflow-y-auto overscroll-contain border-y border-hairline bg-surface"
         >
           <nav className="flex flex-col px-5 py-2">
             {rows.map((row) => {
@@ -118,19 +130,29 @@ export function MobileNav({
               );
             })}
             {account && (
-              <div className="mt-2 flex flex-col gap-2 border-t border-hairline pt-4">
+              // A tap on a link inside the account rows closes the panel the same
+              // way a tapped section link does.
+              <div
+                className="mt-2 flex flex-col gap-2 border-t border-hairline pt-4"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("a")) close();
+                }}
+              >
                 {account}
               </div>
             )}
             {/*
-              The language control lives here below `lg` — the bar has no room for
-              it at 390px, and dropping it entirely would strand a Russian visitor
-              on a phone.
+              The language control lives here below `lg` for a signed-out visitor —
+              the bar has no room for it at 390px, and dropping it entirely would
+              strand a Russian visitor on a phone. A signed-in viewer's is among
+              the account rows.
             */}
-            <div className="mt-2 flex items-center justify-between border-t border-hairline pt-4 pb-2">
-              <span className="label-instr">{dict.nav.language}</span>
-              <LanguageSwitcher />
-            </div>
+            {language && (
+              <div className="mt-2 flex items-center justify-between border-t border-hairline pt-4 pb-2">
+                <span className="label-instr">{dict.nav.languageShort}</span>
+                <LanguageSwitcher />
+              </div>
+            )}
           </nav>
         </div>
       )}

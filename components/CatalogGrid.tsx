@@ -15,7 +15,12 @@ export type CatalogTemplate = {
 /**
  * The one grid in the product (docs/design-system.md §6): a template carries no
  * state, so there is no rail to draw and nothing to encode in a table row. Used
- * full-length on /catalog and at teaser length on the landing page.
+ * full-length on /catalog and in its teaser form on the landing page.
+ *
+ * `compact` is that teaser: the preview and the name, four across from `lg`. The
+ * description and the standards chips are what the catalog is for — comparing
+ * templates — and on the landing page seven identical chips told nothing and the
+ * description repeated what the preview shows (ADR-0037).
  *
  * Deliberately static — no live unit inside a tile. VPAID units share the
  * `window.getVPAIDAd` global, so a grid of running mechanics renders the wrong
@@ -25,10 +30,12 @@ export function CatalogGrid({
   templates,
   dict,
   limit,
+  compact = false,
 }: {
   templates: CatalogTemplate[];
   dict: Dict;
   limit?: number;
+  compact?: boolean;
 }) {
   const shown = limit ? templates.slice(0, limit) : templates;
 
@@ -40,7 +47,11 @@ export function CatalogGrid({
   // 2px-offset focus ring (docs/design-system.md §2). The preview rounds itself
   // instead of being clipped by its parent.
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div
+      className={`grid gap-4 sm:grid-cols-2 ${
+        compact ? "lg:grid-cols-4" : "lg:grid-cols-3"
+      }`}
+    >
       {shown.map((t) => (
         <Link
           key={t.id}
@@ -48,17 +59,23 @@ export function CatalogGrid({
           className="flex flex-col gap-4 rounded-card border border-hairline bg-surface p-5 transition-colors duration-150 hover:bg-surface-2"
         >
           <TemplatePreview type={t.type} />
-          <div className="flex flex-col gap-2">
+          {compact ? (
             <h3 className="type-h3">{t.name}</h3>
-            <p className="type-small line-clamp-3 text-fg-secondary">
-              {t.description}
-            </p>
-          </div>
-          <div className="mt-auto flex flex-wrap gap-2">
-            {t.supported_standards.map((s) => (
-              <Chip key={s}>{s}</Chip>
-            ))}
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-2">
+                <h3 className="type-h3">{t.name}</h3>
+                <p className="type-small line-clamp-3 text-fg-secondary">
+                  {t.description}
+                </p>
+              </div>
+              <div className="mt-auto flex flex-wrap gap-2">
+                {t.supported_standards.map((s) => (
+                  <Chip key={s}>{s}</Chip>
+                ))}
+              </div>
+            </>
+          )}
         </Link>
       ))}
     </div>

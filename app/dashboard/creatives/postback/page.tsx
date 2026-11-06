@@ -114,7 +114,7 @@ export default async function PostbackPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title={t.title} subtitle={t.subtitle} />
+      <PageHeader title={t.title} />
 
       {/* `live`: the rotation lands back on this same page after a soft
           navigation that moves no focus, so without it a screen reader hears

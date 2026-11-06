@@ -26,12 +26,7 @@ export default async function SignupPage({
 
       <div className="flex flex-1 items-center justify-center py-16">
         <Container width="narrow" className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="type-h2">{dict.auth.signUpTitle}</h1>
-            <p className="type-small text-fg-secondary">
-              {dict.auth.signUpSubtitle}
-            </p>
-          </div>
+          <h1 className="type-h2">{dict.auth.signUpTitle}</h1>
 
           {/* `live`: the failed sign-up redirects back here, and nothing on
               this page takes focus to announce it otherwise. */}

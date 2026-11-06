@@ -7,8 +7,9 @@
 
 ## How access is granted
 
-Terms are agreed in person — Telegram `@agggrro`, which every page links to from the
-closed-beta strip and the account's `/dashboard/access` page. The admin (the accounts
+Terms are agreed in person — Telegram `@agggrro`, which the account menu and, for an
+account without access, the notice at the top of Creatives link to
+([ADR-0037](decisions/0037-reduced-navigation-and-copy.md)). The admin (the accounts
 named in `ADMIN_EMAILS`) then marks the account on `/dashboard/admin`:
 
 - **Grant** inserts one row into `public.subscriptions`:

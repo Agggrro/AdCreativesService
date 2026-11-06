@@ -157,7 +157,9 @@ export function PreviewPanel({
         */}
         <div className="relative">
           <div
-            className="relative w-full overflow-hidden rounded-ctl bg-well-screen"
+            /* Isolated for the same reason as `VpaidPreview`'s screen: a
+               creative's chrome would otherwise paint over the page's own. */
+            className="relative isolate w-full overflow-hidden rounded-ctl bg-well-screen"
             style={{ aspectRatio: "16 / 9" }}
           >
             {commonProps && (tab === "sandbox" ? (

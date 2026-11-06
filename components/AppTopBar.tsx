@@ -1,12 +1,12 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getDict } from "@/lib/i18n/server";
-import { signOut } from "@/app/auth/actions";
 import { mainNav, publicNav } from "@/lib/nav";
 import { isAdminEmail } from "@/lib/admin";
 import { readOwnAccess } from "@/lib/beta-access";
 import { TopBar } from "@/components/TopBar";
-import { ClosedBetaStrip } from "@/components/ClosedBetaStrip";
-import { Button, LinkButton } from "@/components/ui/Button";
+import { AccountMenu } from "@/components/AccountMenu";
+import { AccountPanel } from "@/components/AccountPanel";
+import { LinkButton } from "@/components/ui/Button";
 
 /**
  * The one top bar, rendered by both the dashboard layout and the public
@@ -18,10 +18,11 @@ import { Button, LinkButton } from "@/components/ui/Button";
  * login are dropped rather than the whole strip hidden, so the catalog and the
  * free tools stay reachable by the people they exist for (ADR-0013).
  *
- * The closed-beta strip (ADR-0034) hangs under the bar for everyone except a
- * signed-in participant, which costs one owner-scoped read of their own
- * entitlement rows per page; the admin's accounts section is appended to the
- * nav for the accounts `lib/admin.ts` names.
+ * A signed-in viewer gets Creatives, Tools and one Account menu (ADR-0037): the
+ * address, the access state, the postback, the language and sign-out sit in it
+ * instead of in the bar. Reading the viewer's own entitlement rows costs one
+ * owner-scoped query per page; the admin's accounts link joins the menu for the
+ * accounts `lib/admin.ts` names.
  */
 export async function AppTopBar() {
   const supabase = await createServerSupabase();
@@ -33,30 +34,33 @@ export async function AppTopBar() {
   const access = user
     ? await readOwnAccess(supabase, user.id)
     : { granted: false, since: null };
-  // The strip asks the viewer to write to the admin; the admin and a
-  // participant are the two readers it has nothing to tell.
-  const strip = !(access.granted || admin);
+
+  // One component, two homes: the dropdown from `lg`, and the end of the mobile
+  // panel below it. The bar and the panel never show the same control at the
+  // same width.
+  const accountProps = user
+    ? {
+        dict,
+        email: user.email ?? "",
+        granted: access.granted,
+        admin,
+      }
+    : null;
 
   return (
     <TopBar
       dict={dict}
       brandHref="/"
-      nav={user ? mainNav(dict, { admin }) : publicNav(dict)}
-      below={strip ? <ClosedBetaStrip dict={dict} /> : undefined}
+      nav={user ? mainNav(dict) : publicNav(dict)}
+      // A signed-in viewer's language control is a row of the account menu.
+      language={!user}
       right={
         user ? (
-          <>
-            {/* From `xl`: at `lg` the address was the 4px a Russian admin's bar
-                overlapped by. Below `lg` it is in the panel. */}
-            <span className="data-instr hidden type-small text-fg-muted xl:inline">
-              {user.email}
-            </span>
-            <form action={signOut} className="hidden lg:block">
-              <Button type="submit" variant="ghost">
-                {dict.common.signOut}
-              </Button>
-            </form>
-          </>
+          <div className="hidden lg:block">
+            <AccountMenu label={dict.nav.account}>
+              {accountProps && <AccountPanel {...accountProps} variant="menu" />}
+            </AccountMenu>
+          </div>
         ) : (
           <>
             {/*
@@ -85,26 +89,18 @@ export async function AppTopBar() {
         )
       }
       /*
-       * The same actions again, for the menu panel. Everything in `right` above
-       * but the sign-up action is hidden below `lg` because a compact bar cannot
-       * hold it (sign-up below `xs`), and without a
-       * second home a signed-in visitor on a phone had **no way to sign out at
-       * all** — the account cluster was simply gone. The bar and the panel never
-       * show the same control at the same width, so this is two placements of
-       * one action, not two actions.
+       * The same actions again, for the menu panel. A signed-in viewer's panel
+       * ends with the account rows — `-mx-5` lets their dividers run edge to
+       * edge across the panel's gutter. A signed-out visitor's is sign-in and,
+       * below `xs`, sign-up: the bar and the panel never show the same control
+       * at the same width, so this is two placements of one action, not two
+       * actions.
        */
       mobileAccount={
-        user ? (
-          <>
-            <span className="data-instr type-small break-all text-fg-muted">
-              {user.email}
-            </span>
-            <form action={signOut}>
-              <Button type="submit" variant="secondary" className="w-full">
-                {dict.common.signOut}
-              </Button>
-            </form>
-          </>
+        user && accountProps ? (
+          <div className="-mx-5">
+            <AccountPanel {...accountProps} variant="panel" />
+          </div>
         ) : (
           <>
             <LinkButton href="/login" variant="secondary" className="w-full">

@@ -52,11 +52,12 @@ const ru = {
   },
   nav: {
     catalog: "Каталог",
-    myCreatives: "Мои креативы",
-    access: "Доступ",
+    creatives: "Креативы",
     accounts: "Аккаунты",
+    account: "Аккаунт",
     tools: "Инструменты",
     language: "Язык интерфейса",
+    languageShort: "Язык",
     menu: "Меню",
   },
   meta: {
@@ -65,73 +66,29 @@ const ru = {
       "Соберите интерактивный креатив без разработчика и заберите динамический VAST-тег для любого DSP. SIMID 1.1 и VPAID 2.0.",
   },
   landing: {
-    eyebrow: "Для медиабайеров и агентств",
     title: "Реклама, с которой действительно взаимодействуют",
-    subtitle:
-      "Выберите шаблон, настройте под кампанию и заберите динамический VAST-тег. SIMID 1.1 и VPAID 2.0 — вставляется в любой DSP без разработчика.",
+    subtitle: "Креатив из шаблона, VAST-тег для любого DSP",
     ctaStart: "Создать аккаунт",
     ctaDashboard: "Перейти в кабинет",
-    ctaTemplates: "Смотреть шаблоны",
-    heroNote: "Закрытый бета-тест · правка креатива не требует перевыпуска тега",
-
-    howEyebrow: "Как это работает",
-    howTitle: "От шаблона до тега в DSP — четыре шага",
-    howLead:
-      "От первого шага до готового тега — ничего, кроме браузера.",
+    heroNote: "Закрытый бета-тест",
     step1Title: "Выберите шаблон",
-    step1Body:
-      "Семь механик: шоппинг, скретч, до/после, квиз, возрастной гейт, выбор с сообщением и дуэль.",
-    step2Title: "Настройте под кампанию",
-    step2Body:
-      "Медиафайлы, ссылка перехода, тексты кнопок. Превью обновляется сразу.",
+    step2Title: "Настройте",
     step3Title: "Заберите VAST-тег",
-    step3Body:
-      "Один динамический URL. Формат отдачи выбираете вы — SIMID или VPAID.",
     step4Title: "Вставьте в DSP",
-    step4Body:
-      "Тег отдаёт интерактив, пока у аккаунта есть доступ. Дальше — обычная закупка.",
     tagLabel: "Ваш тег",
-
-    templatesEyebrow: "Шаблоны",
-    templatesTitle: "Механики, готовые к запуску",
-    customTitle: "Нужна своя механика?",
-    customBody: "Соберём шаблон под вашу кампанию и добавим его в каталог.",
-
-    stdEyebrow: "Совместимость",
-    stdTitle: "Стандарты, а не костыли",
-    stdLead:
-      "Мы отдаём то, что DSP уже умеет читать. Никаких собственных плееров и обёрток на стороне площадки.",
-    stdVast: "Формат тега",
-    stdSimid: "Интерактив нового поколения",
-    stdVpaid: "Совместимость с текущим парком",
-    stdOmid: "Проброс верификации вендора",
-
-    toolsEyebrow: "Бесплатно",
-    toolsTitle: "Инструменты для VAST-тегов",
-
-    finalTitle: "Соберите первый креатив сегодня",
-    finalBody: "Закрытый бета-тест: участникам открыты все шаблоны.",
-    ctaCheckTag: "Проверить свой тег",
-  },
-  beta: {
-    strip: "Закрытый бета-тест — доступ выдаётся вручную.",
-    stripLink: "Написать в Telegram",
+    templatesTitle: "Шаблоны",
+    standards: "Стандарты",
+    toolsLabel: "Бесплатно, без регистрации",
+    finalTitle: "Соберите первый креатив",
   },
   access: {
-    title: "Доступ",
-    subtitle:
-      "Закрытый бета-тест: отдачу интерактива включает участникам администратор. Условия обсуждаем лично.",
     granted: "Доступ выдан",
     notGranted: "Доступа нет",
-    grantedOn: "с",
-    body: "Напишите в Telegram — договоримся об условиях и включим доступ на этот аккаунт.",
-    telegram: "Написать в Telegram",
-    accountLabel: "Аккаунт",
+    notice: "Доступа нет: теги не отдают интерактив",
+    contact: "Написать в Telegram",
   },
   admin: {
     title: "Аккаунты",
-    subtitle:
-      "Все зарегистрированные аккаунты. Метка участника закрытого бета-теста открывает отдачу интерактива по всем шаблонам.",
     email: "Email",
     registered: "Регистрация",
     lastSignIn: "Последний вход",
@@ -152,19 +109,12 @@ const ru = {
     errorList: "Не удалось получить список аккаунтов.",
   },
   footer: {
-    tagline:
-      "Интерактивные креативы и динамические VAST-теги.",
-    product: "Продукт",
-    tools: "Инструменты",
-    standards: "Стандарты",
-    howItWorks: "Как это работает",
+    nav: "Ссылки внизу страницы",
     rights: "© 2026 CreoSmith",
   },
   auth: {
     signInTitle: "Вход в CreoSmith",
-    signInSubtitle: "Управляйте своими интерактивными креативами.",
     signUpTitle: "Создание аккаунта",
-    signUpSubtitle: "Начните собирать интерактивные креативы.",
     createAccount: "Создать аккаунт",
     checkEmail: "Подтвердите адрес по ссылке в письме, затем войдите.",
     noAccount: "Нет аккаунта?",
@@ -190,18 +140,13 @@ const ru = {
     configure: "Настроить креатив",
     noTemplates: "Пока ни один шаблон не опубликован.",
     creatives: "Креативы",
-    creativesSubtitle:
-      "Ваши собранные креативы, их VAST-теги и статистика показов.",
-    noCreatives: "Креативов пока нет.",
-    createFirst: "Соберите первый в каталоге",
-    browseCatalog: "Открыть каталог",
+    noCreatives: "Креативов нет",
     serving: "Отдаётся",
     notServing: "Не отдаётся",
     notServingHint: "Нужен доступ участника бета-теста",
     impressions: "Показы",
     clicks: "Клики",
-    clicksHint:
-      "Только переход по кнопке действия — промежуточные клики не считаются",
+    clicksHint: "Только кнопка действия",
     funnel: "Доставка",
     ctr: "CTR",
     ctrOfImpressions: "от показов",
@@ -213,10 +158,11 @@ const ru = {
     statsUnavailable:
       "Статистика сейчас недоступна, поэтому цифры и состояние отдачи скрыты — показывать неверные мы не будем. Обновите страницу через минуту; если не пройдёт, напишите нам.",
     viewableNotApplicable: "Измеряется вашим вендором верификации, а не нами",
-    viewableSelfReported: "Собственная оценка, без аккредитации OMID",
+    viewableSelfReported: "Собственная оценка",
     viewableNoVersion: "В этой версии VAST видимость не передаётся — она появилась в 4.0",
     viewabilityHeading: "Измерение просмотра",
     createCreative: "Создать креатив",
+    newCreative: "Новый креатив",
     edit: "Изменить",
     saveChanges: "Сохранить изменения",
     vastTag: "VAST-тег",
@@ -316,8 +262,6 @@ const ru = {
   // The account's postback settings page (ADR-0023).
   postback: {
     title: "Постбек",
-    subtitle:
-      "Партнёрка сообщает о конверсии по этой ссылке, а CreoSmith засчитывает её креативу, с которого пришёл клик.",
     howHeading: "Как подключить",
     step1:
       "В настройках креатива поставьте {click_id} в ссылку оффера — в параметр, который партнёрка возвращает в постбеке: `sub1`, `aff_sub`, `subid`.",
@@ -326,8 +270,7 @@ const ru = {
     step3:
       "Конверсии появятся на странице креатива, а каждый пришедший постбек — в журнале ниже.",
     urlHeading: "Postback URL",
-    keyWarning:
-      "Ключ в ссылке работает как пароль: с ним кто угодно может отправлять конверсии в ваш аккаунт. Не публикуйте его.",
+    keyWarning: "Ключ работает как пароль — не публикуйте",
     keyUnavailable:
       "Не удалось получить ключ постбека. Обновите страницу через минуту.",
     rotate: "Сменить ключ",
@@ -395,8 +338,6 @@ const ru = {
     notFound: "Шаблон не найден.",
     backToTemplates: "Вернуться к шаблонам",
     configureTitle: "Настройка",
-    configureSubtitle:
-      "Заполните поля, выберите формат доставки и проверьте креатив в плеере перед сохранением.",
     deliveryFormat: "Формат доставки",
     noFields: "У этого шаблона нет настраиваемых полей.",
     required: "обязательное",
@@ -503,10 +444,7 @@ const ru = {
   },
   catalog: {
     title: "Каталог шаблонов",
-    subtitle:
-      "Откройте любую и попробуйте руками.",
     empty: "Пока ни один шаблон не опубликован.",
-    seeAll: "Весь каталог",
     standards: "Стандарты",
     demoTitle: "Как это работает",
     demoHint:
@@ -518,7 +456,6 @@ const ru = {
     configure: "Настроить креатив",
     signInToConfigure: "Создать аккаунт",
     backToCatalog: "Вернуться в каталог",
-    hint: "Взаимодействуйте с креативом выше — сработавший клик-через появится здесь.",
     funnel: {
       impression: "показ",
       click: "клик",
@@ -538,17 +475,7 @@ const ru = {
     goToSite: "Перейти на основной сайт",
   },
   tools: {
-    title: "Бесплатные инструменты",
-    subtitle:
-      "Проверка и сборка VAST без регистрации. Ничего из проверенного мы у себя не храним.",
-    columnTool: "Инструмент",
-    columnState: "Состояние",
-    stateAvailable: "Доступен",
-    stateSoon: "В работе",
-    open: "Открыть",
     generatorName: "Генератор VAST",
-    generatorDescription:
-      "VAST-тег линейного видео под нужную версию — с вашими пикселями, баннерами и AdChoices. Тег динамический и хранится в «Моих креативах».",
     validatorName: "Валидатор VAST",
     playerFrame: "Плеер VAST",
     validatorMetaTitle: "Валидатор VAST — проверить и проиграть тег",
@@ -557,12 +484,8 @@ const ru = {
     generatorMetaTitle: "Генератор VAST-тегов — линейное видео, VAST 2.0–4.3",
     generatorMetaDescription:
       "VAST-тег линейного видео под версию 2.0–4.3: загрузите ролик или дайте ссылку, добавьте пиксели DSP, баннеры и AdChoices. XML проверяется нашим валидатором и проигрывается в Google IMA. Сохранить тег — после бесплатной регистрации.",
-    validatorDescription:
-      "Разбор тега или XML по спецификации IAB, прогон в реальном плеере и отчёт с ошибками и рекомендациями.",
     validator: {
       title: "Валидатор VAST",
-      subtitle:
-        "Вставьте ссылку на VAST-тег или тело документа. Инструмент разберёт структуру, пройдёт цепочку обёрток и запустит показ в плеере.",
       modeUrl: "Ссылка",
       modeXml: "XML",
       inputLabelUrl: "Ссылка на VAST",
@@ -662,8 +585,6 @@ const ru = {
   // English inside these sentences, the way a DSP writes them (§10).
   vastGen: {
     title: "Генератор VAST",
-    subtitle:
-      "VAST-тег линейного видео с трекингом, под нужную версию. Тег динамический: его можно менять после размещения, и он отдаёт рекламу, пока у вас есть доступ.",
     editTitle: "Изменить VAST-видео",
     versionHeading: "Версия VAST",
     versionHelp:
@@ -883,11 +804,12 @@ const en: Dict = {
   },
   nav: {
     catalog: "Catalog",
-    myCreatives: "My creatives",
-    access: "Access",
+    creatives: "Creatives",
     accounts: "Accounts",
+    account: "Account",
     tools: "Tools",
     language: "Interface language",
+    languageShort: "Language",
     menu: "Menu",
   },
   meta: {
@@ -896,74 +818,29 @@ const en: Dict = {
       "Build an interactive ad creative without a developer and take a dynamic VAST tag for any DSP. SIMID 1.1 and VPAID 2.0.",
   },
   landing: {
-    eyebrow: "For media buyers and agencies",
     title: "Ads your viewer actually touches",
-    subtitle:
-      "Pick a template, tune it to the campaign, take the dynamic VAST tag. SIMID 1.1 and VPAID 2.0 — it pastes into any DSP, with no developer.",
+    subtitle: "A creative from a template, a VAST tag for any DSP",
     ctaStart: "Create an account",
     ctaDashboard: "Go to dashboard",
-    ctaTemplates: "See the templates",
-    heroNote: "Closed beta · editing a creative never reissues the tag",
-
-    howEyebrow: "How it works",
-    howTitle: "Template to DSP tag in four steps",
-    howLead:
-      "From the first step to a working tag — nothing but a browser.",
+    heroNote: "Closed beta",
     step1Title: "Pick a template",
-    step1Body:
-      "Seven mechanics: shoppable, scratch, before/after, quiz, an age gate, pick-and-message, and a duel.",
-    step2Title: "Tune it to the campaign",
-    step2Body:
-      "Media, click-through, button copy. The preview updates as you type.",
+    step2Title: "Tune it",
     step3Title: "Take the VAST tag",
-    step3Body:
-      "One dynamic URL. You choose the delivery format — SIMID or VPAID.",
     step4Title: "Paste it into your DSP",
-    step4Body:
-      "The tag serves the interactive payload while the account has access. The rest is ordinary buying.",
     tagLabel: "Your tag",
-
-    templatesEyebrow: "Templates",
-    templatesTitle: "Mechanics ready to run",
-    customTitle: "Need a mechanic of your own?",
-    customBody:
-      "We will build the template around your campaign and add it to the catalog.",
-
-    stdEyebrow: "Compatibility",
-    stdTitle: "Standards, not workarounds",
-    stdLead:
-      "We serve what a DSP already knows how to read. No player of our own, no wrapper on the publisher's side.",
-    stdVast: "Tag format",
-    stdSimid: "Next-generation interactivity",
-    stdVpaid: "Works with the installed base",
-    stdOmid: "Vendor verification pass-through",
-
-    toolsEyebrow: "Free",
-    toolsTitle: "Tools for VAST tags",
-
-    finalTitle: "Build your first creative today",
-    finalBody: "Closed beta: every template is open to participants.",
-    ctaCheckTag: "Check your own tag",
-  },
-  beta: {
-    strip: "Closed beta — access is granted by hand.",
-    stripLink: "Message on Telegram",
+    templatesTitle: "Templates",
+    standards: "Standards",
+    toolsLabel: "Free, no sign-up",
+    finalTitle: "Build your first creative",
   },
   access: {
-    title: "Access",
-    subtitle:
-      "Closed beta: the administrator switches interactive delivery on for participants. Terms are agreed in person.",
     granted: "Access granted",
     notGranted: "No access",
-    grantedOn: "since",
-    body: "Message on Telegram — we agree the terms and switch access on for this account.",
-    telegram: "Message on Telegram",
-    accountLabel: "Account",
+    notice: "No access: tags do not serve interactive ads",
+    contact: "Message on Telegram",
   },
   admin: {
     title: "Accounts",
-    subtitle:
-      "Every registered account. The closed-beta participant mark opens interactive delivery on every template.",
     email: "Email",
     registered: "Registered",
     lastSignIn: "Last sign-in",
@@ -984,19 +861,12 @@ const en: Dict = {
     errorList: "Could not load the account list.",
   },
   footer: {
-    tagline:
-      "Interactive ad creatives and dynamic VAST tags.",
-    product: "Product",
-    tools: "Tools",
-    standards: "Standards",
-    howItWorks: "How it works",
+    nav: "Footer links",
     rights: "© 2026 CreoSmith",
   },
   auth: {
     signInTitle: "Sign in to CreoSmith",
-    signInSubtitle: "Manage your interactive ad creatives.",
     signUpTitle: "Create your account",
-    signUpSubtitle: "Start building interactive ad creatives.",
     createAccount: "Create account",
     checkEmail: "Confirm your address from the email we sent, then sign in.",
     noAccount: "No account?",
@@ -1021,18 +891,13 @@ const en: Dict = {
     configure: "Configure creative",
     noTemplates: "No templates published yet.",
     creatives: "Creatives",
-    creativesSubtitle:
-      "The creatives you have built, their VAST tags, and their delivery numbers.",
-    noCreatives: "No creatives yet.",
-    createFirst: "Build the first one from the catalog",
-    browseCatalog: "Open the catalog",
+    noCreatives: "No creatives",
     serving: "Serving",
     notServing: "Not serving",
     notServingHint: "Needs closed-beta access",
     impressions: "Impressions",
     clicks: "Clicks",
-    clicksHint:
-      "Final call-to-action only — intermediate clicks are not counted",
+    clicksHint: "Final call-to-action only",
     funnel: "Delivery",
     ctr: "CTR",
     ctrOfImpressions: "of impressions",
@@ -1044,10 +909,11 @@ const en: Dict = {
     statsUnavailable:
       "Delivery numbers are unavailable right now, so counts and serving state are hidden rather than shown wrong. Refresh in a minute; if it persists, contact us.",
     viewableNotApplicable: "Measured by your verification vendor, not by us",
-    viewableSelfReported: "Self-reported, not OMID-accredited",
+    viewableSelfReported: "Self-reported",
     viewableNoVersion: "This VAST version carries no viewability — it arrived in 4.0",
     viewabilityHeading: "Viewability measurement",
     createCreative: "Create creative",
+    newCreative: "New creative",
     edit: "Edit",
     saveChanges: "Save changes",
     vastTag: "VAST tag",
@@ -1129,8 +995,6 @@ const en: Dict = {
   },
   postback: {
     title: "Postback",
-    subtitle:
-      "Your network reports each conversion to this URL, and CreoSmith credits it to the creative the click came from.",
     howHeading: "How to connect",
     step1:
       "In the creative's settings, put {click_id} into the offer link — in the parameter your network returns in its postback: `sub1`, `aff_sub`, `subid`.",
@@ -1139,8 +1003,7 @@ const en: Dict = {
     step3:
       "Conversions appear on the creative's page, and every postback that arrives shows up in the log below.",
     urlHeading: "Postback URL",
-    keyWarning:
-      "The key in this URL works like a password: anyone holding it can post conversions to your account. Keep it private.",
+    keyWarning: "The key works like a password — keep it private",
     keyUnavailable:
       "Couldn't load your postback key. Refresh the page in a minute.",
     rotate: "Rotate key",
@@ -1208,8 +1071,6 @@ const en: Dict = {
     notFound: "Template not found.",
     backToTemplates: "Back to templates",
     configureTitle: "Configure",
-    configureSubtitle:
-      "Fill in the fields, pick a delivery format, and try the creative in a player before saving.",
     deliveryFormat: "Delivery format",
     noFields: "This template has no configurable fields.",
     required: "required",
@@ -1308,10 +1169,7 @@ const en: Dict = {
   },
   catalog: {
     title: "Template catalog",
-    subtitle:
-      "Open any of them and try it by hand.",
     empty: "No templates published yet.",
-    seeAll: "Whole catalog",
     standards: "Standards",
     demoTitle: "How it works",
     demoHint:
@@ -1323,7 +1181,6 @@ const en: Dict = {
     configure: "Configure creative",
     signInToConfigure: "Create an account",
     backToCatalog: "Back to the catalog",
-    hint: "Interact with the creative above — the click-through that fires shows up here.",
     funnel: {
       impression: "impression",
       click: "click",
@@ -1341,17 +1198,7 @@ const en: Dict = {
     goToSite: "Go to the main site",
   },
   tools: {
-    title: "Free tools",
-    subtitle:
-      "Check and build VAST without an account. Nothing you check is stored on our side.",
-    columnTool: "Tool",
-    columnState: "State",
-    stateAvailable: "Available",
-    stateSoon: "In progress",
-    open: "Open",
     generatorName: "VAST generator",
-    generatorDescription:
-      "A VAST tag for a linear video at the version you need — with your pixels, banners and AdChoices. The tag is dynamic and lives in My creatives.",
     validatorName: "VAST validator",
     playerFrame: "VAST player",
     validatorMetaTitle: "VAST validator — check and play a VAST tag",
@@ -1360,12 +1207,8 @@ const en: Dict = {
     generatorMetaTitle: "VAST tag generator — linear video, VAST 2.0–4.3",
     generatorMetaDescription:
       "A VAST tag for a linear video at version 2.0–4.3: upload a spot or link one, add DSP pixels, banners and AdChoices. The XML is checked by our validator and played in Google IMA. Saving the tag takes a free account.",
-    validatorDescription:
-      "Parse a tag or document against the IAB specification, play it in a real player, and report every fault with a fix.",
     validator: {
       title: "VAST validator",
-      subtitle:
-        "Paste a VAST tag URL or the document itself. The tool parses the structure, walks the wrapper chain, and plays the ad in a real player.",
       modeUrl: "URL",
       modeXml: "XML",
       inputLabelUrl: "VAST tag URL",
@@ -1456,8 +1299,6 @@ const en: Dict = {
   },
   vastGen: {
     title: "VAST generator",
-    subtitle:
-      "A VAST tag for a linear video with tracking, at the version you need. The tag is dynamic: you can change it after it is placed, and it serves while you have access.",
     editTitle: "Edit VAST video",
     versionHeading: "VAST version",
     versionHelp:

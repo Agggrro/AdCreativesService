@@ -50,7 +50,7 @@ export default async function VastGeneratorPage({
       <AppTopBar />
 
       <Section tone="surface" pad="md" width="wide" innerClassName="flex flex-col gap-8">
-        <PageHeader title={t.title} subtitle={t.subtitle} />
+        <PageHeader title={t.title} />
         <VideoTagGenerator
           mode="create"
           signedIn={Boolean(user)}

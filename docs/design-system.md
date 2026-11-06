@@ -45,9 +45,8 @@ Three consequences follow, and they override any local styling preference:
   | `--radius-card` | `16px` | Cards, template tiles, feature blocks |
   | `--radius-well` | `20px` | The player well |
 
-  `50%` for the status dot, and for two shapes that are circles by nature rather than
-  by styling: the brand stage’s ambient halo (§6) and a drag handle drawn as a knob.
-  Nothing else is rounded, and there are no pills.
+  `50%` for the status dot, and for one shape that is a circle by nature rather than
+  by styling: a drag handle drawn as a knob. Nothing else is rounded, and there are no pills.
 - **Depth is elevation plus a hairline**, and the hairline does most of the work.
   Surfaces step `ground` → `surface` → `surface-2` at **1.06:1** and **1.07:1**; the
   hairline sits at **1.31:1** against ground and **1.24:1** against surface. Those tone
@@ -66,7 +65,13 @@ Three consequences follow, and they override any local styling preference:
   `overflow-hidden` box.** This applies to every grouped control — segments, tiles,
   anything using a `gap-px` hairline container: round the first and last child instead of
   clipping the parent. It is the single most repeated way focus disappears in this
-  codebase.
+  codebase. Two things follow. A strip of *static* cells may clip — the landing's steps and
+  standards hold no link or button — and stops being allowed the moment a cell holds one.
+  A row that runs edge to edge of its box has no outside to draw in, so it draws the ring
+  **inside**, `outline-offset: -2px` — the `.focus-inset` class in `globals.css`, a plain
+  class because a Tailwind utility sits in a layer and loses to the unlayered rule: the rows
+  of the Tools and Account dropdowns and of the mobile sheet, whose box also scrolls (§6,
+  "Mobile navigation").
 
 ## 3. Colour
 
@@ -124,7 +129,8 @@ something else must give it up.
 **The marketing surfaces get three**, and the third is spent on the repeated call to
 action rather than on decoration: a landing page that states its offer once at the top and
 once at the bottom is answering a visitor's reading order, not decorating. `/` and
-`/catalog` are the whole list. It is a budget of three, not a suspension of the rule —
+`/catalog` are the whole list. The landing spends two of them today — the hero's action and
+the closing one — and the third is headroom, not a target. It is a budget of three, not a suspension of the rule —
 an accent on a heading, an icon, or a rule is still a defect on every surface.
 
 **Persistent chrome is exempt from the count** on every surface: it is on every screen by
@@ -132,10 +138,9 @@ definition, and counting it would spend a slot before a page renders anything. T
 exemption covers exactly three things:
 
 - the **whole brand lockup, wherever chrome puts it** — the monogram's `C` and the
-  wordmark's `Creo`, one identity in two pieces, not two spends. That means the top bar
-  **and the footer**: the same lockup at the bottom of the page is the same identity, not
-  a second spend, and a footer that has to render its own brand in grey to stay under
-  budget is the rule mis-applied;
+  wordmark's `Creo`, one identity in two pieces, not two spends. Today that is the top bar
+  only: the footer carries no lockup ([ADR-0037](decisions/0037-reduced-navigation-and-copy.md));
+  were one to return, it would be the same identity, not a second spend;
 - the **active-section marker** (the underline on desktop, the coloured row in the mobile
   panel — the same marker in two layouts);
 - the **single sign-up action for a signed-out visitor** — in the bar, or below `xs` in
@@ -213,8 +218,7 @@ rule, not a preference. All three faces cover Latin and Cyrillic, so both UI lan
 
 | Role | Size / line | Weight | Face | Notes |
 | --- | --- | --- | --- | --- |
-| display | 76/1.08 | 400 | Prata | `-0.025em`, landing hero only |
-| display-sm | 52/1.12 | 400 | Prata | `-0.022em`, closing CTA |
+| display-sm | 52/1.12 | 400 | Prata | `-0.022em`, the landing hero and the closing CTA; `clamp(2rem, 4.5vw, 3.25rem)`, so 32px on a phone |
 | h1 | 44/1.14 | 400 | Prata | `-0.02em`, section headings on marketing surfaces |
 | h2 | 26/1.25 | 500 | Onest | `-0.015em`, page titles, sub-section headings |
 | h3 | 19/1.35 | 500 | Onest | `-0.01em`, card and step titles |
@@ -268,7 +272,8 @@ viewport width and wrong at every other.
   token in `app/globals.css`'s `@theme`, and has one use: the top bar's sign-up placement
   (§6, "Mobile navigation"). A page must be checked at 360 / 390 / 768 / 1280 / 1920 /
   2560 before it ships — 360 because a phone that narrow is common and `xs` changes the
-  bar below 384. A layout that only exists at one width is unfinished.
+  bar below 384. The list says nothing about height, so the mobile sheet is also opened
+  at 740×360, a phone on its side. A layout that only exists at one width is unfinished.
 - **Navigation must survive every width.** There is no width at which the nav simply
   disappears; below `lg` it becomes a disclosure panel, not nothing.
 - The spec-sheet grid — a `168px` label gutter plus a fluid content column — is the
@@ -362,21 +367,6 @@ both would announce the brand twice. The strings are split in the dictionary
 (`brand.nameLead` / `brand.nameTail`), not sliced in the component: §9 admits no exception
 for short literals.
 
-### Brand stage — the large mark
-
-`ui/BrandStage.tsx` is the landing page's opening object: the monogram on an ambient
-halo, above the headline. It steps **128px → 176px at `sm` → 300px at `lg`** — three
-sizes rather than two, because a 300px mark that drops straight to 128px leaves the
-tablet range with either a cramped stage or a hero the headline never clears.
-
-- **It is a stage, not a decoration.** Its geometry is fixed so that interactive mechanics
-  can later replace its contents without moving anything around it. Do not re-tune its
-  height to fill a gap elsewhere.
-- Ambient motion only — a slow halo rotation and a soft pulse on the play triangle, both
-  disabled under `prefers-reduced-motion` (§7).
-- It reuses `BrandMark`'s geometry. A second drawing of the same glyph is a defect.
-- **One per page, on `/` only.** The mark elsewhere is the 28px bar lockup.
-
 ### Data tables — the default for lists
 
 Lists of creatives and subscriptions are **tables with a state rail**, not a grid of cards.
@@ -417,6 +407,10 @@ or failing — it is a thing you pick.
 - Tile contents, in order: preview → name (h3) → description (`small`, `fg-secondary`,
   clamped to three lines) → format chips. Nothing else, and nothing else interactive: the
   whole tile is one link.
+- **The landing page's gallery is the teaser form** (`CatalogGrid compact`): preview and name,
+  two across at `sm` and four at `lg`. The description and the chips are what the catalog is
+  for — comparing templates — and on the landing seven identical chips told nothing
+  ([ADR-0037](decisions/0037-reduced-navigation-and-copy.md)).
 - Hover is `bg-surface-2`. No lift, no shadow. Focus is the standard 2px accent outline at
   2px offset.
 - **Accent budget on the catalog index is zero.** Tiles are links, not actions.
@@ -491,19 +485,24 @@ how the bug survived a round of "verified locally".
 
 ### Nav dropdown
 
-The Tools entry in the top bar ([ADR-0013](decisions/0013-public-free-tools-section.md)) is
-a disclosure button, not a link: it opens a panel listing the two free tools directly.
-There is no `/tools` index page.
+Two entries in the top bar are disclosure buttons rather than links, both built on
+`NavDropdown`: **Tools** ([ADR-0013](decisions/0013-public-free-tools-section.md)), which
+lists the two free tools directly — there is no `/tools` index page — and **Account**
+(below).
 
 - `aria-expanded` + `aria-controls` on the trigger, a plain panel of real `Link`s under it
   — the two-item disclosure pattern, not a full ARIA `menu` role (which would promise
   arrow-key navigation this component does not implement).
 - Panel: `border border-hairline`, `--radius-panel`, `bg-surface`, the `shadow-overlay`
-  token, `divide-y divide-hairline` between items. Each item carries the tool's name, its
-  `StateWord`, and its one-line description, read from `lib/tools.ts`'s `freeTools()` — the
-  one place that list is assembled.
+  token, `divide-y divide-hairline` between items. A tool is its name and nothing else: both
+  are available, so a `StateWord` says nothing, and the name needs no sentence under it
+  ([ADR-0037](decisions/0037-reduced-navigation-and-copy.md)). The list is assembled in
+  `lib/tools.ts`'s `freeTools()`.
 - Round the first and last item's own corners; the panel itself is never `overflow-hidden`,
-  for the same reason a segmented control isn't (§2's 2px-offset focus ring).
+  for the same reason a segmented control isn't (§2's 2px-offset focus ring). Rows run
+  edge to edge of the panel, so they draw that ring inside (`-2px`). The link rows of the
+  Tools and Account menus are alike — 44px, `px-5`, `type-small`, `fg`, the normal weight —
+  so the two panels read as one list.
 - **Not portalled** — the system's one documented exception, and it is *not* a blanket
   carve-out for `position: absolute`. The portal rule guards two separate hazards and each
   has to be checked on its own terms:
@@ -518,6 +517,32 @@ There is no `/tools` index page.
     viewport anchor to hijack. It also needs to scroll with the header, which `fixed` would
     get wrong regardless.
 
+### Account menu
+
+The signed-in viewer's account is one disclosure at the right of the bar — **Account** —
+instead of an address, a language control and a *Sign out* button side by side
+([ADR-0037](decisions/0037-reduced-navigation-and-copy.md)). The trigger is a `ghost` `md`
+button with a chevron and a word; it never takes the accent.
+
+- **Rows, top to bottom:** the address (mono — it is an identifier) with the access state
+  under it as a `StateWord`, `live` *Access granted* or `idle` *No access* and, only in the
+  second case and never for the admin, who is the one who answers it, a link to the
+  Telegram chat; *Postback*; for an admin, *Accounts*; *Language* — a `label-instr`, as in
+  the signed-out panel, because it names a control — with the `RU | EN` control; *Sign out*,
+  the quiet row (`fg-secondary`, `fg` on hover). Nothing else. The state is a fact, not a
+  page, which is why there is no Access page. *No access* is a word here and an empty cell
+  in the admin's list (below): a table shows an absence by leaving the cell out, where a
+  menu line has nothing to leave out.
+- **No current marker.** The trigger takes neither the accent nor the underline. *Postback*
+  sits under Creatives' route prefix, which carries the marker; `/dashboard/admin` is
+  reached from this menu and has no section of its own.
+- The panel is `NavDropdown`'s, right-aligned: the same border, radius, `shadow-overlay` and
+  44px rows, and the same exemption from the portal rule — the DOM path from `<header>` to it
+  is the Tools panel's, re-checked.
+- **A signed-out visitor has no such menu**: the bar keeps the `RU | EN` control, *Sign in*
+  and the one sign-up action (§3).
+- Below `lg` the same rows sit in the mobile panel (next).
+
 ### Mobile navigation
 
 Below `lg` the section links collapse into a disclosure panel behind a labelled trigger.
@@ -525,16 +550,28 @@ Below `lg` the section links collapse into a disclosure panel behind a labelled 
 replacement, which left a phone visitor with a brand mark and nothing to navigate with.
 
 **Why `lg`, measured** (2026-11-03, labels that never wrap — `navItemClass` is
-`whitespace-nowrap`): the full bar needs 768px signed out and 832px signed in, in Russian,
+`whitespace-nowrap`): the full bar needs 768px signed out and, before ADR-0037, 832px signed in, in Russian,
 the longer locale; collapsing at `sm`, as the bar once did, overlapped the language
 control and the Tools trigger from 640 to 768 and wrapped «Мои креативы» onto two lines.
-`lg` is the first standard breakpoint above both. The signed-in account's email joins the
-bar from `xl`: at `lg` it was the 4px a Russian admin's bar overlapped by.
+`lg` is the first standard breakpoint above both. Since ADR-0037 a signed-in bar holds
+Creatives, Tools and Account only — the address, the language control and *Sign out* are rows
+of the Account menu — so it is shorter than the 832px measured then, and `lg` stays: the
+signed-out bar's 768px is unchanged.
 
 - The trigger is a 44px touch target carrying `aria-expanded` and `aria-controls`.
 - The panel is a full-width sheet under the bar: `bg-surface`, hairline top and bottom,
   44px rows, the same links as the desktop nav plus the auth actions.
 - `Escape` closes and returns focus to the trigger.
+- A signed-in viewer's panel ends with the account rows (above), the language control among
+  them; the panel's own language row is for the signed-out visitor only.
+- **The sheet scrolls inside itself.** It is capped at what is left of the viewport under
+  the bar — `max-height: calc(100dvh − 100%)`, `100%` being the sticky bar it hangs from —
+  with `overscroll-contain`. It has to be: the bar is sticky, so nothing below the fold of a
+  short viewport can be scrolled to, and a signed-in sheet is 385–430px tall, taller than a
+  phone on its side (740×360, measured 2026-11-06: the admin's *Sign out* ended 124px below
+  the screen). A scrolling box clips a ring drawn outside it, so the account rows, which run
+  edge to edge, draw theirs inside (§2); the section links keep the 2px offset, since their
+  gutter is room enough.
 - An icon may accompany the trigger but never replaces its label (§10).
 - **What the bar keeps.** Below `lg` the bar carries the lockup, a signed-out visitor's
   sign-up action and the trigger; sign-in, the language control and the account move into
@@ -550,34 +587,36 @@ bar from `xl`: at `lg` it was the 4px a Russian admin's bar overlapped by.
   phones most visitors carry. Nothing touches; Russian clears by 32px or more. A longer
   label breaks this, and then `xs` moves, not the label's box.
 
-### Site strip — the closed-beta notice
+### Access notice — the closed-beta notice
 
-One strip under the top bar, on every page that renders the bar, for as long as the
-product is in closed beta ([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md)).
-It says that access is granted by hand and where to ask for it. `ClosedBetaStrip`.
+One notice at the top of **Creatives**, for a signed-in account that has no access
+([ADR-0034](decisions/0034-closed-beta-manual-entitlement.md),
+[ADR-0037](decisions/0037-reduced-navigation-and-copy.md)): *No access: tags do not serve
+interactive ads*, and a link to the Telegram chat. `AccessNotice` is a `Notice` of tone `info`
+with the link in its `action` slot — not a second box that copies it. It replaced a strip that hung
+under the top bar on every page: a visitor who had decided nothing read it first on every
+page, and an account without access read it on pages that had nothing to do with it. A
+signed-out visitor now learns about the closed beta from the landing's note, and the account
+menu carries the state.
 
-- **Tone `info`, and only `info`.** The strip informs; it is not an action, so it never
-  wears the accent, and it is not an alarm, so it is not `dead`. Tint `info-bg` with
-  `info` text — 7.63:1 — and a hairline rule above it. The link is underlined
-  (`underline-offset-4`) and hovers to `fg`, 14.54:1 on the tint.
-- **One sentence and one link.** The Telegram handle rides inside the link in mono: it is
-  a value to copy, not a word in the sentence (§4). No icon, no second line of copy, and
-  no dismiss control — there is no state to remember a dismissal with, and a strip that
-  can be closed is a strip that gets closed before it is read.
-- `type-small`, 40px minimum height, `py-2`. At 390px it wraps to two lines rather than
-  truncating; the sentence and the link are separate flex items so the link never breaks
-  mid-phrase.
-- **Hidden for a signed-in participant.** The sentence asks for something they already
-  have. The bar reads the viewer's own entitlement rows (owner-scoped under RLS) to
-  decide; a signed-out visitor always sees it.
-- Persistent chrome: it sits inside the sticky `<header>` under the bar's `Container`, so
-  the mobile panel (`top-full`) hangs below it, and it does not count against the accent
-  budget — it has no accent to count.
-
+- **Tone `info`, and only `info`.** The notice informs; it is not an action, so it never wears
+  the accent, and it is not an alarm, so it is not `dead`. Tint `info-bg` with `info` text —
+  7.63:1 — in a `--radius-panel` block. The link is underlined (`underline-offset-4`) and
+  hovers to `fg`, 14.54:1 on the tint.
+- **One sentence and one link**, in that order, as separate flex items so a 390px wrap
+  happens between them and never inside the link. No icon, no second line of copy, and no
+  dismiss control — there is no state to remember a dismissal with, and a notice that can be
+  closed gets closed before it is read.
+- The `Notice` block's own size: `type-small`, `py-2`, one line at 390px in English. It is
+  page content, not chrome: not sticky, and it carries no accent to count.
+- **Hidden for a participant and for the admin.** The sentence asks for something the first
+  has and the second never needs. The page reads the viewer's own entitlement rows
+  (owner-scoped under RLS).
 The admin's accounts list (`/dashboard/admin`, the same ADR) is an ordinary state-rail
 table: rail `live` for a participant, `info` for an account entitled by an external
 subscription, none for an account with no access — and in that row the access cell is
-the muted em dash, not a state word: no access is an absence, not a state. Its row
+the muted em dash, not a state word: in a table an absence is an empty cell (the account menu
+says the same fact with an `idle` word, above). Its row
 action is the `sm` secondary button the table rule prescribes — *Выдать доступ* /
 *Отозвать* — and the email is mono, because an address is an identifier. *Отозвать*
 goes through the destructive confirmation: a re-grant restores access, not the
@@ -665,8 +704,12 @@ segment instead.
 
 ### Landing hero — one well, switched by tabs
 
-The landing page (`/`) leads with the brand stage, then the headline and pitch, then a
-segmented template switcher above a single **demo well** (§7), then the primary CTA.
+The landing page (`/`) opens on one screen at 1280×720. From `lg` up the left column is the
+headline (`display-sm`, §4), a one-line pitch, the primary CTA and, for a signed-out visitor, the closed-beta note; the
+right column is a segmented template switcher above a single **demo well** (§7). Below `lg`
+they stack in that order. There is no logo stage — the lockup in the bar is the brand, and
+the first screen belongs to the offer and the proof
+([ADR-0037](decisions/0037-reduced-navigation-and-copy.md)).
 
 - Exactly one VPAID unit is mounted at any moment: switching tabs unmounts the previous
   one before mounting the next. Two units would fight over the single `window.getVPAIDAd`
@@ -681,6 +724,12 @@ segmented template switcher above a single **demo well** (§7), then the primary
   simply doesn't load; nothing else on the page depends on it.
 - **Same exception on `/catalog/[slug]`**, which runs the identical demo unit built the
   same way. The catalog **grid** is unaffected: its tiles render static previews.
+- **Below the hero the page says each thing once:** four step titles and an example tag; the
+  template grid in its teaser form (preview and name — no description, no standards chip; the
+  catalog is where templates are compared); the four standards by name beside the two free
+  tools by name; one closing CTA; a footer of a copyright and three links. The page spends the
+  accent twice in its content, on the two CTAs, plus the bar's sign-up action, which §3
+  exempts.
 
 ### Free tools — the public utility surface
 
@@ -1029,6 +1078,13 @@ expiring. Dim-looking text in the well is `well-fg`; `well-fg-dim` draws lines, 
 There are two variants of the well, and the difference is whether an ad was actually
 requested. **Exactly one well per page**; the catalog index has none.
 
+**The screen is its own stacking context** (`isolate`). A creative's chrome — its mandatory
+close control — is positioned at `z-index: 2147483000`; with no stacking context of its own
+it escapes into the page's and paints over the sticky bar and the menus that hang from it.
+It was found with the account menu open over the landing's well: an overlay is tested in
+the context it opens from (§6, "Destructive confirmation"). The dev harness's stage has no
+bar to paint over and stays as it is.
+
 **Serving well** — the configurator. A real VAST request happened, so an instrument strip
 above the viewport carries what that request can prove: the delivery format (which *is* the
 standard — `SIMID 1.1`, `VPAID 2.0` — one field, not two) on the left, and the server's
@@ -1124,9 +1180,10 @@ Movement is slow and few. Nothing bounces, nothing springs.
 
 ## 10. Language and copy
 
-- The UI ships in **Russian and English**. The switcher is a two-state segmented control in
-  the top bar next to the account, mono 11px uppercase, labelled `RU` / `EN` — language
-  codes, never flags (a flag denotes a country, not a language).
+- The UI ships in **Russian and English**. The switcher is a two-state segmented control, mono
+  11px uppercase, labelled `RU` / `EN` — language codes, never flags (a flag denotes a
+  country, not a language). It sits in the top bar for a signed-out visitor and in the
+  account menu for a signed-in one ([ADR-0037](decisions/0037-reduced-navigation-and-copy.md)).
 - The choice persists in a **cookie**, written server-side, so the landing page and the
   dashboard always agree within a browser. It is deliberately *not* on the user record yet:
   adding a `locale` column is a schema migration, and a display preference is not a good
@@ -1165,6 +1222,14 @@ Movement is slow and few. Nothing bounces, nothing springs.
 - Copy rules: sentence case; a control names what happens ("Copy tag" → "Tag copied", never
   "Successfully copied!"); errors say what went wrong and what to do; no exclamation marks;
   no "please", "simply", "just".
+- **Text earns its place** ([ADR-0037](decisions/0037-reduced-navigation-and-copy.md)). Before a
+  string ships, five questions: does it change what the reader does; is it already said next
+  to it — a label, a state, a button's name; does it restate the name or the obvious; does it
+  repeat without telling things apart — seven identical chips; would it say the same shorter?
+  A page has no subtitle under its title (`PageHeader` takes none), a field no hint that
+  repeats its label, a required
+  field only its `*`. Lines that carry trust or safety stay: the postback key works like a
+  password, we keep no copy of a checked tag.
 
 ## 11. Boundaries — what we do not do
 
@@ -1179,7 +1244,7 @@ Movement is slow and few. Nothing bounces, nothing springs.
 | ✕ | Derived-ratio metrics without the counts they come from. Fill rate is barred outright — ad requests are not counted — and so is error rate: errors are counted, but an error often fires before any impression (ADR-0033). CTR is permitted since ADR-0016 made click a real count, and VTR only on a VAST video creative's page, whose progress events ADR-0035 counts — both with their denominator stated (§6). |
 | ✕ | Raw Tailwind palette colours (`gray-200`, `green-100`, `blue-600`, …), or any literal hex, in `app/` or `components/`. Tokens only. §8 exempts `runtime/templates/**` and nothing else. |
 | ✕ | Arbitrary type sizes (`text-[13px]`) on content. Roles from §4, as utilities. The one place a literal size is correct is **inside a shared primitive that defines a documented control size** — `ui/Button.tsx`'s three label sizes, the top bar's brand and nav sizes. A control's size is part of its specification (§6), not a call site's opinion; a page reaching for a literal size is the defect this bans. |
-| ✕ | Rounded pills as a default shape. The radius scale in §2; `50%` only for the status dot and the two circles §2 names as circles by nature (the brand stage's halo, a drag knob). |
+| ✕ | Rounded pills as a default shape. The radius scale in §2; `50%` only for the status dot and the one circle §2 names as a circle by nature (a drag knob). |
 | ✕ | Hard `<br>` inside a heading. Use `text-wrap: balance`. |
 | ✕ | Icon-only actions, no exceptions. Verbs label actions; an icon accompanies a word. Tried once as a data-table space-saving device and retracted: even a spec-correct 18px icon read as an indistinguishable speck once it had no word to lean on, confirmed twice from live screenshots and a DevTools inspection that ruled out a rendering bug — the icon was never the problem, having no label was. If a row's action cell is too narrow for labelled buttons, the fix is narrower *other* columns or a taller cell, not a smaller word. |
 | ✕ | Flags for language. |

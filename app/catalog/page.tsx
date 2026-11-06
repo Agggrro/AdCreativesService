@@ -29,7 +29,7 @@ export default async function CatalogPage() {
       <AppTopBar />
 
       <Section tone="ground" pad="md" width="wide" innerClassName="flex flex-col gap-10">
-        <PageHeader title={dict.catalog.title} subtitle={dict.catalog.subtitle} />
+        <PageHeader title={dict.catalog.title} />
         <CatalogGrid templates={templates ?? []} dict={dict} />
       </Section>
 

@@ -7,5 +7,5 @@ import { redirect } from "next/navigation";
  * bookmarked reads as the product breaking.
  */
 export default function SubscriptionsRedirect() {
-  redirect("/dashboard/access");
+  redirect("/dashboard/creatives");
 }

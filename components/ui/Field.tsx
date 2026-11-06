@@ -91,6 +91,7 @@ export function Notice({
   tone,
   live,
   detail,
+  action,
   children,
 }: {
   tone: "info" | "warn" | "dead";
@@ -102,6 +103,12 @@ export function Notice({
    * surfaces that show one cannot drift into two different treatments.
    */
   detail?: string;
+  /**
+   * The one link or button that goes with the sentence. A flex item of its own,
+   * so a narrow screen wraps between the sentence and the action and never
+   * inside the action (docs/design-system.md §6, "Access notice").
+   */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const styles = `${TINT[tone]} ${TEXT[tone]}`;
@@ -110,7 +117,14 @@ export function Notice({
       role={live ? "alert" : undefined}
       className={`rounded-panel px-3 py-2 type-small ${styles}`}
     >
-      {children}
+      {action ? (
+        <span className="flex flex-wrap items-center gap-x-3">
+          <span>{children}</span>
+          {action}
+        </span>
+      ) : (
+        children
+      )}
       {detail && (
         <span className="data-instr mt-1 block type-caption break-all">{detail}</span>
       )}

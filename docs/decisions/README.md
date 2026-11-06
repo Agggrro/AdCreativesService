@@ -22,7 +22,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0005](0005-interactive-image-creatives.md) | Interactive-image creatives via VPAID/SIMID (not display) | Accepted |
 | [0006](0006-live-preview-token.md) | Stateless signed tokens for the live "Launch Ad" preview | Accepted |
 | [0007](0007-design-system-instrument.md) | "Instrument" design system: single light theme, Sienna accent, cold semantics | Superseded by 0022 |
-| [0008](0008-catalog-first-information-architecture.md) | Catalog-first information architecture: three sections, public catalog, honest metrics | Accepted |
+| [0008](0008-catalog-first-information-architecture.md) | Catalog-first information architecture: three sections, public catalog, honest metrics | Accepted (the navigation superseded in part by 0037) |
 | [0009](0009-mandatory-close-control.md) | Mandatory close control, no fixed watch duration | Accepted |
 | [0010](0010-advertiser-media-uploads.md) | Advertiser media uploads via a public Storage bucket | Accepted (storage location and replace-delete amended by 0028) |
 | [0011](0011-conditional-grouped-config-schemas.md) | Conditional, grouped config schemas — and per-path click-through | Accepted |
@@ -51,6 +51,7 @@ We don't delete ADRs; we supersede them with a newer one.
 | [0034](0034-closed-beta-manual-entitlement.md) | Closed beta: entitlement granted by hand, Stripe disconnected | Accepted |
 | [0035](0035-vast-video-creatives.md) | VAST video creatives: a system template, a version-aware builder, and quartiles counted | Accepted |
 | [0036](0036-public-tool-that-saves.md) | A public tool that saves: sign in at the end, the draft kept in the browser | Accepted |
+| [0037](0037-reduced-navigation-and-copy.md) | Reduced navigation, one account menu, a leaner landing and text that earns its place | Accepted |
 
 ## Template
 

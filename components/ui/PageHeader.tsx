@@ -6,17 +6,16 @@
  * is working, not being sold to. The marketing surfaces use the display roles
  * directly instead of this component.
  *
- * Running prose stays near 66 characters regardless of how wide the page is.
+ * There is no subtitle: a page whose title needs a sentence under it has the wrong
+ * title (ADR-0037, §10 "Text earns its place").
  */
 export function PageHeader({
   eyebrow,
   title,
-  subtitle,
   actions,
 }: {
   eyebrow?: string;
   title: string;
-  subtitle?: string;
   /** Page-level actions, right-aligned from `sm` up and stacked below it. */
   actions?: React.ReactNode;
 }) {
@@ -25,9 +24,6 @@ export function PageHeader({
       <div className="flex flex-col gap-2">
         {eyebrow && <p className="label-instr">{eyebrow}</p>}
         <h1 className="type-h2">{title}</h1>
-        {subtitle && (
-          <p className="type-small max-w-[66ch] text-fg-secondary">{subtitle}</p>
-        )}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-3">{actions}</div>}
     </div>

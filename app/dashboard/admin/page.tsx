@@ -105,7 +105,7 @@ export default async function AdminAccountsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={dict.admin.title} subtitle={dict.admin.subtitle} />
+      <PageHeader title={dict.admin.title} />
 
       {actionError && <Notice tone="dead">{actionError}</Notice>}
       {rows === null && <Notice tone="dead">{dict.admin.errorList}</Notice>}

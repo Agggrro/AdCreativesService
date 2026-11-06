@@ -16,9 +16,9 @@ export type TopBarLink = {
 };
 
 /**
- * The one top bar: brand mark, section links, then the language control next to
- * the account. The accent appears here at most once — on the current section's
- * marker, which §3 exempts from the budget along with the lockup itself.
+ * The one top bar: brand mark, section links, then the account cluster. The accent
+ * appears here at most once — on the current section's marker, which §3 exempts
+ * along with the lockup itself.
  *
  * `sticky` because both reference sites this system was measured against keep
  * their navigation pinned, and because the page is long enough on marketing
@@ -32,23 +32,22 @@ export function TopBar({
   dict,
   brandHref,
   nav = [],
+  language = true,
   right,
   mobileAccount,
-  below,
 }: {
   dict: Dict;
   brandHref: string;
   nav?: TopBarLink[];
+  /**
+   * The `RU | EN` control in the bar. A signed-in viewer has it in the account
+   * menu instead (ADR-0037), so the bar passes `false` for them.
+   */
+  language?: boolean;
   /** The account cluster in the bar itself, from `lg` up. */
   right?: React.ReactNode;
   /** The same actions for the mobile panel, where the bar has no room. */
   mobileAccount?: React.ReactNode;
-  /**
-   * A strip under the bar, inside the sticky header — the closed-beta notice
-   * (§6 "Site strip"). Inside rather than after, so it scrolls with the bar and
-   * the mobile panel hangs below it.
-   */
-  below?: React.ReactNode;
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-ground/90 backdrop-blur-md">
@@ -97,16 +96,19 @@ export function TopBar({
             clears the wordmark by 11px, at 384 by 5px. What overlapped at 390
             before was a Sign in that never hid — see docs/design-system.md §11.
           */}
-          <span className="hidden lg:flex">
-            <LanguageSwitcher />
-          </span>
+          {language && (
+            <span className="hidden lg:flex">
+              <LanguageSwitcher />
+            </span>
+          )}
           {right}
           {/* Below `lg` the panel is the only home of sign-in and the account,
               so it mounts whenever it has either to hold. */}
-          {(nav.length > 0 || mobileAccount) && <MobileNav items={nav} account={mobileAccount} />}
+          {(nav.length > 0 || mobileAccount) && (
+            <MobileNav items={nav} account={mobileAccount} language={language} />
+          )}
         </div>
       </Container>
-      {below}
     </header>
   );
 }

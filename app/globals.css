@@ -141,16 +141,6 @@ body {
  */
 
 /* Prata, display only. Never below 32px, never in body copy. */
-@utility type-display {
-  font-family: var(--font-display);
-  font-weight: 400;
-  /* 36px at 390, 76px from ~1270 up — the role carries its own responsiveness */
-  font-size: clamp(2.25rem, 6vw, 4.75rem); /* 36px floor, already above §4’s 32 */
-  line-height: 1.08;
-  letter-spacing: -0.025em;
-  text-wrap: balance;
-}
-
 @utility type-display-sm {
   font-family: var(--font-display);
   font-weight: 400;
@@ -334,56 +324,6 @@ body {
 }
 
 /*
- * The brand stage's ambient motion (ui/BrandStage.tsx). Both animate `transform`
- * and `opacity` only, so neither moves layout. The reduced-motion block above
- * stops them along with everything else.
- *
- * `transform-box: fill-box` is what makes `transform-origin: center` mean the
- * triangle's own centre rather than the SVG viewport's — without it the pulse
- * swings the glyph across the counter instead of breathing in place.
- */
-/*
- * Built from the accent alone. It used to mix in --color-info for a second hue,
- * which put a state colour into decoration — §3 forbids that in the one file the
- * rest of the system reads as the reference.
- */
-.brand-halo {
-  background: conic-gradient(
-    from 0deg,
-    color-mix(in srgb, var(--color-accent) 16%, transparent),
-    transparent 28%,
-    color-mix(in srgb, var(--color-accent) 7%, transparent) 52%,
-    transparent 78%,
-    color-mix(in srgb, var(--color-accent) 16%, transparent)
-  );
-  animation: brand-halo-spin 22s linear infinite;
-}
-
-.brand-play {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: brand-play-beat 3.8s ease-in-out infinite;
-}
-
-@keyframes brand-halo-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes brand-play-beat {
-  0%,
-  100% {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.045);
-  }
-}
-
-/*
  * Every interactive element gets the same visible focus state.
  *
  * `summary` is in the list because a disclosure row is keyboard-focusable and is not
@@ -396,4 +336,15 @@ body {
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/*
+ * A row that runs edge to edge of its box has no outside to draw the ring in — it
+ * would land on a dropdown's border, or be clipped by a sheet that scrolls — so it
+ * draws it inside (§2). A plain class, not a Tailwind utility: utilities sit in a
+ * layer, and the unlayered rule above beats any layered one whatever its specificity,
+ * so `focus-visible:outline-offset-*` on an element is silently ignored.
+ */
+.focus-inset:focus-visible {
+  outline-offset: -2px;
 }

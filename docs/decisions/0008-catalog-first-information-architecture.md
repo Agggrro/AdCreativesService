@@ -1,6 +1,6 @@
 # 0008. Catalog-first information architecture
 
-- Status: Accepted
+- Status: Accepted — the signed-in navigation (three sections) superseded in part by [0037](0037-reduced-navigation-and-copy.md)
 - Date: 2026-07-27
 
 ## Context

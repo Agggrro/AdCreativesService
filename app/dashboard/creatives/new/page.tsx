@@ -56,9 +56,6 @@ export default async function NewCreativePage({
         <h1 className="type-h2">
           {dict.configurator.configureTitle}: {template.name}
         </h1>
-        <p className="type-small max-w-[66ch] text-fg-secondary">
-          {dict.configurator.configureSubtitle}
-        </p>
       </div>
 
       {message && <Notice tone="dead">{message}</Notice>}

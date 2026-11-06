@@ -5,19 +5,26 @@ import { AppTopBar } from "@/components/AppTopBar";
 import { HeroShowcase, type ShowcaseTemplate } from "@/components/HeroShowcase";
 import { CatalogGrid, type CatalogTemplate } from "@/components/CatalogGrid";
 import { LinkButton } from "@/components/ui/Button";
-import { BrandStage } from "@/components/ui/BrandStage";
 import { Section } from "@/components/ui/Section";
 import { Reveal } from "@/components/ui/Reveal";
 import { Footer } from "@/components/ui/Footer";
 import { demoConfig, demoUnitKey, templateSlug } from "@/lib/template-demo";
+import { freeTools } from "@/lib/tools";
+import { vastTagUrl } from "@/lib/site";
+
+/** An illustrative id: it points at nothing and shows the shape of a tag. */
+const EXAMPLE_CREATIVE_ID = "8f3a91d4-2b7e-4c05-9a11-6de0f2c48b73";
 
 /**
- * The landing page (docs/design-system.md §6, "Landing hero").
+ * The landing page (docs/design-system.md §6, "Landing hero"; ADR-0037).
  *
- * The order is the visitor's reading order, not ours: the brand stage opens, the
- * offer is stated once, the live creative proves it, and only then do the
- * supporting sections run. Section colour is full-bleed and the content stays in a
- * container — that is what owns a wide monitor (§5), not wider paragraphs.
+ * The first screen belongs to the offer and the proof: from `lg` the headline, one
+ * line, the call to action and the beta note sit beside the live creative; there
+ * is no logo stage in front of them. Below the hero each band says its one thing
+ * — the steps, the templates, the standards and the tools, the call to action
+ * again — and nothing explains what its heading already says. Section colour is
+ * full-bleed and the content stays in a container; that is what owns a wide
+ * monitor (§5), not wider paragraphs.
  *
  * Exactly one VPAID unit is ever mounted, in `HeroShowcase`. The gallery below is
  * static previews, because VPAID units share the `window.getVPAIDAd` global and a
@@ -78,18 +85,20 @@ export default async function Home({
     : undefined;
 
   const steps = [
-    { n: "01", title: dict.landing.step1Title, body: dict.landing.step1Body },
-    { n: "02", title: dict.landing.step2Title, body: dict.landing.step2Body },
-    { n: "03", title: dict.landing.step3Title, body: dict.landing.step3Body },
-    { n: "04", title: dict.landing.step4Title, body: dict.landing.step4Body },
+    dict.landing.step1Title,
+    dict.landing.step2Title,
+    dict.landing.step3Title,
+    dict.landing.step4Title,
   ];
 
-  const standards = [
-    { name: "VAST 4.2", role: dict.landing.stdVast },
-    { name: "SIMID 1.1", role: dict.landing.stdSimid },
-    { name: "VPAID 2.0", role: dict.landing.stdVpaid },
-    { name: "OMID", role: dict.landing.stdOmid },
-  ];
+  // Machine values: identical in both locales (§10).
+  const standards = ["VAST 4.2", "SIMID 1.1", "VPAID 2.0", "OMID"];
+  const tools = freeTools(dict);
+  const exampleTag = vastTagUrl(EXAMPLE_CREATIVE_ID);
+
+  const cta = user
+    ? { href: "/dashboard/creatives", label: dict.landing.ctaDashboard }
+    : { href: "/signup", label: dict.landing.ctaStart };
 
   return (
     <main className="flex flex-1 flex-col">
@@ -97,190 +106,144 @@ export default async function Home({
 
       {/* ---- Hero. `surface` so the well, which keeps the ground tone, has
            something to sit on — a well on a ground band is invisible (§7). ---- */}
-      <Section tone="surface" pad="lg" width="wide">
-        <Reveal>
-          <BrandStage />
-        </Reveal>
-
-        <div className="mx-auto mt-8 flex max-w-3xl flex-col items-center text-center sm:mt-12">
-          <Reveal delay={80}>
-            <p className="label-instr">{dict.landing.eyebrow}</p>
-          </Reveal>
-          <Reveal delay={140}>
-            <h1 className="type-display mt-5 max-w-[17ch]">
-              {dict.landing.title}
-            </h1>
-          </Reveal>
-          <Reveal delay={200}>
-            <p className="type-body-lg mt-6 max-w-[58ch] text-fg-secondary">
-              {dict.landing.subtitle}
-            </p>
-          </Reveal>
-          <Reveal delay={260}>
-            <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
-              <LinkButton
-                href={user ? "/dashboard/creatives" : "/signup"}
-                variant="primary"
-                size="lg"
-              >
-                {user ? dict.landing.ctaDashboard : dict.landing.ctaStart}
-              </LinkButton>
-              <LinkButton href="/catalog" variant="secondary" size="lg">
-                {dict.landing.ctaTemplates}
-              </LinkButton>
+      <Section tone="surface" pad="md" width="wide">
+        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16">
+          <Reveal>
+            <div className="flex flex-col items-start">
+              <h1 className="type-display-sm max-w-[16ch]">
+                {dict.landing.title}
+              </h1>
+              <p className="type-body-lg mt-5 max-w-[34ch] text-balance text-fg-secondary">
+                {dict.landing.subtitle}
+              </p>
+              <div className="mt-8">
+                <LinkButton href={cta.href} variant="primary" size="lg">
+                  {cta.label}
+                </LinkButton>
+              </div>
+              {/* A signed-in viewer has the access state in the account menu; the
+                  note is for the visitor who has not signed up yet. */}
+              {!user && (
+                <p className="data-instr mt-5 type-caption text-fg-muted">
+                  {dict.landing.heroNote}
+                </p>
+              )}
             </div>
           </Reveal>
-          <Reveal delay={310}>
-            <p className="data-instr mt-5 type-caption text-fg-muted">
-              {dict.landing.heroNote}
-            </p>
-          </Reveal>
-        </div>
 
-        {templates.length > 0 && (
-          <Reveal delay={360}>
-            <div className="mt-14">
+          {templates.length > 0 && (
+            <Reveal delay={80}>
               <HeroShowcase
                 templates={templates}
                 dict={dict}
                 initialId={initialId}
               />
-            </div>
-          </Reveal>
-        )}
+            </Reveal>
+          )}
+        </div>
       </Section>
 
-      {/* ---- How it works ---- */}
-      <Section id="how" tone="ground" pad="lg" bordered>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
-          <div>
-            <p className="label-instr">{dict.landing.howEyebrow}</p>
-            <h2 className="type-h1 mt-5 max-w-[20ch]">{dict.landing.howTitle}</h2>
-          </div>
-          <p className="type-body max-w-[44ch] text-fg-secondary">
-            {dict.landing.howLead}
-          </p>
-        </div>
-
-        <div className="mt-14 grid gap-px border-y border-hairline bg-hairline md:grid-cols-2 lg:grid-cols-4">
-          {steps.map((step, i) => (
-            <Reveal key={step.n} delay={i * 70} className="bg-ground">
-              <div className="flex h-full flex-col gap-3 px-6 py-8 lg:px-8">
-                <span className="data-instr type-caption tracking-[0.1em] text-fg-muted">
-                  {step.n}
-                </span>
-                <h3 className="type-h3">{step.title}</h3>
-                <p className="type-small text-fg-secondary">{step.body}</p>
-              </div>
-            </Reveal>
+      {/* ---- Steps: four titles and what the tag looks like ---- */}
+      <Section tone="ground" pad="sm" bordered>
+        {/*
+          A clipping parent would erase a 2px-offset focus ring (§2). Verified safe
+          here and only here: every cell is a static readout with no focusable
+          descendant. Put a link or a button in one and the rounding has to move to
+          the cells.
+        */}
+        <ol className="grid gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map((title, i) => (
+            <li key={title} className="flex flex-col gap-2 bg-ground px-6 py-5">
+              <span className="data-instr type-caption text-fg-muted">
+                {`0${i + 1}`}
+              </span>
+              <span className="type-h3">{title}</span>
+            </li>
           ))}
-        </div>
+        </ol>
 
         {/*
-          The tag is machine text — mono, identical in both locales, and it has to
-          be the shape the product actually emits. It read `?c=…&fmt=simid`, a
-          parameter name and a query arg that exist nowhere: the real tag is
-          `{cdn}/v?creative_id={uuid}` (app/dashboard/creatives/page.tsx). §7
-          forbids fabricating a response time on this screen for the same reason —
-          a machine value that means nothing on the one page a prospect trusts most.
+          The tag is machine text — mono, identical in both locales — and it has to
+          be the shape the product actually emits, on the host it emits it from:
+          `vastTagUrl` builds every tag the product shows, and the ad domain is its
+          own (ADR-0018), so a host typed by hand is a host that does not exist. A
+          fabricated machine value on the one page a prospect trusts most is the
+          fault §7 names for a made-up response time. A tag URL is wide content: it
+          scrolls inside its own box (§5) instead of being cut off mid-id.
         */}
-        <div className="mt-10 flex flex-col gap-4 rounded-panel border border-hairline bg-surface p-5 sm:flex-row sm:items-center sm:gap-5">
+        <div className="mt-4 flex flex-col gap-2 rounded-panel border border-hairline bg-surface px-5 py-4 sm:flex-row sm:items-center sm:gap-5">
           <span className="label-instr shrink-0">{dict.landing.tagLabel}</span>
-          <code className="type-data min-w-0 flex-1 truncate text-fg-secondary">
-            https://ads.creosmith.com/v?creative_id=8f3a91d4-2b7e-4c05-9a11-6de0f2c48b73
-          </code>
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <code className="type-data whitespace-nowrap text-fg-secondary">
+              {exampleTag}
+            </code>
+          </div>
         </div>
       </Section>
 
-      {/* ---- Templates ---- */}
-      <Section tone="surface" pad="lg" bordered>
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="label-instr">{dict.landing.templatesEyebrow}</p>
-            <h2 className="type-h1 mt-5">{dict.landing.templatesTitle}</h2>
-          </div>
+      {/* ---- Templates, in teaser form: the catalog is where they are compared ---- */}
+      <Section tone="surface" pad="md" bordered>
+        <div className="flex items-end justify-between gap-6">
+          <h2 className="type-h1">{dict.landing.templatesTitle}</h2>
           <Link
             href="/catalog"
-            className="type-body w-fit rounded-ctl text-fg-secondary underline underline-offset-4 transition-colors duration-150 hover:text-fg"
+            className="type-body w-fit shrink-0 rounded-ctl text-fg-secondary underline underline-offset-4 transition-colors duration-150 hover:text-fg"
           >
-            {dict.catalog.seeAll} →
+            {dict.nav.catalog}
+            <span aria-hidden="true"> →</span>
           </Link>
         </div>
-
-        <div className="mt-12">
-          <CatalogGrid templates={gallery} dict={dict} />
+        <div className="mt-8">
+          <CatalogGrid templates={gallery} dict={dict} compact />
         </div>
       </Section>
 
-      {/* ---- Standards and the free tools ---- */}
-      <Section tone="ground" pad="lg" bordered>
-        <div className="grid gap-14 lg:grid-cols-2 lg:gap-24">
-          <div>
-            <p className="label-instr">{dict.landing.stdEyebrow}</p>
-            <h2 className="type-h1 mt-5 max-w-[16ch]">{dict.landing.stdTitle}</h2>
-            <p className="type-body mt-6 max-w-[44ch] text-fg-secondary">
-              {dict.landing.stdLead}
-            </p>
-            {/*
-              A clipping parent would erase a 2px-offset focus ring (§2). Verified
-              safe here and only here: every cell is a static readout with no
-              focusable descendant. Put a link or a button in one and the rounding
-              has to move to the cells.
-            */}
-            <div className="mt-10 grid gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-2">
-              {standards.map((s) => (
-                <div key={s.name} className="bg-ground px-5 py-5">
-                  <div className="data-instr type-h3">{s.name}</div>
-                  <div className="type-small mt-2 text-fg-muted">{s.role}</div>
+      {/* ---- Standards and the free tools, by name ---- */}
+      <Section tone="ground" pad="md" bordered>
+        <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
+          <div className="flex flex-col gap-4">
+            <p className="label-instr">{dict.landing.standards}</p>
+            {/* Same clipping check as the steps: static cells, nothing focusable. */}
+            <div className="grid gap-px overflow-hidden rounded-panel border border-hairline bg-hairline sm:grid-cols-2">
+              {standards.map((name) => (
+                <div key={name} className="bg-ground px-6 py-5">
+                  <span className="data-instr type-h3">{name}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div>
-            <p className="label-instr">{dict.landing.toolsEyebrow}</p>
-            <h2 className="type-h2 mt-5 max-w-[26ch]">
-              {dict.landing.toolsTitle}
-            </h2>
-            <div className="mt-8 flex flex-col gap-4">
-              <ToolCard
-                href="/tools/vast-validator"
-                name={dict.tools.validatorName}
-                description={dict.tools.validatorDescription}
-              />
-              <ToolCard
-                href="/tools/vast-generator"
-                name={dict.tools.generatorName}
-                description={dict.tools.generatorDescription}
-              />
+          <div className="flex flex-col gap-4">
+            <p className="label-instr">{dict.landing.toolsLabel}</p>
+            <div className="divide-y divide-hairline rounded-panel border border-hairline">
+              {tools.map((tool, i) => (
+                <Link
+                  key={tool.href}
+                  href={tool.href}
+                  className={`type-h3 flex items-center justify-between gap-4 px-6 py-5 transition-colors duration-150 hover:bg-surface-2 ${
+                    i === 0 ? "rounded-t-panel" : ""
+                  } ${i === tools.length - 1 ? "rounded-b-panel" : ""}`}
+                >
+                  {tool.name}
+                  <span aria-hidden="true" className="text-fg-secondary">
+                    →
+                  </span>
+                </Link>
+              ))}
             </div>
           </div>
         </div>
       </Section>
 
       {/* ---- Closing call to action ---- */}
-      <Section tone="surface" pad="lg" bordered innerClassName="text-center">
+      <Section tone="surface" pad="md" bordered innerClassName="text-center">
         <Reveal>
           <h2 className="type-display-sm mx-auto max-w-[18ch]">
             {dict.landing.finalTitle}
           </h2>
-          <p className="type-body-lg mx-auto mt-6 max-w-[52ch] text-fg-secondary">
-            {dict.landing.finalBody}
-          </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <LinkButton
-              href={user ? "/dashboard/creatives" : "/signup"}
-              variant="primary"
-              size="lg"
-            >
-              {user ? dict.landing.ctaDashboard : dict.landing.ctaStart}
-            </LinkButton>
-            <LinkButton
-              href="/tools/vast-validator"
-              variant="secondary"
-              size="lg"
-            >
-              {dict.landing.ctaCheckTag}
+          <div className="mt-8 flex justify-center">
+            <LinkButton href={cta.href} variant="primary" size="lg">
+              {cta.label}
             </LinkButton>
           </div>
         </Reveal>
@@ -288,25 +251,5 @@ export default async function Home({
 
       <Footer dict={dict} />
     </main>
-  );
-}
-
-function ToolCard({
-  href,
-  name,
-  description,
-}: {
-  href: string;
-  name: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex flex-col gap-2 rounded-card border border-hairline bg-surface p-6 transition-colors duration-150 hover:bg-surface-2"
-    >
-      <span className="type-h3">{name}</span>
-      <span className="type-small text-fg-secondary">{description}</span>
-    </Link>
   );
 }

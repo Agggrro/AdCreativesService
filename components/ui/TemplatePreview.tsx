@@ -72,8 +72,8 @@ function Mechanic({ type }: { type: string }) {
       // in above them. One flex column with a gap, not three separate offsets:
       // the card is a fixed height, so offsets let it close onto the tiles in
       // the narrowest previews. The avatar is square on purpose: nothing but the
-      // status dot, the brand stage's halo and a drag knob is drawn as a circle
-      // (§2), even where the creative itself uses one.
+      // status dot and a drag knob is drawn as a circle (§2), even where the
+      // creative itself uses one.
       return (
         <div className="absolute inset-x-0 inset-y-[10%] flex flex-col items-center gap-2">
           <div className="flex w-[54%] items-center gap-2 rounded-ctl border border-line bg-surface p-2">

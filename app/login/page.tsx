@@ -27,12 +27,7 @@ export default async function LoginPage({
 
       <div className="flex flex-1 items-center justify-center py-16">
         <Container width="narrow" className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="type-h2">{dict.auth.signInTitle}</h1>
-            <p className="type-small text-fg-secondary">
-              {dict.auth.signInSubtitle}
-            </p>
-          </div>
+          <h1 className="type-h2">{dict.auth.signInTitle}</h1>
 
           {sp.message === "check-email" && (
             <Notice tone="info">{dict.auth.checkEmail}</Notice>

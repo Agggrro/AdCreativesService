@@ -49,9 +49,9 @@ export function hasAllAccess(rows: AccessRow[], now: Date = new Date()): boolean
  * (`subscriptions_select_own`) scopes the rows; the explicit `user_id` filter
  * is defence in depth, so a policy change could widen nothing here. A failed
  * read answers "no access": the only thing that decision controls is whether
- * the closed-beta strip shows and what the access page says, and showing the
- * strip to a participant costs a glance, while hiding it from a
- * non-participant hides the one way to ask.
+ * the account menu and the Creatives list show the way to ask for it
+ * (ADR-0037), and showing that to a participant costs a glance, while hiding
+ * it from a non-participant hides the one way to ask.
  */
 export async function readOwnAccess(
   supabase: SupabaseClient<Database>,

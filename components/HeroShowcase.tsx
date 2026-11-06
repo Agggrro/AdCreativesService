@@ -13,11 +13,15 @@ export type ShowcaseTemplate = {
 };
 
 /**
- * The landing page's front door (docs/design-system.md §6, "Landing hero"):
- * one segmented switcher, one demo well. Restores the shape of the original
+ * The landing page's proof (docs/design-system.md §6, "Landing hero"): one
+ * segmented switcher, one demo well. Restores the shape of the original
  * `/preview` page — visible player, buttons to switch templates, no click
  * required to see the mechanic — as the site's main landing rather than a
  * signed-out-only side page.
+ *
+ * It fills the right column of the two-column hero (ADR-0037). The pair shares the
+ * well's own cap (`max-w-2xl`), so in a column wider than that the switcher still
+ * starts where the well does, not at the column's edge.
  *
  * Exactly one `VpaidPreview` is ever mounted: switching tabs changes `key`,
  * which unmounts the previous unit before the next one mounts. Two units
@@ -39,15 +43,10 @@ export function HeroShowcase({
   if (!active) return null;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
       <Segmented
         wrap
-        // Centred on both axes: the hero is a centred composition, and the well
-        // below is `mx-auto`, so a left-aligned switcher sat off-axis from the
-        // thing it switches. `justify-center` is what centres the *wrapped* rows
-        // too — without it the strip centres as a block but its second row still
-        // starts at the left edge on a narrow viewport.
-        className="self-center justify-center"
+        className="self-start"
         label={dict.catalog.heroSwitcher}
         value={active.id}
         onChange={setActiveId}

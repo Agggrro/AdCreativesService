@@ -1,7 +1,11 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getDict } from "@/lib/i18n/server";
 import { creativeErrorMessage } from "@/lib/creative-errors";
+import { isAdminEmail } from "@/lib/admin";
+import { readOwnAccess } from "@/lib/beta-access";
+import { AccessNotice } from "@/components/AccessNotice";
 import { LinkButton } from "@/components/ui/Button";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { CreativesTable } from "@/components/CreativesTable";
 import { Notice, Panel } from "@/components/ui/Field";
 import { VIDEO_FORMAT } from "@/lib/vast-gen/kind";
@@ -17,12 +21,26 @@ export default async function MyCreativesPage({
   // Delete and duplicate both redirect back here with their error code.
   const actionError = creativeErrorMessage(dict, sp.error, undefined);
 
+  // The notice asks an account to write to the admin: a participant already has
+  // access, and the admin is the one who grants it (ADR-0037). The read chains off
+  // the session lookup but starts with the page's own queries, not before them —
+  // two serial round trips ahead of every render is what this avoids.
+  const accessNotice = supabase.auth
+    .getUser()
+    .then(async ({ data: { user } }) =>
+      user && !isAdminEmail(user.email)
+        ? !(await readOwnAccess(supabase, user.id)).granted
+        : false,
+    );
+
   const [
+    showAccessNotice,
     { data: creatives },
     { data: templates },
     { data: overview, error: overviewError },
   ] =
     await Promise.all([
+      accessNotice,
       supabase
         .from("creatives")
         // `version` is a VAST video creative's own (ADR-0035), for its format chip.
@@ -45,34 +63,30 @@ export default async function MyCreativesPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="type-h2">
-            {dict.dashboard.creatives}
-          </h1>
-          <p className="type-small max-w-[66ch] text-fg-secondary">
-            {dict.dashboard.creativesSubtitle}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* The postback lives inside this section rather than in the top
-              bar (ADR-0023): the bar is already full at 768px, and the page
-              only exists to serve these creatives' conversion numbers. */}
-          <LinkButton href="/dashboard/creatives/postback" variant="secondary">
-            {dict.conversions.setUp}
-          </LinkButton>
-          {/* A plain video tag is built in the VAST generator rather than
-              from a catalog tile (ADR-0035); secondary, so the page keeps one
-              primary (§3). `resume`: an unfinished draft left in this browser
-              — by a sign-up that came back signed out — is picked up here. */}
-          <LinkButton href="/tools/vast-generator?resume=1" variant="secondary">
-            {dict.dashboard.newVideo}
-          </LinkButton>
-          <LinkButton href="/catalog" variant="primary">
-            {dict.dashboard.createCreative}
-          </LinkButton>
-        </div>
-      </div>
+      {/* No subtitle under the title (ADR-0037), and no postback button: the
+          postback is a row of the account menu. A plain video tag is built in the
+          VAST generator rather than from a catalog tile (ADR-0035); secondary, so
+          the page keeps one primary (§3). `resume`: an unfinished draft left in
+          this browser — by a sign-up that came back signed out — is picked up
+          here. Creation still starts at the catalog until the template picker
+          replaces that path. */}
+      <PageHeader
+        title={dict.dashboard.creatives}
+        actions={
+          // `flex-wrap`: the two labelled buttons fill a 360px phone's whole
+          // 320px gutter in Russian, with nothing to spare.
+          <div className="flex flex-wrap items-center gap-3">
+            <LinkButton href="/tools/vast-generator?resume=1" variant="secondary">
+              {dict.dashboard.newVideo}
+            </LinkButton>
+            <LinkButton href="/catalog" variant="primary">
+              {dict.dashboard.newCreative}
+            </LinkButton>
+          </div>
+        }
+      />
+
+      {showAccessNotice && <AccessNotice dict={dict} />}
 
       {overviewError && (
         <Notice tone="dead">{dict.dashboard.statsUnavailable}</Notice>
@@ -103,13 +117,8 @@ export default async function MyCreativesPage({
           locale={locale}
         />
       ) : (
-        <Panel className="flex flex-col items-start gap-3 p-6">
-          <p className="type-small text-fg-muted">
-            {dict.dashboard.noCreatives}
-          </p>
-          <LinkButton href="/catalog" variant="secondary">
-            {dict.dashboard.browseCatalog}
-          </LinkButton>
+        <Panel className="p-6">
+          <p className="type-small text-fg-muted">{dict.dashboard.noCreatives}</p>
         </Panel>
       )}
     </div>

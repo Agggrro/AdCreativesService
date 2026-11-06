@@ -129,7 +129,11 @@ export function VpaidPreview({
     <div className="mx-auto w-full max-w-2xl rounded-well border border-well-line bg-well p-3">
       <div
         ref={slotRef}
-        className="relative w-full overflow-hidden rounded-ctl bg-well-screen"
+        /* A creative's chrome — its mandatory close control — sits at z-index
+           2147483000. Without a stacking context of its own it escapes into the
+           page's and paints over the sticky bar and the menus hanging from it,
+           so the screen isolates it. */
+        className="relative isolate w-full overflow-hidden rounded-ctl bg-well-screen"
         style={{ aspectRatio: "16 / 9" }}
       />
       {/* One caption slot: the placeholder disclosure until a click-through

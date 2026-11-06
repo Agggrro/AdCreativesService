@@ -68,6 +68,9 @@ validator's three-level severity needs.
 
 - **The IA is now four sections.** A fifth should be resisted; the top bar is the
   product's one persistent piece of chrome, and it degrades quickly past this.
+  > **Amended by [ADR-0037](0037-reduced-navigation-and-copy.md) (2026-11-06):** the signed-in
+  > bar is Creatives, Tools and one Account menu, and the Tools dropdown lists the two tools
+  > by name only.
 - **`publicNav` is a second list to maintain.** Any new section has to be
   classified as public or not. That is a small, explicit cost in exchange for
   never again hiding a public page from the people it was built for.

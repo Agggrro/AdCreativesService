@@ -74,6 +74,10 @@ its single-template subscribe buttons; the landing copy no longer promises a tri
 `Serving / Not serving` badges keep their meaning — they always read the gate, never the
 billing state.
 
+> **Amended by [ADR-0037](0037-reduced-navigation-and-copy.md) (2026-11-06):** the strip is
+> gone and `/dashboard/access` redirects to Creatives. The state is a row of the account menu;
+> the request is one notice at the top of Creatives, for an account without access.
+
 ## Consequences
 
 - Entitlement is granted by a person, so there is no trial, no renewal and no lapse by

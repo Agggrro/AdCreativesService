@@ -43,7 +43,7 @@ export default async function VastValidatorPage({
       <AppTopBar />
 
       <Section tone="surface" pad="md" width="wide" innerClassName="flex flex-col gap-8">
-        <PageHeader title={t.title} subtitle={t.subtitle} />
+        <PageHeader title={t.title} />
         <VastValidator initialTag={initialTag} />
       </Section>
     </main>
