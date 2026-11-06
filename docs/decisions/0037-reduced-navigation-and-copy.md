@@ -60,8 +60,8 @@ with the dictionary strings only they used. The rule is written into
 template picker sheet in place of catalog → template page → configure; a creative as one
 workspace with *Settings | Stats* tabs, an outline and a one-section inspector, replacing the
 long configurator form; search and filter on Creatives — **delivered by
-[ADR-0038](0038-creative-workspace.md)**. Still planned: the two tools inside the same
-workspace shell, and the matching phone layouts of the tools.
+[ADR-0038](0038-creative-workspace.md)**. The two tools inside the same shell — **delivered by ADR-0038** for the
+generator, which is a workspace, and for both tools' bar; the validator keeps its layout.
 
 ## Consequences
 

@@ -44,7 +44,8 @@ export function ExpandablePanel({
         {more && (
           <button
             type="button"
-            aria-expanded={all}
+            // No `aria-expanded`: the label changes with the state, and both together
+            // read as "Show less, expanded".
             onClick={() => setAll((a) => !a)}
             className={buttonClass("secondary", "sm")}
           >

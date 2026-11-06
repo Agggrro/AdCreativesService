@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Loader2, Upload as UploadIcon } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import type { ConfigField } from "@/lib/config-schema";
 import {
   MEDIA_ACCEPT,
@@ -11,7 +11,6 @@ import {
 } from "@/lib/creative-media";
 import { uploadMediaFile } from "@/lib/media-upload-client";
 import { useDict } from "@/components/i18n/LocaleProvider";
-import { Segmented } from "@/components/ui/Segmented";
 import { buttonClass } from "@/components/ui/Button";
 import { inputClass } from "@/components/ui/Field";
 
@@ -31,7 +30,7 @@ export function MediaUploadField({
   field,
   value,
   onChange,
-  variant = "full",
+  variant = "row",
   tileLabel,
   thumb = "md",
 }: {
@@ -39,17 +38,17 @@ export function MediaUploadField({
   value: string;
   onChange: (v: string) => void;
   /**
-   * `tile` is the compact stage of a scenario group (docs/design-system.md §6,
-   * "Scenario"): the same upload, URL and replace paths in a 112px box.
-   *
-   * `row` and `stack` are the inspector's (§6, "Workspace"): a thumbnail with its
-   * controls beside it, or under it where three sit side by side in 340px. Same
-   * paths again, drawn as the thumbnail and one or two quiet buttons.
+   * The inspector's two shapes (docs/design-system.md §6, "Workspace"): `row`, a
+   * thumbnail with its controls beside it, where the field has the 299px column to
+   * itself; and `stack`, the thumbnail with its controls under it, as wide as the
+   * cell and one word to a button, where two or three fields sit side by side — in
+   * 94px, "Upload" and "URL" do not fit on one line, and in 125px nor do they beside
+   * a thumbnail. The same upload, URL and replace paths in both.
    */
-  variant?: "full" | "tile" | "row" | "stack";
-  /** The tile's accessible name — its block and stage, e.g. `A · Vote`. */
+  variant?: "row" | "stack";
+  /** The field's accessible name — its block and stage, e.g. `A · Vote`. */
   tileLabel?: string;
-  /** Thumbnail edge for `row`: 44px, or 36px inside an option's row. */
+  /** Thumbnail edge: 44px, or 36px inside an option's row. */
   thumb?: "md" | "sm";
 }) {
   const dict = useDict();
@@ -183,210 +182,76 @@ export function MediaUploadField({
     </p>
   );
 
-  if (variant === "row" || variant === "stack") {
-    const stacked = variant === "stack";
-    const box = thumb === "sm" ? "size-9" : "size-11";
-    const wide = stacked ? "w-full" : "";
-    return (
-      <div ref={rootRef} className="flex min-w-0 flex-col gap-1">
-        <input type="hidden" name={field.name} value={value} />
-        <div
-          role="group"
-          aria-label={tileLabel ?? field.label}
-          className={
-            stacked ? "flex flex-col items-start gap-2" : "flex min-w-0 items-center gap-2"
-          }
-        >
-          <div
-            className={`flex ${box} shrink-0 overflow-hidden rounded-ctl border ${
-              filled ? "border-line bg-surface-2" : "border-dashed border-line"
-            }`}
-          >
-            {filled && <Thumb key={value} value={value} fallback={valueLabel} />}
-          </div>
-          {filled && <span className="sr-only">{valueLabel}</span>}
-
-          {filled ? (
-            <button
-              type="button"
-              data-focus="replace"
-              onClick={clear}
-              className={buttonClass("ghost", "sm", wide)}
-            >
-              {m.replace}
-            </button>
-          ) : uploading ? (
-            <span
-              role="status"
-              className="flex items-center gap-1.5 type-caption text-fg-secondary"
-            >
-              <Loader2 size={14} className="animate-spin" aria-hidden />
-              {m.uploading}
-            </span>
-          ) : mode === "url" ? (
-            <div className={`flex min-w-0 items-center gap-2 ${stacked ? "w-full" : "flex-1"}`}>
-              <div className="min-w-0 flex-1">{urlInput}</div>
-              <button
-                type="button"
-                onClick={() => switchMode("upload")}
-                className={buttonClass("ghost", "sm", "shrink-0")}
-              >
-                {m.uploadTab}
-              </button>
-            </div>
-          ) : (
-            <div className={`flex items-center gap-2 ${wide}`}>
-              <label className={uploadLabelClass(stacked ? "flex-1" : "")}>
-                {fileInput}
-                {m.uploadTab}
-              </label>
-              <button
-                type="button"
-                onClick={() => switchMode("url")}
-                className={buttonClass("ghost", "sm")}
-              >
-                {m.urlTab}
-              </button>
-            </div>
-          )}
-        </div>
-        {errorLine}
-      </div>
-    );
-  }
-
-  if (variant === "tile") {
-    return (
-      <div ref={rootRef} className="flex min-w-0 flex-col gap-1">
-        <input type="hidden" name={field.name} value={value} />
-        <div
-          role="group"
-          aria-label={tileLabel ?? field.label}
-          className="flex h-28 min-w-0 flex-col justify-center gap-2 rounded-ctl border border-line bg-surface p-1.5"
-        >
-          {filled ? (
-            <>
-              <Thumb key={value} value={value} fallback={valueLabel} />
-              <span className="sr-only">{valueLabel}</span>
-              <button
-                type="button"
-                data-focus="replace"
-                onClick={clear}
-                className={buttonClass("ghost", "sm", "w-full")}
-              >
-                {m.replace}
-              </button>
-            </>
-          ) : uploading ? (
-            <span
-              role="status"
-              className="flex items-center justify-center gap-1.5 type-caption text-fg-secondary"
-            >
-              <Loader2 size={14} className="animate-spin" aria-hidden />
-              {m.uploading}
-            </span>
-          ) : mode === "url" ? (
-            <>
-              {urlInput}
-              <button
-                type="button"
-                onClick={() => switchMode("upload")}
-                className={buttonClass("ghost", "sm", "w-full")}
-              >
-                {m.uploadTab}
-              </button>
-            </>
-          ) : (
-            <>
-              <label className={uploadLabelClass("w-full")}>
-                {fileInput}
-                {m.uploadTab}
-              </label>
-              <button
-                type="button"
-                onClick={() => switchMode("url")}
-                className={buttonClass("ghost", "sm", "w-full")}
-              >
-                {m.urlTab}
-              </button>
-            </>
-          )}
-        </div>
-        {errorLine}
-      </div>
-    );
-  }
-
+  const stacked = variant === "stack";
+  const box = thumb === "sm" ? "size-9" : "size-11";
+  // A stacked button is as wide as its cell, and its padding is what gives way:
+  // "Загрузить" is about 65px of type in a 94px cell.
+  const fit = stacked ? "w-full pr-2 pl-2" : "";
   return (
-    <div ref={rootRef} className="flex flex-col gap-2">
-      {/* Always present so FormData carries the resolved URL regardless of
-          which control produced it — the visible controls below stay unnamed. */}
+    <div ref={rootRef} className="flex min-w-0 flex-col gap-1">
       <input type="hidden" name={field.name} value={value} />
+      <div
+        role="group"
+        aria-label={tileLabel ?? field.label}
+        className={
+          stacked ? "flex flex-col items-start gap-2" : "flex min-w-0 items-center gap-2"
+        }
+      >
+        <div
+          className={`flex ${box} shrink-0 overflow-hidden rounded-ctl border ${
+            filled ? "border-line bg-surface-2" : "border-dashed border-line"
+          }`}
+        >
+          {filled && <Thumb key={value} value={value} fallback={valueLabel} />}
+        </div>
+        {filled && <span className="sr-only">{valueLabel}</span>}
 
-      {filled ? (
-        <div className="flex items-start justify-between gap-3 rounded-ctl border border-line bg-surface px-2.5 py-1.5">
-          {own ? (
-            // Never surface our own storage URL in the UI — it's our
-            // infrastructure's internal address, not something a user needs
-            // to see, and showing it invites copying it for unrelated hotlinking.
-            <span className="flex min-w-0 flex-1 items-center gap-1.5 type-small text-fg-secondary">
-              <Check size={14} className="shrink-0 text-live" aria-hidden />
-              <span className="truncate">{valueLabel}</span>
-            </span>
-          ) : (
-            <span className="data-instr min-w-0 flex-1 break-all type-small text-fg-secondary">
-              {value}
-            </span>
-          )}
+        {filled ? (
           <button
             type="button"
             data-focus="replace"
-            // The superseded file is deliberately not deleted here: until the
-            // form is saved, the live tag still points at it (ADR-0028).
             onClick={clear}
-            className={`${buttonClass("ghost")} shrink-0`}
+            className={buttonClass("ghost", "sm", fit)}
           >
             {m.replace}
           </button>
-        </div>
-      ) : (
-        <>
-          {/*
-            The shared control, not a fourth copy of it. This was hand-rolled and
-            had already drifted from Segmented, which is exactly the failure §6's
-            "one implementation per repeated element" describes.
-          */}
-          <Segmented
-            className="self-start"
-            label={m.sourceLabel}
-            value={mode}
-            onChange={(next) => switchMode(next)}
-            options={[
-              { value: "upload" as const, label: m.uploadTab },
-              { value: "url" as const, label: m.urlTab },
-            ]}
-          />
-
-          {mode === "upload" ? (
-            <div>
-              <label className={uploadLabelClass("")}>
-                {fileInput}
-                {uploading ? (
-                  <Loader2 size={14} className="animate-spin" aria-hidden />
-                ) : (
-                  <UploadIcon size={14} aria-hidden />
-                )}
-                <span role={uploading ? "status" : undefined}>
-                  {uploading ? m.uploading : m.chooseFile}
-                </span>
-              </label>
-            </div>
-          ) : (
-            urlInput
-          )}
-        </>
-      )}
-
+        ) : uploading ? (
+          <span
+            role="status"
+            className="flex items-center gap-1.5 type-caption text-fg-secondary"
+          >
+            <Loader2 size={14} className="animate-spin" aria-hidden />
+            {m.uploading}
+          </span>
+        ) : mode === "url" ? (
+          <div
+            className={`flex min-w-0 gap-2 ${stacked ? "w-full flex-col" : "flex-1 items-center"}`}
+          >
+            <div className={stacked ? "min-w-0" : "min-w-0 flex-1"}>{urlInput}</div>
+            <button
+              type="button"
+              onClick={() => switchMode("upload")}
+              className={buttonClass("ghost", "sm", `shrink-0 ${fit}`)}
+            >
+              {m.uploadTab}
+            </button>
+          </div>
+        ) : (
+          <div className={`flex gap-2 ${stacked ? "w-full flex-col" : "items-center"}`}>
+            <label className={uploadLabelClass(fit)}>
+              {fileInput}
+              {m.uploadTab}
+            </label>
+            <button
+              type="button"
+              onClick={() => switchMode("url")}
+              className={buttonClass("ghost", "sm", fit)}
+            >
+              {m.urlTab}
+            </button>
+          </div>
+        )}
+      </div>
       {errorLine}
     </div>
   );

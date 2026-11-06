@@ -18,9 +18,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AppTopBar />
-      <Container width="default" className="py-10">
-        {children}
-      </Container>
+      <main>
+        <Container width="default" className="py-10">
+          {children}
+        </Container>
+      </main>
     </>
   );
 }

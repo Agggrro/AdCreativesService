@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import { LOCALE_TAG, type Dict } from "@/lib/i18n/dictionaries";
 import { Chip } from "@/components/ui/Chip";
+import { Disclosure } from "@/components/ui/Disclosure";
 import { Notice } from "@/components/ui/Field";
 import { HelpLabel } from "@/components/ui/Tooltip";
 import { RAIL, StateWord, type Tone } from "@/components/ui/State";
@@ -252,32 +253,13 @@ export function Recommendations({ findings }: { findings: Finding[] }) {
 /* ---------- reference tables ---------- */
 
 /**
- * A collapsed reference table.
+ * The reference tables, each behind a fold (`Disclosure`, in its row shape).
  *
  * These four answer a follow-up question, not the question the visitor arrived
  * with — "is my tag broken" is answered above, in the verdict and the
  * recommendations. Expanded by default they turned the page into a document you
  * scroll rather than a panel you read.
  */
-function Fold({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <details className="group border-b border-hairline last:border-b-0">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 type-small font-medium hover:bg-surface-2">
-        {/* Open/closed is encoded in form, not only in what is visible below it
-            (§9): the marker turns. */}
-        <span
-          aria-hidden
-          className="text-fg-muted transition-transform duration-150 group-open:rotate-90"
-        >
-          ▸
-        </span>
-        {title}
-      </summary>
-      <div className="px-4 pb-4">{children}</div>
-    </details>
-  );
-}
-
 function Interactive({ report }: { report: InspectReport }) {
   const { locale, dict } = useLocale();
   const t = dict.tools.validator;
@@ -488,19 +470,19 @@ export function ReferenceSections({
     <section className="flex flex-col gap-2 border-t border-hairline pt-4">
       <h2 className="type-h3">{t.sectionReference}</h2>
       <div className="rounded-panel border border-hairline bg-surface">
-        <Fold title={t.sectionInteractive}>
+        <Disclosure variant="fold" title={t.sectionInteractive}>
           <Interactive report={report} />
-        </Fold>
-        <Fold title={t.sectionFeatures}>
+        </Disclosure>
+        <Disclosure variant="fold" title={t.sectionFeatures}>
           <Features report={report} />
-        </Fold>
-        <Fold title={t.sectionChain}>
+        </Disclosure>
+        <Disclosure variant="fold" title={t.sectionChain}>
           <Chain hops={report.chain} />
-        </Fold>
+        </Disclosure>
         {resolvedAd && (
-          <Fold title={t.sectionComparison}>
+          <Disclosure variant="fold" title={t.sectionComparison}>
             <ParserVsPlayer facts={report.facts} resolved={resolvedAd} />
-          </Fold>
+          </Disclosure>
         )}
       </div>
     </section>

@@ -38,8 +38,8 @@ export interface ConfigField {
   default?: string | number;
   options?: { value: string; label: string }[];
   /**
-   * Section id. Consecutive fields sharing a group render inside one
-   * hairline-separated section (docs/design-system.md §5). The heading text
+   * Section id. Consecutive fields sharing a group are one run, and the run is
+   * a section of the workspace's outline (docs/design-system.md §6, "Workspace"). The heading text
    * comes from `dict.configurator.groups[id]`, falling back to the raw id —
    * unlike `label`, which is English-only DB data.
    */
@@ -47,7 +47,7 @@ export interface ConfigField {
   /**
    * Sub-block inside a `kind: "matrix"` group — for the quiz, the answer path
    * this exit belongs to ("A", "BA", "ABB"). Fields sharing a block are edited
-   * together as one collapsible row. Inside a `kind: "scenario"` group it names
+   * together, as one path of the outcome drill-down. Inside a `kind: "scenario"` group it names
    * one row of the playback scheme — for Duel, a side ("A", "B"). Inside an
    * `options` group it names one option — for Step Builder, "A" to "D".
    */
@@ -63,11 +63,11 @@ export interface ConfigField {
 
 /**
  * How a group renders. `matrix` groups are further partitioned by `block`, as
- * collapsible rows. `scenario` groups are too, but every row stays open as one
- * line of a playback scheme: the block's text fields head the row, and its
+ * the paths of a drill-down. `scenario` groups are too, but every block is shown
+ * as one line of a playback scheme: the block's text fields head it, and its
  * media fields follow as compact stages in schema order (ADR-0030). `options`
- * groups are the same table without the order: one row per option, its media
- * as unnumbered tiles side by side — variants, not stages (ADR-0031).
+ * groups are the same without the order: one row per option, its media side by
+ * side and unnumbered — variants, not stages (ADR-0031).
  */
 export interface ConfigGroup {
   id: string;

@@ -4,6 +4,7 @@ import { LOCALE_TAG, type Dict, type Locale } from "@/lib/i18n/dictionaries";
 import { asJsonObject } from "@/lib/json";
 import { MacroText } from "@/components/ui/MacroText";
 import { Notice } from "@/components/ui/Field";
+import { Disclosure } from "@/components/ui/Disclosure";
 import { ExpandablePanel } from "@/components/stats/ExpandablePanel";
 import { StatStrip, type StatTile } from "@/components/stats/StatStrip";
 import {
@@ -101,37 +102,6 @@ function lastDays(days: number, now: Date = new Date()): string[] {
     out.push(new Date(base - i * 86_400_000).toISOString().slice(0, 10));
   }
   return out;
-}
-
-/**
- * A disclosure panel for a table that is read on demand. Native `<details>`: it
- * needs no script, announces its state, and `summary` is already in the global
- * focus rule (§2). The panel is not `overflow-hidden` — the summary's ring would
- * be clipped; the table scrolls in a frame of its own below it (§5).
- */
-function Disclosure({
-  title,
-  note,
-  children,
-}: {
-  title: string;
-  note?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <details className="group rounded-panel border border-hairline bg-surface">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-panel px-4 py-1.5 [&::-webkit-details-marker]:hidden">
-        <h2 className="label-instr">{title}</h2>
-        <span aria-hidden className="text-fg-secondary transition-transform duration-150 group-open:rotate-180">
-          ▾
-        </span>
-      </summary>
-      <div className="border-t border-hairline">
-        {note && <p className="max-w-prose px-4 py-3 type-caption text-fg-muted">{note}</p>}
-        <div className="overflow-x-auto">{children}</div>
-      </div>
-    </details>
-  );
 }
 
 export function conversionParts({

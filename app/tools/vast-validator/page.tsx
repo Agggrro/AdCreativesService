@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getDict } from "@/lib/i18n/server";
-import { AppTopBar } from "@/components/AppTopBar";
+import { ToolBar } from "@/components/ToolBar";
 import { Section } from "@/components/ui/Section";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { VastValidator } from "@/components/tools/VastValidator";
@@ -40,7 +40,7 @@ export default async function VastValidatorPage({
 
   return (
     <main className="flex flex-1 flex-col">
-      <AppTopBar />
+      <ToolBar current="validator" />
 
       <Section tone="surface" pad="md" width="wide" innerClassName="flex flex-col gap-8">
         <PageHeader title={t.title} />

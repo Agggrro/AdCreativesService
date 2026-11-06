@@ -3,9 +3,7 @@ import { getDict } from "@/lib/i18n/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { withNext } from "@/lib/safe-next";
 import { getCdnUrl } from "@/lib/site";
-import { AppTopBar } from "@/components/AppTopBar";
-import { Section } from "@/components/ui/Section";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ToolBar } from "@/components/ToolBar";
 import { VideoTagGenerator } from "@/components/vast-gen/VideoTagGenerator";
 import { emptyDraft } from "@/components/vast-gen/draft";
 import { createVideoCreative } from "@/app/dashboard/creatives/video-actions";
@@ -25,12 +23,16 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * The VAST generator (ADR-0035, ADR-0036): a VAST video creative built from a
- * form, saved to Мои креативы, served as a dynamic tag.
+ * form, saved to Creatives, served as a dynamic tag.
  *
  * Public, like every tool: a signed-out visitor configures everything, previews
  * the XML and plays it — and creating it takes an account, with the draft kept
  * in their browser across the sign-in (ADR-0036). The page reads the session
  * only to choose between those two endings; nothing is stored for a visitor.
+ *
+ * Its screen is a workspace like a creative's (docs/design-system.md §6,
+ * "Workspace"; ADR-0038): the tools' bar, the outline of the tag's sections, the
+ * stage with the player and the XML, and the inspector.
  */
 export default async function VastGeneratorPage({
   searchParams,
@@ -47,22 +49,19 @@ export default async function VastGeneratorPage({
 
   return (
     <main className="flex flex-1 flex-col">
-      <AppTopBar />
-
-      <Section tone="surface" pad="md" width="wide" innerClassName="flex flex-col gap-8">
-        <PageHeader title={t.title} />
-        <VideoTagGenerator
-          mode="create"
-          signedIn={Boolean(user)}
-          // Back from signing in, and only then, the draft kept in this
-          // browser is restored: a later visit starts clean (ADR-0036).
-          resume={resume === "1"}
-          cdnUrl={getCdnUrl()}
-          signInHref={withNext("/login", "/tools/vast-generator?resume=1")}
-          action={createVideoCreative}
-          initialDraft={emptyDraft()}
-        />
-      </Section>
+      <VideoTagGenerator
+        bar={<ToolBar current="generator" />}
+        heading={t.title}
+        mode="create"
+        signedIn={Boolean(user)}
+        // Back from signing in, and only then, the draft kept in this
+        // browser is restored: a later visit starts clean (ADR-0036).
+        resume={resume === "1"}
+        cdnUrl={getCdnUrl()}
+        signInHref={withNext("/login", "/tools/vast-generator?resume=1")}
+        action={createVideoCreative}
+        initialDraft={emptyDraft()}
+      />
     </main>
   );
 }

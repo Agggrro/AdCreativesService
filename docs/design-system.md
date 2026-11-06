@@ -298,7 +298,9 @@ The lockup is a **CS monogram** plus the wordmark, read as one object:
   triangle and the `S` are `fg`.
 - **Wordmark** — `Creo` in `accent`, `Smith` in `fg`. The colour split is the same split
   as the glyph, which is the whole point: `C`↔`Creo`, `S`↔`Smith`. The two halves explain
-  each other, so the word is not a caption under a logo.
+  each other, so the word is not a caption under a logo. The pair is one component,
+  `ui/BrandLockup`, shared by the product bar and the tools' bar; the wordmark's 16px/600 is a
+  literal because it is the brand's size, allowed only inside that primitive (§11).
 
 Constraints that bind any future revision:
 
@@ -516,6 +518,14 @@ lists the two free tools directly — there is no `/tools` index page — and **
     panel is `absolute` against a `relative` wrapper it owns one level up, so there is no
     viewport anchor to hijack. It also needs to scroll with the header, which `fixed` would
     get wrong regardless.
+  - **Where the check fails** — a row of a table, whose scroll frame would clip the panel — the panel
+    is portalled (`portal`, §6, "Workspace"): fixed at the trigger's place when it opens (above the
+    trigger when it is in the lower half of the screen), measured against the viewport without its
+    scrollbars. It is then at the end of `<body>`, outside the page's tab order, so opening it moves
+    focus to its first item; Escape, or Tab off either end, closes it and returns focus to the button.
+    Choosing in a menu of options (`closeOnClick`) returns focus to the button too, since the row that
+    was chosen has gone. A dialog opened from a row of the panel hands focus back to the button when it
+    closes, because the row is hidden (`NavDropdownContext`).
 
 ### Account menu
 
@@ -694,7 +704,7 @@ is the only thing a timeline is for.
 
 ### Segmented controls
 
-Language, delivery format, player backend, the landing hero's template switcher, the VAST
+Language, delivery format, the landing hero's template switcher, the VAST
 generator's version picker and its on/off switches for an optional section (skip, AdChoices,
 OMID — the system has no checkbox, and a switch between two named states reads better than
 one) all use the same shape: mono `chip` type, 1px `line` border, `surface-2` on the current segment,
@@ -746,6 +756,20 @@ highest on a marketing-adjacent surface.
   workbench: everything else on it is secondary or a link.
 - **One click starts a run.** The page has a single verb. Analysis and playback are two
   mechanisms, not two steps the visitor performs.
+- **The bar is the tools' own** (`ToolBar`; [ADR-0038](decisions/0038-creative-workspace.md)): 48px,
+  the lockup (`BrandLockup`, §6 — whole at every width), the **Validator | Generator** switch in the
+  middle — two links, each tool its own address, the current one on `surface-2` and never the accent —
+  and the visitor on the right: a signed-out visitor's `RU | EN` and *Sign in*, a signed-in one's
+  *Creatives* and account menu (`AccountMenu`, `sm`). It stands where the product bar stood, as a
+  creative's bar does on its own screens: the other tool is one click away, and so is the product (the
+  lockup, *Creatives*). **Below `md` it re-stacks instead of squeezing**, as the workspace bar does: the
+  lockup and the account (or *Sign in*) on a 48px row, then the switch with *Creatives* — or the language
+  control — at the end of it. The switch is about 184px in either language and the two outer columns of a
+  single row are 64px at 360, so one row there ran the switch under the account. The validator's bar stands
+  in the page's `wide` column; the generator's, a workspace's, runs edge to edge like a creative's. The
+  DOM path from the bar to the account's panel was checked for the nav dropdown's exemption (§6, "Nav
+  dropdown"): a sticky header with a backdrop blur, a grid, a `contents` / flex cluster, the dropdown's
+  root, and a panel that is `absolute` — no `overflow-hidden`, `white-space` or `truncate` between.
 
 The validator's top row is two columns from `lg` up and one below it: the well on the left,
 the settings and the verdict strip on the right. **Everything below that row is full width**,
@@ -781,18 +805,29 @@ it holds a VAST document, and a proportional face makes indentation unreadable.
 [ADR-0036](decisions/0036-public-tool-that-saves.md)) keeps the validator's frame and changes
 what sits in it, because its job is to make something rather than to judge it.
 
-- **The well is left and sticky from `lg`**, the form right: the form is long, and the
-  preview has to stay in view while it scrolls. Below `lg` both stack, well first, as on
-  the validator.
+- **The generator is a workspace** (§6, "Workspace"): the tools' bar, an **outline** of the tag's
+  sections at 216px, the **stage** — the well with *Check and play* under it, and a *Player | XML*
+  switch for the tag's document — and a 340px **inspector** with one section's fields. At 1280×720 it is
+  one screen where the form ran to 2.8. Below `lg` the outline is a row of chips, the stage comes
+  first and the inspector follows; the section's explanation (the version's) leads its fields there,
+  since the inspector's header is not drawn, and only the buttons stay at the foot of the screen — the
+  notice and the sign-in note scroll with the section, because between them they took a quarter of a
+  phone's height for good. The stage's content stops at the `default` width and is centred (§5): colour
+  owns a wide monitor, not the measure of the text. Editing a video creative is this screen under a
+  creative's own bar (§6, "Workspace"), with Settings | Stats.
 - **The accent budget is one, spent on *Create creative*** — or *Sign in and create* for a
-  signed-out visitor, the same button with the same position. *Check and play* is a
-  secondary under the well: analysis and playback are still one click, but they are not
-  the page's verb.
-- **The form is the configurator's sections** (§6, "Configurator sections"): a fieldset per
-  section with an `h3` legend and a hairline rule, labels stacked above fields. A section a
-  version cannot carry is not rendered; a caption under the version picker names what
-  later versions add, and an `info` notice names what the draft holds that this version
-  leaves out — `info`, because nothing is wrong.
+  signed-out visitor, the same button in the same place: the foot of the inspector, under the form's
+  notice. *Check and play* is a secondary under the well: analysis and playback are still one click, but
+  they are not the page's verb.
+- **The sections** are the version, the basics, the video, the click-through, skip, tracking, companion
+  banners, AdChoices, OMID and UniversalAdId, one at a time in the inspector. A section a version cannot
+  carry is not in the outline; a caption under the version picker names what later versions add, and an
+  `info` notice names what the draft holds that this version leaves out — `info`, because nothing is
+  wrong. A section with an error in it carries a `dead` rail, a mark and the words *has errors* for
+  assistive technology (colour is not the only channel, §11), and a save the browser can already refuse
+  opens it with its first field focused; one the server refuses shows the rail and the notice and leaves
+  the section as it is. Only such a section has a rail, since a rail on every row would teach the reader
+  that the rail means nothing (§6).
 - **The buyer's pixels are one list of rows**, each an event menu, a URL input and a
   `Remove` word, with `Add pixel` as an `sm` secondary under it. No rail: a pixel row has
   no state. The menu offers only the events the chosen version's XSD names. The rules a
@@ -801,28 +836,26 @@ what sits in it, because its job is to make something rather than to judge it.
   says so under itself.
 - **Our own trackers are stated, not configured**: one mono line of their element and event
   names, under a `HelpLabel` saying they are always in the tag and counted.
-- **The XML is full width below**, in a scrollable mono `<pre>` that takes keyboard focus,
-  captioned as a preview whose tracking links are placeholders. Then the validator's
-  recommendations, when a check has run.
-- **Media fields take the scenario tile's states** (§6) at full width: `Choose file` and
-  `Link` words when empty; a frame one second in, the file's name and a mono readout —
-  type, size, duration, bitrate, megabytes — with `Replace` when filled; a linked file
-  shows its URL in mono where an upload shows its name. The link state departs from the
-  tile in one way: a type menu and an `Apply` word beside the input, and Enter applies
-  where blur does not — the check reads the file over the network, and a URL may carry no
-  extension to take the type from. Signed out, the upload word becomes `Sign in to upload
-  a file`, and does exactly that.
+- **The XML is the stage's other view**, in a scrollable mono `<pre>` that takes keyboard focus,
+  captioned as a preview whose tracking links are placeholders. The validator's recommendations follow
+  under either view, when a check has run.
+- **Media fields** are full width: `Choose file` and `Link` words when empty; a frame one second in,
+  the file's name and a mono readout — type, size, duration, bitrate, megabytes — with `Replace` when
+  filled; a linked file shows its URL in mono where an upload shows its name. The link state has a type
+  menu and an `Apply` word beside the input, and Enter applies where blur does not — the check reads the
+  file over the network, and a URL may carry no extension to take the type from. Signed out, the upload
+  word becomes `Sign in to upload a file`, and does exactly that.
 - **A verdict belongs to the document it ran on.** Once the form changes the document,
   the well returns to its idle screen, saying the tag changed since the check, and the
   verdict and recommendations leave with it.
 
 ### Workspace
 
-A creative's own screens — Settings, Stats, and a creative not yet created — are a workspace
-rather than a page of the product: they take the whole viewport and bring a bar of their own
-([ADR-0038](decisions/0038-creative-workspace.md)). It is the one exception to "page shells go
-through `ui/Container`" (§5) and to the product bar being persistent: what these screens need
-from a bar is the creative, and the product is one click away behind *Creatives*. The list
+A creative's own screens — Settings, Stats, a creative not yet created, and the VAST video generator,
+new or editing — are a workspace rather than a page of the product: they take the whole viewport and
+bring a bar of their own ([ADR-0038](decisions/0038-creative-workspace.md)). It is an exception to "page
+shells go through `ui/Container`" (§5) and to the product bar being persistent: what these screens need
+from a bar is the creative (or the tool), and the product is one click away behind *Creatives*. The list
 pages — Creatives, the postback, the accounts — keep the product bar and the container
 (`DashboardShell`).
 
@@ -831,26 +864,39 @@ pages — Creatives, the postback, the accounts — keep the product bar and the
   place the product's navigation is reached from), the creative's name, its format and, once it
   exists, its serving state. Middle: the **Settings | Stats** switch. Right: *More*, *Copy tag*
   and the screen's one primary — *Save* or *Create* on Settings, *Copy tag* on Stats. The name is
-  an input on Settings (a dashed underline says so) and plain text on Stats. A template that offers
-  more than one delivery format shows them as a segmented choice beside the name; one format is a
-  chip.
+  a dense input on Settings (`inputDenseClass`: mono 13px at 32px, the height of the bar's `sm`
+  controls — §4 makes every text input mono) and plain text on Stats and on the video editor
+  (`type-small`, weight 500). A template that offers more than one delivery format shows them as a
+  segmented choice beside the name; one format is a chip.
+- **The name is the part that gives way.** From `lg` the left cluster gets what the switch and the
+  actions leave: the name shrinks (to 224px at most) and the chip and the serving word never wrap. The
+  switch is centred only from `xl`, where the outer columns are equal and each wide enough for its own
+  contents; between `lg` and `xl` it follows the left cluster, because a centred 144px switch at 1024
+  took room the name, the format and the serving state need, and they were drawn under it.
 - **Below `lg` the bar re-stacks instead of squeezing**: the way back and *More* (and *Copy tag*
-  where it is not the primary) on a 48px row, then the name with its chips, then the switch. The
-  screen's primary moves to a full-width 72px strip at the foot of the page (`sticky bottom-0`, a
-  hairline above it). One DOM for both: the name is a form field and cannot exist twice.
+  where it is not the primary) on a row of at least 48px — it grows, and the buttons wrap, if Russian at
+  360px does not fit them beside the way back — then the name with its chips, then the switch. The
+  screen's primary moves to a full-width strip at the foot of the page: the button, 16px above and below
+  it and a hairline, 77px (`sticky bottom-0`). One DOM for both: the name is a form field and cannot
+  exist twice.
 - **The tabs are links** (`CreativeTabs`), each its own address — `/dashboard/creatives/[id]/edit`
   and `/dashboard/creatives/[id]` — so the back button, a bookmark and a pasted URL all land where
   they should. Drawn as a segmented control (§6, "Segmented controls"): the current one on
   `surface-2`, never the accent.
 - **Dimensions.** From `lg` the screen is the viewport high (`h-dvh`) and scrolls inside its parts,
   never as a page: outline 216px, inspector 340px, the stage the rest. They are the workspace's own
-  measures and not tokens — no other screen has an outline.
+  measures and not tokens — no other screen has an outline. The outline and the inspector's chips are
+  one component (`SectionNav`), used by Settings and by the generator.
 - **More** (`NavDropdown`, §6, "Nav dropdown"): the actions that are not the screen's one action —
   check the tag in the validator, duplicate, delete (through the destructive confirmation, §6). Rows
-  are plain text, 44px, never coloured; the panel is not closed by a click on a form row (it would
-  unmount before it submitted) and keeps its children mounted while closed (the dialog's mousedown is
-  "outside" the panel). In a row of the Creatives list the panel is portalled, because the table's
-  scroll frame would clip it, and it closes if the page scrolls under it.
+  are plain text, 44px, never coloured. The panel closes on a click and hands focus back to *More*; it
+  keeps its children mounted while closed, so a form row still submits after the panel has closed under
+  its click, and the dialog's mousedown, which is "outside" the panel, does not take the dialog down.
+  When the dialog closes, focus goes to *More* — the row that opened it is hidden. In a row of the
+  Creatives list the panel is portalled, because the table's scroll frame would clip it: it opens
+  above its button when the button is in the lower half of the screen (below it there is no room, and a
+  panel that opens out of view can only be reached by scrolling, which closes it), takes focus on open,
+  returns it on Escape or when Tab leaves either end of it, and closes if the page scrolls under it.
 
 #### Settings
 
@@ -860,29 +906,46 @@ screen; the long form this replaced ran from one screen to six.
 - **The outline** lists a template's sections: a schema group is a section, except that an
   `options` or a `matrix` group belongs to the group before it — Step Builder's step 1 is the title
   with its four options under it, the quiz's *Result* is the result screen with every path's exit.
-  44px rows, a 3px rail — `live` when every required field in the section has a value, `idle` when
-  not, never `dead` (an unfinished section is incomplete, not an alarm) — the current one on
-  `surface-2`. It appears only where a template has three sections or more and over eight active
-  fields (Duel, the quiz, Step Builder, Pick & Message); six or eight fields are one inspector. Below
-  `lg` it is a row of chips above the inspector, a dot for the rail.
+  Rows of at least 44px, a 3px rail — `live` when every required field in the section has a value,
+  `idle` when not, never `dead` (an unfinished section is incomplete, not an alarm) — the current one
+  on `surface-2`. The rail is colour and colour is not the only channel (§11): a complete section
+  carries a check at the right of its row, and every row says *complete* or *incomplete* to assistive
+  technology. The text stands 16px in, the rail and its padding making the inset a table's cells have.
+  The column scrolls by itself when a short window cannot hold every row. It appears only where a
+  template has three sections or more and over eight active fields (Duel, the quiz, Step Builder, Pick &
+  Message); six or eight fields are one inspector. Below `lg` it is a row of chips above the inspector —
+  the same check, the same words — and a chip draws its focus ring inside, where the scroller's edge
+  would cut it.
 - **The stage** is the player well (§7) as large as the screen leaves it: the largest 16:9 screen that
   fits, taken from the well's own size (container query units) and centred. The player — Sandbox,
   Google IMA, Fluid Player — is chosen from a menu in the stage's corner. Below `lg` the screen takes
-  the width and the stage sticks to the top while the parameters scroll under it.
-- **The inspector** holds one section's fields in a 340px column under a 48px header that names it, and
-  scrolls inside itself. A field is a mono label and a 44px control, 16px apart. Text and URL fields
-  are inputs; a select of up to three short options is a segmented control and a longer one a select;
-  a range is a slider with its value at the right of the label; a colour is a swatch beside its hex
-  input; a picture or a clip is `MediaUploadField` in its `row` form. A field's `help` is behind its
-  label (§6, "Help tooltip"), the click-through macros behind *{ } Macros* at the right of the label of
-  a click field, and a required field is marked `*` and nothing else (§10). Accent budget of the
-  inspector: zero — the one warm element is the bar's primary.
+  the column's width, capped by the screen's height — 30% of it where the stage sticks, 70% where it
+  does not — and the stage sticks to the top while the parameters scroll under it, **only where the
+  screen is 600px high or more**: a phone on its side is 360px high, and a stage that stuck there would
+  leave nothing to scroll the fields into. A field a keyboard focuses is kept out from under the stage
+  and the strip by `scroll-padding` (`.stage-stick`, `.stage-screen`, `.workspace-strip`:
+  `app/globals.css`). **The stage is outside the form.** The Sandbox player runs the creative in this
+  document, a creative's own buttons carry no `type`, and a typeless button is a submit button to any
+  form around it: inside the form, a click on the ad's call to action saved the creative.
+- **The inspector** holds one section's fields in a 340px column under a 48px header that names it
+  (below `lg` the chip is the name and the header stays a heading for assistive technology) and scrolls
+  inside itself. A field is a mono label and a 44px control, 16px apart. Text and URL fields are inputs;
+  a **required** select of up to three options whose labels together run to 26 characters is a segmented
+  control — the 299px of the column hold about 28 characters of chip type, and a longer row wraps every
+  button onto two lines — and any other select stays a select; a range is a slider with its value at the
+  right of the label; a colour is a swatch beside its hex input; a picture or a clip is
+  `MediaUploadField`, in its `row` form or, where fields sit side by side, its `stack` form. A field's
+  `help` is behind its label (§6, "Help tooltip"), the click-through macros behind *{ } Macros* at the
+  right of the label of a click field, and a required field is marked `*` and nothing else (§10). Accent
+  budget of the inspector: zero — the one warm element is the bar's primary.
 - **What posts.** Every active field posts under its own name, shown or not: the inspector shows one
   section and the rest ride along as hidden inputs. `visibleFieldNames` is the walk the Server Action
-  makes, so what the form hides is what the action prunes. A save with a required field empty in a
-  section the inspector is not showing is stopped before it is sent — a hidden input is exempt from
-  the browser's validation, and the server's redirect would throw away everything typed: the section
-  opens, the field takes focus and a cold-red notice names it with where it is (`A → B · Heading`).
+  makes, so what the form hides is what the action prunes. A save with a field the browser would refuse
+  in a section the inspector is not showing — a required one empty, a URL that is not an address, a number
+  outside its bounds — is stopped before it is sent: a hidden input is exempt from the browser's
+  validation, and the server's redirect would throw away everything typed. The section opens, the field
+  takes focus (an image field's first control) and a cold-red notice names it with where it is
+  (`A → B · Heading`).
 
 #### Inspector sections
 
@@ -892,21 +955,25 @@ A group renders one of four ways in the inspector
 - **Section** — the fields, stacked.
 - **Options** — Step Builder's options per step ([ADR-0031](decisions/0031-step-builder-and-forwarded-picks.md)):
   one row per option. Its letter in a chip beside its label; its value beneath, when the template needs
-  one; then its clips as 36px thumbnails, the column's name in `label-instr` above each — two across,
-  one where a step has one. The clips are variants of the option, not stages, so they are not numbered.
+  one; then its clips as 36px thumbnails, the column's name in `label-instr` above each — two across
+  (each with its buttons under it, `stack`: a cell is about 125px), one where a step has one (the
+  buttons beside it, `row`). The clips are variants of the option, not stages, so they are not numbered.
 - **Scenario** — Duel's vote → win → after for each side ([ADR-0030](decisions/0030-duel-template.md)):
   one block per side, the letter and the name, then the clips across in play order, each a 44px thumbnail
-  with its button under it (three across a 340px column leave no room beside a thumbnail). The order is
-  the columns', so their captions carry no number.
+  with its buttons under it — *Upload* above *URL*, as wide as the column, which is 94px: "Upload" and
+  "URL" on one line need 133px, and a field that overflows its column pushes the inspector into a
+  horizontal scrollbar. The order is the columns', so their captions carry no number.
 - **Outcome matrix** — the quiz's answer-path exits ([ADR-0011](decisions/0011-conditional-grouped-config-schemas.md)),
-  as a **drill-down**: the list of paths (44px rows, a 3px rail `live` or `idle`, the path in mono, the first
-  text field's value muted, a chevron), then one path's fields with *All paths*, its place (`3 / 8`) and
-  *Previous* / *Next*. The paths not open post through hidden inputs. `FILLED 3 / 8` under the list is the
+  as a **drill-down**: the list of paths (44px rows, a 3px rail `live` or `idle` with a check and the words
+  *complete* / *incomplete* behind it, the path in mono, the first text field's value muted, a chevron),
+  then one path's fields with *All paths*, its place (`3 / 8`) and *Previous* / *Next*. Opening a path
+  moves focus to its name, and *All paths* returns it to the row that was open — the button that was
+  pressed is gone. The paths not open post through hidden inputs. `FILLED 3 / 8` under the list is the
   only progress signal. The list is not `overflow-hidden`; its rows round their own first and last corners
   (§2).
 
 A **media field** in the inspector is a thumbnail and one or two quiet buttons: empty, an `sm` secondary
-*Upload* and an `sm` ghost *URL*; URL entry, the input and a ghost word back to upload (the field turns
+*Upload* and an `sm` ghost *URL* (one above the other, as wide as the cell, in a `stack`); URL entry, the input and a ghost word back to upload (the field turns
 filled on blur or Enter, never on a keystroke); uploading, a spinner and the word, as a `status`; filled, a
 frame one second into the clip (`#t=1` — the first frame is often a fade from black; `preload="metadata"`,
 never autoplaying, since the page's one live unit stays in the stage, §7) or the picture, beside an `sm`
@@ -927,8 +994,10 @@ always there; the way to the numbers is a click on a row of the list, and no scr
   structurally does not apply, the denominator named under a ratio. A caption is there only where the number
   alone would mislead — what CTR is *of*, what the conversions add up from, which revenue counts — and the
   explanation of why errors carry no rate is behind the label of their tile (§6, "Help tooltip").
-- A section that could not be read says so in a notice at the top of its row and shows dashes; the rest of the
-  screen is unaffected.
+- A section that could not be read says so in a notice under the strips, beside the section it concerns,
+  and shows dashes; the rest of the screen is unaffected.
+- The screen's content stands in the `wide` column (§5), not `default`: the three strips of the first row
+  and the two panels beside each other need the 1440px. The bar runs edge to edge, as the workspace's does.
 - The by-goal and by-day tables are native disclosures (`<details>`): they announce their state, need no script
   and carry the `summary` focus ring (§2). The panel is not `overflow-hidden`; the table scrolls in a frame of its
   own under the heading (§5).
@@ -937,41 +1006,62 @@ always there; the way to the numbers is a click on a row of the list, and no scr
 
 A hairline strip of readings (`StatStrip`): a label, one value line per currency, and what it is measured against.
 It is the one implementation of the delivery, progress and conversions strips and of the single tiles beside the
-delivery strip. A clipping parent is safe on it and only on it: every cell is a static readout with no focusable
-descendant (§2). Put a control in a cell and the rounding moves to the cells.
+delivery strip. A clipping parent is safe on it and only on it: every cell is a static readout, and the one
+focusable thing a cell may hold is a tile's label as a help control (`HelpLabel`, §6) — its ring clears the
+cell's 16px padding, which is the whole reason the clip is still safe. Put any other control in a cell and the
+rounding moves to the cells.
 
 ### Expandable panel
 
 A panel with a heading, a table and, when there are more rows than fit, *Show all* in its corner
-(`ExpandablePanel`): the first three rows, the rest in place on a click, the button saying it is open
-(`aria-expanded`, *Show less*). The rows are server-rendered; the panel owns which of them show. Not
-`overflow-hidden` (the button's ring, §2); the table scrolls in its own frame (§5).
+(`ExpandablePanel`): the first three rows, the rest in place on a click, the button's own label saying it is
+open (*Show less* — no `aria-expanded` besides, since both together read "Show less, expanded"). The rows are
+server-rendered; the panel owns which of them show. Not `overflow-hidden` (the button's ring, §2); the table
+scrolls in its own frame (§5).
+
+### Disclosure
+
+One collapsible panel (`ui/Disclosure`), native `<details>`: it needs no script, announces its state, and
+`summary` carries the focus ring (§2). The chevron turns when it is open (§9), the summary takes a `surface-2`
+hover, and nothing is `overflow-hidden`. Two shapes of the one element: `panel`, standing alone — a bordered box
+titled in the label role, with an optional line of explanation above its content (a creative's by-goal and by-day
+tables, the postback's parameters and statuses) — and `fold`, a row of a stack inside a panel that has its frame
+already (the validator report's sections, a hairline between them, the title in `type-small`, weight 500).
 
 ### Creatives list
 
 The Creatives page (`CreativesList`) is the list a returning owner opens the product for: the title with the
-number of rows **shown**, a search by name, a filter by state (*All* / *Serving* / *Not serving*, hidden while the
-aggregate is down) and the page's one primary, *New creative*. The rows are the data-table treatment (§6, "Data
-tables"): 44px, a 3px rail for the serving state, the name, a format chip, impressions, clicks, CTR, the state, and
-three actions with words — *Copy tag*, *Edit*, *More* (the validator, duplicate, delete). Search and filter are
-client-side over the rows the page has: an account's creatives are dozens, and a round trip per keystroke would be
-the slower way to the same list. With no creatives the page is the title and one panel with one button.
+number of rows **shown**, a search by name (280px from `sm`), a filter by state (*All* / *Serving* /
+*Not serving*, hidden while the aggregate is down) and the page's one primary, *New creative*. The rows are the
+data-table treatment (§6, "Data tables"): 44px — the actions cell keeps 6px of vertical padding, which still clears
+the focus ring's 4px, so three 32px buttons make a 44px row — a 3px rail for the serving state, the name, a format
+chip, impressions, clicks, CTR (its header names the denominator, *of impressions*, under the label), the state,
+and three actions with words — *Copy tag* (with its icon), *Edit*, *More* (with its chevron; the validator,
+duplicate, delete). Search and filter are client-side over the rows the page has: an account's creatives are dozens,
+and a round trip per keystroke would be the slower way to the same list. An empty result says so as a `status`.
+With no creatives the page is the title and one panel with one button.
+Below `sm` the rows are not a table that scrolls sideways: the name, the state and the three readings, each with its
+name and the ratio with its denominator, and *Copy tag*. The page's primary becomes a strip at the foot of the screen
+that is `fixed` — a list is a page, and a page's strip is pinned to the viewport, where the workspace's is
+`sticky` within its screen — and the list leaves room for it.
 
 ### Template sheet
 
 *New creative* opens a dialog over the list (`NewCreativeSheet`; [ADR-0038](decisions/0038-creative-workspace.md)): the
-templates on the left, the selected one on the right — its static preview in a well, its name, its standards and its
-description — and *Cancel* / *Configure creative* in the footer. The VAST video generator is the last row, set apart: a
-creative of a kind of its own, built in its own tool. A modal like the destructive confirmation (§6) and built the
-same way: portalled to `<body>`, Escape closes it, Tab stays inside the card, focus returns to where it was opened
-from. Pick, *Configure*, and the workspace opens on the first field: three clicks and one page load, where
+templates on the left (300px from `md`), the selected one on the right — its static preview in a well, its name,
+its standards and its description (held to 52ch) — and *Cancel* / *Configure creative* in the footer. The card is
+880px wide at most and as high as the screen leaves it, 612px at most (`min(612px, 100dvh − 2rem)`). The VAST video
+generator is the last row, set apart by a hairline: a creative of a kind of its own, built in its own tool. A modal
+like the destructive confirmation (§6) and built the same way: portalled to `<body>`, its title an `h2` in the
+`type-h3` role, Escape closes it, Tab stays inside the card, focus returns to where it was opened from. Pick,
+*Configure*, and the workspace opens on the template's first section: three clicks and one page load, where
 catalog → template page → *Configure creative* was three of each. Below `md` the preview pane gives way and the
 selected row opens to show its description. `/dashboard/creatives/new` without a template opens the list with the
 sheet already open (`?new=1`).
 
 ### Inputs
 
-44px high (32px in a dense table context), 1px `line` border, `--radius-ctl`, **mono 13px**,
+44px high (32px in a dense table context, or in a bar of `sm` controls — `inputDenseClass`), 1px `line` border, `--radius-ctl`, **mono 13px**,
 `bg-surface`. Placeholders are `fg-muted` (`fg-disabled` may not carry a word — §3). Help
 text is `caption` in `fg-muted` below the field. Focus is a 2px accent outline with 2px
 offset — every interactive element must have a visible focus state, including one whose real
@@ -1041,9 +1131,10 @@ Counting rules, because a metric that lies costs more than a metric that is miss
   naming its denominator: **CR "of clicks"** and **EPC "per click"** — a table column
   included ("CR of clicks"). Both print the transient em dash with no clicks, for the
   reason CTR does.
-  - **Laid out as two rows from `lg`**: a six-column grid, the three counts two columns
-    each, the two ratios three each. Five equal columns were measured too narrow for money
-    at the metric size — a large RUB amount ran out of its cell below ~1270px.
+  - **Laid out as one row from `lg`**, five columns sized to their readings (1 : 1.4 : 1.3 : 0.9 : 1, with
+    `minmax(0, …)` so a long figure cannot blow its cell out), and two across below it. Five *equal* columns were
+    measured too narrow for money at the metric size — a large RUB amount ran out of its cell below ~1270px — and
+    the money columns are the wider ones.
   - **A qualifier's parts add up to the number above it.** The conversions count is
     approved + pending; its caption names both, and names the rejected count as not
     counted, with every number in mono.
@@ -1137,17 +1228,16 @@ It was found with the account menu open over the landing's well: an overlay is t
 the context it opens from (§6, "Destructive confirmation"). The dev harness's stage has no
 bar to paint over and stays as it is.
 
-**Serving well** — the configurator. A real VAST request happened, so an instrument strip
-above the viewport carries what that request can prove: the delivery format (which *is* the
-standard — `SIMID 1.1`, `VPAID 2.0` — one field, not two) on the left, and the server's
-response time on the right once an ad has been served. Player status and the expiry
-countdown sit below the viewport rather than in the strip, because they change during
-playback while the strip states the fixed facts of the request.
+**Serving well** — the configurator. A real VAST request happened, so the stage carries what that
+request can prove. The delivery format (which *is* the standard — `SIMID 1.1`, `VPAID 2.0` — one
+field, not two) is in the workspace's bar beside the name, and the server's response time sits in the
+status line under the well once an ad has been served. Player status and the expiry countdown share that
+line: they change during playback, and the format states the fixed fact of the request.
 
 A player may mark a status with a **tone**, which raises it out of that line into a
 full-width `Notice` under the well; the line goes quiet meanwhile, so one sentence is never
 in two places. The line is sized for three words, and a condition the viewer has to *act* on
-is prose. The case this exists for is the IMA tab meeting an ad blocker: the SDK is a
+is prose. The case this exists for is the IMA player meeting an ad blocker: the SDK is a
 third-party script from an ad-serving domain, and the notice has to say so plainly, name the
 address to allow, and state that the creative is not the problem. It is `info`, not `dead` —
 nothing about the account, the tag or the creative is failing, and red is the vocabulary a
@@ -1168,13 +1258,13 @@ size: it holds the placeholder disclosure until a click-through fires, and the c
 readout afterwards (label in `well-live`, URL in mono `well-fg`). One slot, never two stacked
 captions.
 
-**A third-party player's chrome does not belong in the well.** The Fluid tab runs as an
+**A third-party player's chrome does not belong in the well.** The Fluid player runs as an
 ad-only outstream player — the `<video>` it wraps has no content — so its play button, scrub
 bar and `00:00 / 00:00` readout drive a video that does not exist, and a timecode frozen at
 zero under a running creative is a false readout, not merely clutter. The skin is ours rather
-than the publisher's; no DSP ships it, so it is not part of what the tab proves. **The whole
+than the publisher's; no DSP ships it, so it is not part of what the player proves. **The whole
 control bar is hidden**, its gradient scrim along with it. Stated cost — the preview starts
-muted and nothing in this tab can unmute it, so a template with a base video is judged
+muted and nothing in this player can unmute it, so a template with a base video is judged
 silently here. The rules live next to the component
 (`components/players/fluid-preview.css`), not in the token file — vendor chrome is not a
 design token. The creative's own close control

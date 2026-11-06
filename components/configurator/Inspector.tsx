@@ -1,7 +1,7 @@
 "use client";
 
-import { useId } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useId, useRef } from "react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   formatAnswerPath,
   isClickField,
@@ -79,14 +79,28 @@ function LabelRow({
   );
 }
 
-/** A select of at most three short options is a segmented control; anything longer stays a select. */
+/**
+ * The widest row of labels a segmented control may carry, in characters. The
+ * inspector's 299px hold about 28 characters of chip type with each segment's
+ * padding; a row past it wraps every button onto two lines.
+ */
+const SEGMENTED_MAX_CHARS = 26;
+
+/**
+ * A required select of at most three short options is a segmented control; anything
+ * longer stays a select. "Short" is the row, not each label — "Built-in chime", "My
+ * sound file" and "No sound" are each short and do not fit together. An optional
+ * select stays a select: a segmented control has no empty choice to clear it with.
+ */
 function isSegmentedSelect(field: ConfigField) {
   const options = field.options ?? [];
   return (
     field.type === "select" &&
+    field.required === true &&
     options.length > 0 &&
     options.length <= 3 &&
-    options.every((o) => o.label.length <= 14)
+    options.every((o) => o.label.length <= 14) &&
+    options.reduce((n, o) => n + o.label.length, 0) <= SEGMENTED_MAX_CHARS
   );
 }
 
@@ -326,7 +340,9 @@ export function OptionRows({
                     <StageCaption field={f} text={f.label} />
                     <MediaUploadField
                       field={f}
-                      variant="row"
+                      // Two across in 299px is about 125px a cell: a thumbnail with
+                      // its buttons beside it does not fit, one with them under it does.
+                      variant={block.stages.length > 1 ? "stack" : "row"}
                       thumb="sm"
                       tileLabel={`${block.id} · ${f.label}${f.required ? " *" : ""}`}
                       value={values[f.name] ?? ""}
@@ -443,6 +459,26 @@ export function OutcomeDrill({
   const index = blocks.findIndex((b) => b.id === openId);
   const open = index >= 0 ? blocks[index] : null;
 
+  // Opening a path swaps the list for a card, and *All paths* swaps it back, so the
+  // button that was pressed unmounts and focus would fall to the page (§2). It lands
+  // on the card's name when a card opens — read first, then Tab to its fields — and
+  // on the row that was open when the list returns. Set by the clicks that mean it:
+  // a path opened by the save guard is the guard's to focus.
+  const focusNext = useRef<{ to: "card" } | { to: "row"; id: string } | null>(null);
+  const cardRef = useRef<HTMLParagraphElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const next = focusNext.current;
+    if (!next) return;
+    focusNext.current = null;
+    if (next.to === "card") cardRef.current?.focus();
+    else {
+      listRef.current
+        ?.querySelector<HTMLElement>(`[data-path="${CSS.escape(next.id)}"]`)
+        ?.focus();
+    }
+  });
+
   const hidden = (list: typeof blocks) =>
     list.flatMap((b) =>
       b.fields.map((f) => (
@@ -457,7 +493,10 @@ export function OutcomeDrill({
         <div className="flex items-center justify-between">
           <button
             type="button"
-            onClick={() => onOpen(null)}
+            onClick={() => {
+              focusNext.current = { to: "row", id: open.id };
+              onOpen(null);
+            }}
             className={buttonClass("ghost", "sm", "-ml-2")}
           >
             <ChevronLeft size={14} aria-hidden />
@@ -467,7 +506,9 @@ export function OutcomeDrill({
             {index + 1} / {blocks.length}
           </span>
         </div>
-        <p className="data-instr type-small text-fg">{pathLabel(open)}</p>
+        <p ref={cardRef} tabIndex={-1} className="data-instr type-small text-fg">
+          {pathLabel(open)}
+        </p>
         {open.fields.map((f) => (
           <InspectorField
             key={f.name}
@@ -500,16 +541,21 @@ export function OutcomeDrill({
   return (
     <div className="flex flex-col gap-3">
       {hidden(blocks)}
-      <div className="rounded-panel border border-hairline bg-surface">
+      <div ref={listRef} className="rounded-panel border border-hairline bg-surface">
         {blocks.map((b, i) => {
           const head = b.fields.find((f) => f.type === "text");
+          const ready = complete(b);
           return (
             <button
               key={b.id}
               type="button"
-              onClick={() => onOpen(b.id)}
+              data-path={b.id}
+              onClick={() => {
+                focusNext.current = { to: "card" };
+                onOpen(b.id);
+              }}
               className={`focus-inset flex min-h-11 w-full items-center gap-3 border-l-[3px] py-2 pr-3 pl-[13px] text-left transition-colors duration-150 hover:bg-surface-2 first:rounded-t-ctl last:rounded-b-ctl ${
-                RAIL[complete(b) ? "live" : "idle"]
+                RAIL[ready ? "live" : "idle"]
               } ${i > 0 ? "border-t border-t-hairline" : ""}`}
             >
               <span className="data-instr whitespace-nowrap type-small text-fg">
@@ -517,6 +563,11 @@ export function OutcomeDrill({
               </span>
               <span className="min-w-0 flex-1 truncate type-small text-fg-muted">
                 {head ? (values[head.name] ?? "") : ""}
+              </span>
+              {/* The rail is colour; the check and the word are the rest of it (§11). */}
+              {ready && <Check size={14} aria-hidden className="shrink-0 text-live" />}
+              <span className="sr-only">
+                {ready ? dict.workspace.sectionDone : dict.workspace.sectionTodo}
               </span>
               <ChevronRight size={14} aria-hidden className="shrink-0 text-fg-secondary" />
             </button>

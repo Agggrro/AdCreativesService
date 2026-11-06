@@ -11,7 +11,10 @@ import { CopyButton } from "@/components/CopyButton";
 import { CreativeTabs } from "@/components/workspace/CreativeTabs";
 import { MoreMenu } from "@/components/workspace/MoreMenu";
 import { Notice } from "@/components/ui/Field";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { ChevronLeft } from "lucide-react";
+import { WorkspaceBar } from "@/components/workspace/WorkspaceBar";
+import { buttonClass } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { ServingBadge } from "@/components/ui/State";
 import { withNext } from "@/lib/safe-next";
 import { UUID_RE } from "@/lib/uuid";
@@ -72,29 +75,61 @@ export default async function EditCreativePage({
     }
     const strict = parseVideoConfig(creative.config_json, { mode: "save", ownerId: user?.id });
     const droppedCount = strict.ok ? 0 : strict.issues.length;
+    const { data: videoOverview, error: videoOverviewError } = await supabase.rpc("get_creative_overview");
+    const videoServing =
+      (videoOverview ?? []).find((r) => r.creative_id === creative.id)?.should_serve ?? false;
+    const videoName = creative.name ?? parsed.config.adTitle;
+    const videoTag = vastTagUrl(creative.id);
     return (
-      <DashboardShell>
-        <div className="flex flex-col gap-6">
-          <PageHeader
-            title={`${dict.vastGen.editTitle}: ${creative.name ?? parsed.config.adTitle}`}
-          />
-          {droppedCount > 0 && (
+      <VideoTagGenerator
+        mode="edit"
+        heading={`${dict.vastGen.editTitle}: ${videoName}`}
+        signedIn
+        cdnUrl={getCdnUrl()}
+        signInHref={withNext("/login", `/dashboard/creatives/${creative.id}/edit`)}
+        action={updateVideoCreative}
+        creativeId={creative.id}
+        initialDraft={configToDraft(parsed.config, creative.name)}
+        cancelHref={`/dashboard/creatives/${creative.id}`}
+        notice={
+          droppedCount > 0 ? (
             <Notice tone="warn">
               {dict.vastGen.editDroppedNotice.replace("{n}", String(droppedCount))}
             </Notice>
-          )}
-          <VideoTagGenerator
-            mode="edit"
-            signedIn
-            cdnUrl={getCdnUrl()}
-            signInHref={withNext("/login", `/dashboard/creatives/${creative.id}/edit`)}
-            action={updateVideoCreative}
-            creativeId={creative.id}
-            initialDraft={configToDraft(parsed.config, creative.name)}
-            cancelHref={`/dashboard/creatives/${creative.id}`}
+          ) : undefined
+        }
+        bar={
+          <WorkspaceBar
+            back={
+              <Link href="/dashboard/creatives" className={buttonClass("ghost", "sm", "pl-2")}>
+                <ChevronLeft size={14} aria-hidden />
+                {dict.dashboard.creatives}
+              </Link>
+            }
+            title={
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 lg:flex-nowrap">
+                <span className="min-w-0 max-w-full truncate type-small font-medium lg:max-w-56">
+                  {videoName}
+                </span>
+                <Chip>{`VAST ${parsed.config.version}`}</Chip>
+                {!videoOverviewError && (
+                  <ServingBadge
+                    serving={videoServing}
+                    label={videoServing ? dict.dashboard.serving : dict.dashboard.notServing}
+                  />
+                )}
+              </div>
+            }
+            tabs={<CreativeTabs creativeId={creative.id} current="settings" dict={dict} />}
+            actions={
+              <>
+                <MoreMenu creativeId={creative.id} creativeName={videoName} tag={videoTag} />
+                <CopyButton value={videoTag} size="sm" />
+              </>
+            }
           />
-        </div>
-      </DashboardShell>
+        }
+      />
     );
   }
 

@@ -12,6 +12,7 @@ import {
 } from "@/lib/postback";
 import { CopyButton } from "@/components/CopyButton";
 import { ConfirmAction } from "@/components/ui/ConfirmAction";
+import { Disclosure } from "@/components/ui/Disclosure";
 import { MacroText } from "@/components/ui/MacroText";
 import { Notice, Panel } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -38,7 +39,7 @@ import { DashboardShell } from "@/components/DashboardShell";
  * Account-wide rather than per creative, because that is how a network is set
  * up: one postback URL per network, for every offer the account runs. The click
  * id already says which creative a conversion belongs to. It lives under
- * /dashboard/creatives/ so the section marker stays on "My creatives", the
+ * /dashboard/creatives/ so the section marker stays on "Creatives", the
  * section whose numbers it feeds.
  */
 
@@ -132,36 +133,16 @@ export default async function PostbackPage({
           </Notice>
         )}
 
-        <section className="flex flex-col gap-3">
-          <h2 className="label-instr">{t.howHeading}</h2>
-          <ol className="flex max-w-prose list-decimal flex-col gap-2 pl-5 type-small text-fg-secondary">
-            <li>
-              <MacroText text={t.step1} />
-            </li>
-            <li>
-              <MacroText text={t.step2} />
-            </li>
-            <li>{t.step3}</li>
-          </ol>
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="label-instr">{t.urlHeading}</h2>
-          {url ? (
-            <Panel className="flex flex-col gap-4 p-4">
-              {/* Wraps rather than truncates: the key sits in the middle of the
-                  URL, and a clipped key is the one thing the reader must see
-                  whole to check it against what their network holds. */}
-              <code className="data-instr break-all type-small text-fg-secondary">
-                {url}
-              </code>
+        {/* The setup is one panel: the URL, the one action that matters — copy it —
+            and the one that must not be hit by accident, rotate. How to connect was
+            three paragraphs; what they said is in the table below (the click id's
+            row) and in the click-through field's macros. */}
+        {url ? (
+          <Panel className="flex flex-col gap-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="label-instr">{t.urlHeading}</h2>
               {/* `sm`: controls inside a panel (§6). */}
-              <div className="flex flex-wrap items-center gap-3">
-                <CopyButton
-                  value={url}
-                  size="sm"
-                  labels={{ copy: dict.common.copyUrl, copied: dict.common.urlCopied }}
-                />
+              <div className="flex flex-wrap items-center gap-2">
                 <ConfirmAction
                   triggerLabel={t.rotate}
                   triggerIcon={<RefreshCw size={14} aria-hidden />}
@@ -171,60 +152,62 @@ export default async function PostbackPage({
                   confirmLabel={t.rotateConfirm}
                   action={rotatePostbackKey}
                 />
+                <CopyButton
+                  value={url}
+                  size="sm"
+                  variant="primary"
+                  labels={{ copy: dict.common.copyUrl, copied: dict.common.urlCopied }}
+                />
               </div>
-              <p className="type-caption text-fg-muted">{t.keyWarning}</p>
-            </Panel>
-          ) : (
-            <Notice tone="dead">{t.keyUnavailable}</Notice>
-          )}
-        </section>
+            </div>
+            {/* Wraps rather than truncates: the key sits in the middle of the
+                URL, and a clipped key is the one thing the reader must see
+                whole to check it against what their network holds. */}
+            <code className="data-instr break-all type-small text-fg-secondary">{url}</code>
+            <p className="type-caption text-fg-muted">{t.keyWarning}</p>
+          </Panel>
+        ) : (
+          <Notice tone="dead">{t.keyUnavailable}</Notice>
+        )}
 
-        <section className="flex flex-col gap-3">
-          <h2 className="label-instr">{t.paramsHeading}</h2>
-          {/* Reference rows carry no state, so no rail (§6). */}
-          <TableFrame>
-            <table className="w-full border-collapse type-small">
-              <TableHead>
-                <th className={HEAD}>{t.param}</th>
-                <th className={`${HEAD} w-full`}>{t.meaning}</th>
-              </TableHead>
-              <tbody>
-                {PARAM_ROWS.map((name) => (
-                  <tr key={name} className={ROW}>
-                    <td className={`${CELL} data-instr whitespace-nowrap`}>{name}</td>
-                    <td className={`${CELL} text-fg-secondary`}>
-                      <MacroText text={t.params[name]} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableFrame>
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="label-instr">{t.statusesHeading}</h2>
-          <TableFrame>
-            <table className="w-full border-collapse type-small">
-              <TableHead>
-                <th className={HEAD}>{t.statusCol}</th>
-                <th className={`${HEAD} w-full`}>{t.acceptedCol}</th>
-              </TableHead>
-              <tbody>
-                {STATUS_ORDER.map((status) => (
-                  <tr key={status} className={ROW}>
-                    <td className={`${CELL} whitespace-nowrap`}>
-                      <StateWord tone={STATUS_TONE[status]} label={t.statuses[status]} />
-                    </td>
-                    <td className={`${CELL} data-instr text-fg-secondary`}>
-                      {STATUS_ALIASES[status].join(", ")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableFrame>
-        </section>
+        {/* Reference rows carry no state, so no rail (§6). Behind a disclosure: read
+            once, when a network is set up. */}
+        <Disclosure title={t.reference}>
+          <table className="w-full border-collapse type-small">
+            <TableHead>
+              <th className={HEAD}>{t.param}</th>
+              <th className={`${HEAD} w-full`}>{t.meaning}</th>
+            </TableHead>
+            <tbody>
+              {PARAM_ROWS.map((name) => (
+                <tr key={name} className={ROW}>
+                  <td className={`${CELL} data-instr whitespace-nowrap`}>{name}</td>
+                  <td className={`${CELL} text-fg-secondary`}>
+                    <MacroText text={t.params[name]} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <table className="w-full border-collapse border-t border-hairline type-small">
+            <TableHead>
+              <th className={HEAD}>{t.statusCol}</th>
+              <th className={`${HEAD} w-full`}>{t.acceptedCol}</th>
+            </TableHead>
+            <tbody>
+              {STATUS_ORDER.map((status) => (
+                <tr key={status} className={ROW}>
+                  <td className={`${CELL} whitespace-nowrap`}>
+                    <StateWord tone={STATUS_TONE[status]} label={t.statuses[status]} />
+                  </td>
+                  <td className={`${CELL} data-instr text-fg-secondary`}>
+                    {STATUS_ALIASES[status].join(", ")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Disclosure>
 
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

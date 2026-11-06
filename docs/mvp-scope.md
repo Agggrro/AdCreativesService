@@ -59,11 +59,14 @@ Code-complete and building green:
       [ADR-0022](decisions/0022-midnight-design-system.md), which superseded the
       light-themed Instrument of ADR-0007), bilingual RU/EN with a top-bar switcher
       (locale in a cookie; a `profiles.locale` column is the follow-up)
-- [x] Three-section IA — Каталог / Мои креативы / Подписки
-      ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)); public
-      catalog with live demos replaces `/preview`; per-creative delivery counts from
-      `get_creative_overview()`. **Needs `supabase/schema.sql` re-applied** before the
-      counts and the serving state work against a live database
+- [x] Information architecture — first three sections, Каталог / Мои креативы / Подписки
+      ([ADR-0008](decisions/0008-catalog-first-information-architecture.md)); since the
+      redesign the signed-in navigation is Creatives · Tools · Account, and a creative is a
+      workspace of its own ([ADR-0037](decisions/0037-reduced-navigation-and-copy.md),
+      [ADR-0038](decisions/0038-creative-workspace.md)); public catalog with live demos
+      replaces `/preview`; per-creative delivery counts from `get_creative_overview()`.
+      **Needs `supabase/schema.sql` re-applied** before the counts and the serving state
+      work against a live database
 
 Remaining before a true end-to-end demo (needs external setup / assets):
 

@@ -304,7 +304,7 @@ export default async function CreativePage({
         }
         title={
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 lg:flex-nowrap">
-            <span className="min-w-0 max-w-full truncate text-[14px] font-medium lg:max-w-56">
+            <span className="min-w-0 max-w-full truncate type-small font-medium lg:max-w-56">
               {name}
             </span>
             <Chip>{formatLabel}</Chip>
@@ -327,7 +327,7 @@ export default async function CreativePage({
         }
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <Container width="wide" className="flex flex-col gap-6 py-6">
           {!statsAvailable && <Notice tone="dead">{dict.dashboard.statsUnavailable}</Notice>}
 
@@ -372,9 +372,9 @@ export default async function CreativePage({
           {conv.goalsPanel}
           {conv.dayPanel}
         </Container>
-      </div>
+      </main>
 
-      <div className="sticky bottom-0 z-10 border-t border-hairline bg-ground p-4 lg:hidden">
+      <div className="workspace-strip sticky bottom-0 z-10 border-t border-hairline bg-ground p-4 lg:hidden">
         <CopyButton value={tag} size="md" variant="primary" className="w-full" />
       </div>
     </div>

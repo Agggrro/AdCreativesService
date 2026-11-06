@@ -174,7 +174,9 @@ export function NewCreativeSheet({
               className="flex h-[min(612px,calc(100dvh-2rem))] w-full min-w-0 max-w-[880px] flex-col rounded-panel border border-hairline bg-surface shadow-overlay"
             >
               <header className="flex h-14 shrink-0 items-center border-b border-hairline px-6">
-                <h2 id={titleId} className="type-body font-medium">
+                {/* An h2 in the h3 role, like the destructive confirmation this
+                    dialog is built the same way as (§6). */}
+                <h2 id={titleId} className="type-h3">
                   {dict.dashboard.newCreative}
                 </h2>
               </header>
@@ -187,7 +189,9 @@ export function NewCreativeSheet({
                   <ul className="flex flex-col">{interactive.map(row)}</ul>
                   {video.length > 0 && (
                     <>
-                      <span aria-hidden className="h-4 shrink-0" />
+                      {/* A hairline, not whitespace: the video generator is another
+                          kind of row, and §5 sets groups apart by a line or a surface. */}
+                      <span aria-hidden className="my-2 h-px shrink-0 bg-hairline" />
                       <ul className="flex flex-col">{video.map(row)}</ul>
                     </>
                   )}

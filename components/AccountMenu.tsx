@@ -14,16 +14,19 @@ import { buttonClass } from "@/components/ui/Button";
  */
 export function AccountMenu({
   label,
+  size = "md",
   children,
 }: {
   label: string;
+  /** `sm` in the tools' 48px bar, `md` in the product bar; a creative's bar has no account. */
+  size?: "sm" | "md";
   children: React.ReactNode;
 }) {
   return (
     <NavDropdown
       label={label}
       align="right"
-      triggerClassName={buttonClass("ghost", "md")}
+      triggerClassName={buttonClass("ghost", size)}
       panelClassName="w-72"
     >
       {children}

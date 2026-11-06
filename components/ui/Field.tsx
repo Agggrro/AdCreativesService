@@ -9,6 +9,15 @@ export const inputBaseClass =
   "min-h-11 rounded-ctl border border-line bg-surface px-2.5 py-1.5 type-data text-fg placeholder:text-fg-muted";
 
 /**
+ * The dense form control: `inputBaseClass`'s mono 13px and border at 32px, the
+ * height of an `sm` button — for a field that sits in a bar of `sm` controls (the
+ * creative's name in the workspace bar, §6, "Workspace"). Not for a form, where the
+ * 44px control is the one a thumb can hit.
+ */
+export const inputDenseClass =
+  "h-8 rounded-ctl border border-line bg-surface px-2.5 type-data text-fg placeholder:text-fg-muted";
+
+/**
  * Full width, the default. A control that needs another width takes
  * `inputBaseClass` and its own: Tailwind orders `w-*` utilities by name, not by
  * their place in the attribute, so `w-full` here would beat a `w-28` after it.

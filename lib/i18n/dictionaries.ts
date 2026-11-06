@@ -138,12 +138,10 @@ const ru = {
   dashboard: {
     templates: "Шаблоны",
     configure: "Настроить креатив",
-    noTemplates: "Пока ни один шаблон не опубликован.",
     creatives: "Креативы",
     noCreatives: "Креативов нет",
     serving: "Отдаётся",
     notServing: "Не отдаётся",
-    notServingHint: "Нужен доступ участника бета-теста",
     impressions: "Показы",
     clicks: "Клики",
     clicksHint: "Только кнопка действия",
@@ -151,20 +149,15 @@ const ru = {
     ctr: "CTR",
     ctrOfImpressions: "от показов",
     creativeName: "Название",
-    creativeNameHelp:
-      "Необязательно. По умолчанию — название шаблона; пригодится, когда креативов из одного шаблона станет несколько.",
     createdAt: "Создан",
-    openCreative: "Открыть",
     statsUnavailable:
       "Статистика сейчас недоступна, поэтому цифры и состояние отдачи скрыты — показывать неверные мы не будем. Обновите страницу через минуту; если не пройдёт, напишите нам.",
     viewableNotApplicable: "Измеряется вашим вендором верификации, а не нами",
     viewableSelfReported: "Собственная оценка",
     viewableNoVersion: "В этой версии VAST видимость не передаётся — она появилась в 4.0",
     viewabilityHeading: "Измерение просмотра",
-    createCreative: "Создать креатив",
     newCreative: "Новый креатив",
     edit: "Изменить",
-    saveChanges: "Сохранить изменения",
     vastTag: "VAST-тег",
     deleteCreative: "Удалить креатив",
     deleteConfirmTitle: "Удалить креатив?",
@@ -186,8 +179,8 @@ const ru = {
     description: "Описание",
     format: "Формат",
     status: "Статус",
+    actions: "Действия",
     // VAST video creatives (ADR-0035).
-    newVideo: "Создать VAST-видео",
     videoKind: "VAST-видео",
     progress: "Досмотры",
     progressSteps: {
@@ -229,7 +222,6 @@ const ru = {
     crColumn: "CR от кликов",
     crOfAllClicksColumn: "CR от всех кликов",
     epc: "EPC",
-    epcHint: "Выручка на клик",
     byExit: "По выходам",
     exit: "Выход",
     mainExit: "Основная ссылка",
@@ -271,13 +263,6 @@ const ru = {
   // The account's postback settings page (ADR-0023).
   postback: {
     title: "Постбек",
-    howHeading: "Как подключить",
-    step1:
-      "В настройках креатива поставьте {click_id} в ссылку оффера — в параметр, который партнёрка возвращает в постбеке: `sub1`, `aff_sub`, `subid`.",
-    step2:
-      "Вставьте URL ниже в настройки постбека партнёрки. Замените каждое {…} после знака = на её макрос, а параметры, для которых у неё макроса нет, удалите.",
-    step3:
-      "Конверсии появятся на странице креатива, а каждый пришедший постбек — в журнале ниже.",
     urlHeading: "Postback URL",
     keyWarning: "Ключ работает как пароль — не публикуйте",
     keyUnavailable:
@@ -289,7 +274,7 @@ const ru = {
     rotateConfirm: "Сменить",
     rotated: "Ключ сменён. Обновите ссылку во всех партнёрках.",
     rotateFailed: "Не удалось сменить ключ. Попробуйте ещё раз.",
-    paramsHeading: "Параметры",
+    reference: "Параметры и статусы",
     param: "Параметр",
     meaning: "Что передавать",
     params: {
@@ -303,7 +288,6 @@ const ru = {
       txid: "ID транзакции в партнёрке. Нужен, если по одной цели у клика бывает несколько конверсий — например, повторные депозиты. Повторный постбек с теми же `goal` и `txid` обновляет статус, а не создаёт дубль.",
       goal: "Цель конверсии — например, регистрация или депозит, до 64 символов. Без неё конверсия записывается без цели. У клика может быть по конверсии на каждую цель, и отчёт креатива показывает их по целям.",
     },
-    statusesHeading: "Статусы",
     statusCol: "Статус",
     acceptedCol: "Какие значения принимаем",
     statuses: {
@@ -355,12 +339,11 @@ const ru = {
     allPaths: "Все пути",
     previous: "Предыдущий",
     next: "Следующий",
-    parameters: "Параметры",
+    sectionDone: "заполнено",
+    sectionTodo: "не заполнено",
   },
   configurator: {
-    chooseTemplate: "Выберите шаблон",
     notFound: "Шаблон не найден.",
-    backToTemplates: "Вернуться к шаблонам",
     configureTitle: "Настройка",
     deliveryFormat: "Формат доставки",
     noFields: "У этого шаблона нет настраиваемых полей.",
@@ -370,6 +353,7 @@ const ru = {
     errTemplateNotFound:
       "Шаблон не найден или снят с публикации. Выберите другой в каталоге.",
     errFieldRequired: "Заполните обязательное поле",
+    errFieldInvalid: "Проверьте значение",
     errNameTooLong: "Название длиннее 200 символов — сократите его.",
     errSaveFailed:
       "Не удалось сохранить креатив. Попробуйте ещё раз; если повторится — напишите нам.",
@@ -382,7 +366,6 @@ const ru = {
     clickMacroHint:
       "Макросы: {click_id} — для постбека партнёрки, {creative_id}, {outcome}.",
     media: {
-      sourceLabel: "Источник файла",
       uploadTab: "Загрузить",
       urlTab: "Ссылка",
       chooseFile: "Выбрать файл",
@@ -425,20 +408,14 @@ const ru = {
       viewability: "Верификация просмотра (OMID)",
     },
     outcomes: {
-      complete: "Готов",
-      empty: "Пусто",
       filled: "Заполнено",
-      errIncomplete: "Заполните все обязательные поля этого исхода.",
     },
   },
   preview: {
-    sameTag:
-      "Один и тот же VAST-тег в трёх плеерах — как его загрузил бы настоящий DSP.",
     player: "Плеер",
     launch: "Запустить рекламу",
     building: "Собираем VAST-тег…",
     restart: "Перезапустить",
-    idleHint: "Заполните поля и запустите рекламу выше.",
     clickThrough: "Клик-через",
     errorStart:
       "Не удалось запустить превью. Проверьте обязательные поля и попробуйте снова.",
@@ -450,13 +427,12 @@ const ru = {
     expired:
       "Тег превью истёк — нажмите «Перезапустить», чтобы получить новый.",
     served: "Реклама отдана",
-    format: "Формат",
     loadingUnit: "Загружаем интерактивный блок…",
     unitLoadFailed: "Не удалось загрузить интерактивный блок.",
     unitStartFailed: "Интерактивный блок не запустился.",
     loadingIma: "Загружаем Google IMA SDK…",
     imaSdkBlocked:
-      "Google IMA SDK заблокирован браузером — так делают блокировщики рекламы и расширения приватности. Креатив при этом исправен: вкладка Sandbox не обращается к IMA. Разрешите адрес для этого сайта и перезапустите:",
+      "Google IMA SDK заблокирован браузером — так делают блокировщики рекламы и расширения приватности. Креатив при этом исправен: плеер Sandbox не обращается к IMA. Разрешите адрес для этого сайта и перезапустите:",
     imaRunFailed: "Google IMA SDK загрузился, но реклама не запустилась:",
     imaStartFailed: "Google IMA SDK не смог запустить рекламу.",
     tagFetchFailed: "Не удалось получить VAST-тег превью.",
@@ -501,6 +477,10 @@ const ru = {
   tools: {
     generatorName: "Генератор VAST",
     validatorName: "Валидатор VAST",
+    // The switch in the tools' bar: the word that tells the two apart, not the whole name.
+    switchLabel: "Инструмент",
+    switchValidator: "Валидатор",
+    switchGenerator: "Генератор",
     playerFrame: "Плеер VAST",
     validatorMetaTitle: "Валидатор VAST — проверить и проиграть тег",
     validatorMetaDescription:
@@ -612,14 +592,14 @@ const ru = {
     editTitle: "Изменить VAST-видео",
     versionHeading: "Версия VAST",
     versionHelp:
-      "Определяет, какие параметры есть в теге. Берите ту, что принимает ваша DSP или SSP; не уверены — 4.2.",
+      "Берите ту, что принимает ваша DSP или SSP; не уверены — 4.2.",
     laterVersions: "В более новых версиях",
     sinceVersion: "с {version}",
     excludedNotice:
       "Не войдёт в тег `VAST {version}`: {list}. Значения сохранятся в форме, если вернуть версию.",
     basicsHeading: "Основное",
     name: "Название креатива",
-    nameHelp: "Видно только вам, в «Моих креативах». Пусто — возьмём название в теге.",
+    nameHelp: "Видно только вам. Пусто — возьмём название в теге.",
     adTitle: "Название в теге",
     adTitleHelp: "`AdTitle` — его видят DSP и плеер.",
     description: "Описание",
@@ -654,7 +634,7 @@ const ru = {
     clickHeading: "Переход по клику",
     clickThrough: "Ссылка перехода",
     clickThroughHelp:
-      "Клик пройдёт через наш редирект: он посчитается и получит click id. Подставьте {click_id} в ссылку — сеть вернёт его в постбэке.",
+      "Клик пройдёт через наш редирект: он посчитается и получит click id. Подставьте {click_id} в ссылку — сеть вернёт его в постбеке.",
     skipHeading: "Пропуск",
     skipOff: "Нельзя",
     skipOn: "Можно",
@@ -727,26 +707,32 @@ const ru = {
     uaidAutoHelp: "По умолчанию — реестр `creosmith` и id креатива.",
     uaidRegistry: "Реестр",
     uaidValue: "Идентификатор",
+    // The generator's outline and stage (ADR-0038).
+    sections: "Секции тега",
+    sectionError: "есть ошибки",
+    stageView: "Вид",
+    viewPlayer: "Плеер",
+    viewXml: "XML",
     xmlHeading: "XML тега",
     xmlCaption:
       "Предпросмотр: трекинг-ссылки здесь — заглушки. Настоящие, подписанные, будут в теге после сохранения.",
     xmlIncomplete: "XML появится, когда будут название в теге и видео.",
     xmlBlocked: "XML появится, когда в форме не останется ошибок — кнопка под формой их отметит.",
     wellIdle:
-      "Здесь проиграется тег. Пиксели при проверке не отправляются — ни наши, ни ваши.",
+      "Пиксели при проверке не отправляются — ни наши, ни ваши.",
     wellNeedsMedia: "Добавьте видео, чтобы проиграть тег.",
     play: "Проверить и проиграть",
     playing: "Проверяем",
     create: "Создать креатив",
     signInAndCreate: "Войти и создать",
     signInNote:
-      "Креатив сохранится в «Моих креативах», а тег будет отдавать рекламу, пока у вас есть доступ участника бета-теста. Черновик останется в этом браузере.",
+      "Тег отдаёт рекламу, пока у вас есть доступ участника бета-теста. Черновик останется в этом браузере.",
     save: "Сохранить изменения",
     saving: "Сохраняем",
     cancel: "Отмена",
     draftRestored: "Восстановили незаконченный черновик.",
     startOver: "Начать заново",
-    fixErrors: "Исправьте поля, отмеченные ниже.",
+    fixErrors: "Исправьте отмеченные поля.",
     issues: {
       bad_shape: "Значение в неверном формате.",
       required: "Обязательное поле.",
@@ -913,12 +899,10 @@ const en: Dict = {
   dashboard: {
     templates: "Templates",
     configure: "Configure creative",
-    noTemplates: "No templates published yet.",
     creatives: "Creatives",
     noCreatives: "No creatives",
     serving: "Serving",
     notServing: "Not serving",
-    notServingHint: "Needs closed-beta access",
     impressions: "Impressions",
     clicks: "Clicks",
     clicksHint: "Final call-to-action only",
@@ -926,20 +910,15 @@ const en: Dict = {
     ctr: "CTR",
     ctrOfImpressions: "of impressions",
     creativeName: "Name",
-    creativeNameHelp:
-      "Optional. Defaults to the template name; useful once one template has several creatives.",
     createdAt: "Created",
-    openCreative: "Open",
     statsUnavailable:
       "Delivery numbers are unavailable right now, so counts and serving state are hidden rather than shown wrong. Refresh in a minute; if it persists, contact us.",
     viewableNotApplicable: "Measured by your verification vendor, not by us",
     viewableSelfReported: "Self-reported",
     viewableNoVersion: "This VAST version carries no viewability — it arrived in 4.0",
     viewabilityHeading: "Viewability measurement",
-    createCreative: "Create creative",
     newCreative: "New creative",
     edit: "Edit",
-    saveChanges: "Save changes",
     vastTag: "VAST tag",
     deleteCreative: "Delete creative",
     deleteConfirmTitle: "Delete this creative?",
@@ -952,7 +931,7 @@ const en: Dict = {
     description: "Description",
     format: "Format",
     status: "Status",
-    newVideo: "Create VAST video",
+    actions: "Actions",
     videoKind: "VAST video",
     progress: "Video progress",
     progressSteps: {
@@ -992,7 +971,6 @@ const en: Dict = {
     crColumn: "CR of clicks",
     crOfAllClicksColumn: "CR of all clicks",
     epc: "EPC",
-    epcHint: "Revenue per click",
     byExit: "By exit",
     exit: "Exit",
     mainExit: "Main link",
@@ -1027,13 +1005,6 @@ const en: Dict = {
   },
   postback: {
     title: "Postback",
-    howHeading: "How to connect",
-    step1:
-      "In the creative's settings, put {click_id} into the offer link — in the parameter your network returns in its postback: `sub1`, `aff_sub`, `subid`.",
-    step2:
-      "Paste the URL below into your network's postback settings. Replace each {…} after an = with that network's macro, and remove the parameters it has no macro for.",
-    step3:
-      "Conversions appear on the creative's page, and every postback that arrives shows up in the log below.",
     urlHeading: "Postback URL",
     keyWarning: "The key works like a password — keep it private",
     keyUnavailable:
@@ -1045,7 +1016,7 @@ const en: Dict = {
     rotateConfirm: "Rotate",
     rotated: "Key rotated. Update the URL in every network.",
     rotateFailed: "Couldn't rotate the key. Try again.",
-    paramsHeading: "Parameters",
+    reference: "Parameters and statuses",
     param: "Parameter",
     meaning: "What to send",
     params: {
@@ -1059,7 +1030,6 @@ const en: Dict = {
       txid: "The network's transaction id. Needed when one click can convert more than once for the same goal — repeat deposits, say. A repeat postback with the same `goal` and `txid` updates the status instead of adding a duplicate.",
       goal: "The conversion goal — registration or deposit, say — up to 64 characters. Without it, the conversion is recorded with no goal. A click can carry a conversion per goal, and the creative's report shows them by goal.",
     },
-    statusesHeading: "Statuses",
     statusCol: "Status",
     acceptedCol: "Accepted values",
     statuses: {
@@ -1110,12 +1080,11 @@ const en: Dict = {
     allPaths: "All paths",
     previous: "Previous",
     next: "Next",
-    parameters: "Parameters",
+    sectionDone: "complete",
+    sectionTodo: "incomplete",
   },
   configurator: {
-    chooseTemplate: "Choose a template",
     notFound: "Template not found.",
-    backToTemplates: "Back to templates",
     configureTitle: "Configure",
     deliveryFormat: "Delivery format",
     noFields: "This template has no configurable fields.",
@@ -1125,6 +1094,7 @@ const en: Dict = {
     errTemplateNotFound:
       "That template was not found or is no longer published. Pick another one in the catalog.",
     errFieldRequired: "Fill in the required field",
+    errFieldInvalid: "Check the value",
     errNameTooLong: "The name is longer than 200 characters — shorten it.",
     errSaveFailed:
       "Could not save the creative. Try again; if it keeps failing, contact us.",
@@ -1135,7 +1105,6 @@ const en: Dict = {
     clickMacroHint:
       "Macros: {click_id} for your network's postback, {creative_id}, {outcome}.",
     media: {
-      sourceLabel: "File source",
       uploadTab: "Upload",
       urlTab: "URL",
       chooseFile: "Choose file",
@@ -1174,19 +1143,14 @@ const en: Dict = {
       viewability: "Viewability verification (OMID)",
     },
     outcomes: {
-      complete: "Ready",
-      empty: "Empty",
       filled: "Filled",
-      errIncomplete: "Fill in every required field in this outcome.",
     },
   },
   preview: {
-    sameTag: "The same VAST tag in three players — what a real DSP would load.",
     player: "Player",
     launch: "Launch ad",
     building: "Building the VAST tag…",
     restart: "Restart",
-    idleHint: "Fill in the fields, then launch the ad above.",
     clickThrough: "Click-through",
     errorStart:
       "Could not start the preview. Check the required fields and try again.",
@@ -1197,13 +1161,12 @@ const en: Dict = {
     seconds: "s",
     expired: "Preview tag expired — press Restart to mint a new one.",
     served: "Ad served",
-    format: "Format",
     loadingUnit: "Loading interactive unit…",
     unitLoadFailed: "Could not load the interactive unit.",
     unitStartFailed: "The interactive unit failed to start.",
     loadingIma: "Loading the Google IMA SDK…",
     imaSdkBlocked:
-      "The Google IMA SDK was blocked by the browser — ad blockers and privacy extensions do this. The creative itself is fine: the Sandbox tab never reaches for IMA. Allow the address for this site and restart:",
+      "The Google IMA SDK was blocked by the browser — ad blockers and privacy extensions do this. The creative itself is fine: the Sandbox player never reaches for IMA. Allow the address for this site and restart:",
     imaRunFailed: "The Google IMA SDK loaded, but the ad did not start:",
     imaStartFailed: "The Google IMA SDK failed to start the ad.",
     tagFetchFailed: "Could not fetch the preview VAST tag.",
@@ -1246,6 +1209,9 @@ const en: Dict = {
   tools: {
     generatorName: "VAST generator",
     validatorName: "VAST validator",
+    switchLabel: "Tool",
+    switchValidator: "Validator",
+    switchGenerator: "Generator",
     playerFrame: "VAST player",
     validatorMetaTitle: "VAST validator — check and play a VAST tag",
     validatorMetaDescription:
@@ -1348,14 +1314,14 @@ const en: Dict = {
     editTitle: "Edit VAST video",
     versionHeading: "VAST version",
     versionHelp:
-      "Decides which parameters the tag can carry. Pick the one your DSP or SSP accepts; if unsure, 4.2.",
+      "Pick the one your DSP or SSP accepts; if unsure, 4.2.",
     laterVersions: "In later versions",
     sinceVersion: "from {version}",
     excludedNotice:
       "Left out of the `VAST {version}` tag: {list}. The values stay in the form if you switch back.",
     basicsHeading: "Basics",
     name: "Creative name",
-    nameHelp: "Only you see it, in My creatives. Empty: the title in the tag.",
+    nameHelp: "Only you see it. Empty: the title in the tag.",
     adTitle: "Title in the tag",
     adTitleHelp: "`AdTitle` — what DSPs and the player see.",
     description: "Description",
@@ -1463,26 +1429,31 @@ const en: Dict = {
     uaidAutoHelp: "By default: the `creosmith` registry and the creative id.",
     uaidRegistry: "Registry",
     uaidValue: "Identifier",
+    sections: "Tag sections",
+    sectionError: "has errors",
+    stageView: "View",
+    viewPlayer: "Player",
+    viewXml: "XML",
     xmlHeading: "Tag XML",
     xmlCaption:
       "A preview: the tracking links here are placeholders. The real, signed ones are in the tag once it is saved.",
     xmlIncomplete: "The XML appears once the tag has a title and a video.",
     xmlBlocked: "The XML appears once the form has no errors — the button under the form marks them.",
     wellIdle:
-      "The tag plays here. Nothing is pinged while you check — neither our trackers nor yours.",
+      "Nothing is pinged while you check — neither our trackers nor yours.",
     wellNeedsMedia: "Add a video to play the tag.",
     play: "Check and play",
     playing: "Checking",
     create: "Create creative",
     signInAndCreate: "Sign in and create",
     signInNote:
-      "The creative is saved to My creatives, and the tag serves while you have closed-beta access. The draft stays in this browser.",
+      "The tag serves while you have closed-beta access. The draft stays in this browser.",
     save: "Save changes",
     saving: "Saving",
     cancel: "Cancel",
     draftRestored: "An unfinished draft was restored.",
     startOver: "Start over",
-    fixErrors: "Fix the fields marked below.",
+    fixErrors: "Fix the marked fields.",
     issues: {
       bad_shape: "The value is in the wrong format.",
       required: "Required.",

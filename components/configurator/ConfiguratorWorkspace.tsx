@@ -14,7 +14,7 @@ import { PreviewPanel } from "@/components/PreviewPanel";
 import { InspectorSection } from "@/components/configurator/Inspector";
 import {
   defaultValues,
-  firstMissing,
+  firstInvalid,
   groupKinds,
   isSectionComplete,
   sectionFields,
@@ -23,11 +23,11 @@ import {
   wantsOutline,
 } from "@/components/configurator/model";
 import { useDict } from "@/components/i18n/LocaleProvider";
+import { OutlineNav, SectionChips, type NavSection } from "@/components/workspace/SectionNav";
 import { WorkspaceBar } from "@/components/workspace/WorkspaceBar";
 import { buttonClass } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { Notice } from "@/components/ui/Field";
-import { RAIL } from "@/components/ui/State";
+import { inputDenseClass, Notice } from "@/components/ui/Field";
 
 type WorkspaceTemplate = {
   id: string;
@@ -45,9 +45,12 @@ type WorkspaceTemplate = {
  * What did not change is what it posts. The schema-driven fields keep their
  * `name`s, the Server Action (`createCreative` / `updateCreative`) reads the same
  * FormData, and `buildConfigFromValues` still decides what is saved. The `<form>`
- * wraps the outline, stage and inspector, and the bar sits outside it — it holds a
- * form of its own (Duplicate) — so the name, the format and the save button join
- * the form by its id.
+ * wraps the inspector's fields and nothing else — the bar sits outside it, since it
+ * holds a form of its own (Duplicate), so the name, the format and the save button
+ * join the form by its id — and the **stage is outside it too**. The Sandbox
+ * player runs the creative in this document, inside the stage, and a creative's own
+ * buttons carry no `type`, which makes each of them a submit button to any form
+ * around it: a click on the ad's call to action would have saved the creative.
  *
  * Values live here, lifted out of the DOM, so the stage can mint a preview from
  * exactly what is typed and so a section the inspector is not showing still posts
@@ -147,7 +150,8 @@ export function ConfiguratorWorkspace({
   }, [active, sections]);
   const carried = fields.filter((f) => visible.has(f.name) && !shown.has(f.name));
 
-  const missing = firstMissing(fields, visible, values);
+  const invalid = firstInvalid(fields, visible, values);
+  const missing = invalid?.field ?? null;
   // Named by where it is: a field in a block ("Heading") says nothing until the
   // block is — the path of a quiz exit, the letter of an option.
   const missingText = missing
@@ -161,10 +165,11 @@ export function ConfiguratorWorkspace({
     : "";
 
   /**
-   * A required field in a section the inspector is not showing is exempt from the
-   * browser's own validation — a hidden input is — so the server would be the
-   * first to notice, and its redirect throws away everything else typed. Catching
-   * it here costs one check and saves the whole form.
+   * A field in a section the inspector is not showing is exempt from the browser's
+   * own validation — a hidden input is, `required`, `type="url"` and the bounds of a
+   * number alike — so the server would be the first to notice, and its redirect
+   * throws away everything else typed. Catching it here costs one check and saves
+   * the whole form.
    */
   function guard(e: React.FormEvent<HTMLFormElement>) {
     if (!missing) return;
@@ -178,15 +183,27 @@ export function ConfiguratorWorkspace({
       const el = formRef.current?.querySelector<HTMLElement>(
         `[name="${CSS.escape(missing.name)}"]`,
       );
+      // An image field is a hidden input beside its buttons — a label is not
+      // focusable, so it is the file input inside it, or a button, that takes it.
       const target =
         el instanceof HTMLInputElement && el.type === "hidden"
-          ? el.parentElement?.querySelector<HTMLElement>("button, label, input:not([type='hidden'])")
+          ? el.parentElement?.querySelector<HTMLElement>("button, input:not([type='hidden'])")
           : el;
       target?.focus();
     });
   }
 
   const multiFormat = template.supported_standards.length > 1;
+
+  const navSections: NavSection[] = sections.map((s) => {
+    const complete = isSectionComplete(s, values);
+    return {
+      id: s.id,
+      label: groupLabel(dict, s.id),
+      tone: complete ? "live" : "idle",
+      status: complete ? dict.workspace.sectionDone : dict.workspace.sectionTodo,
+    };
+  });
 
   const bar = (
     <WorkspaceBar
@@ -209,7 +226,7 @@ export function ConfiguratorWorkspace({
             placeholder={template.name}
             defaultValue={initialName}
             aria-label={dict.dashboard.creativeName}
-            className="min-w-0 max-w-full flex-1 border-0 border-b border-dashed border-line bg-transparent p-0 text-[14px] font-medium text-fg placeholder:text-fg-muted lg:w-56 lg:flex-none"
+            className={`${inputDenseClass} min-w-0 max-w-full flex-1 lg:max-w-56`}
           />
           {multiFormat ? (
             <fieldset className="shrink-0">
@@ -243,12 +260,14 @@ export function ConfiguratorWorkspace({
               </div>
             </fieldset>
           ) : (
-            <Chip>{format || "—"}</Chip>
+            <span className="shrink-0">
+              <Chip>{format || "—"}</Chip>
+            </span>
           )}
           {/* Each server-rendered piece sits in a wrapper of its own: placed as a
               bare sibling among client-made elements it draws React's "child in a
               list needs a key" warning, which is about where it was made. */}
-          {state && <span className="contents">{state}</span>}
+          {state && <span className="shrink-0 whitespace-nowrap">{state}</span>}
         </div>
       }
       tabs={tabs}
@@ -276,126 +295,98 @@ export function ConfiguratorWorkspace({
       <h1 className="sr-only">{heading}</h1>
       {bar}
 
-      <form
-        id={formId}
-        ref={formRef}
-        action={action}
-        onSubmit={guard}
-        className="flex min-h-0 flex-1 flex-col lg:flex-row"
-      >
-        <input type="hidden" name="template_id" value={template.id} />
-        {creativeId && <input type="hidden" name="creative_id" value={creativeId} />}
-        {!multiFormat && <input type="hidden" name="selected_format" value={format} />}
-        {carried.map((f) => (
-          <input key={f.name} type="hidden" name={f.name} value={values[f.name] ?? ""} readOnly />
-        ))}
-
+      <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {outline && active && (
-          <nav
-            aria-label={dict.workspace.sections}
-            className="hidden w-[216px] shrink-0 flex-col border-r border-hairline py-3 lg:flex"
-          >
-            {sections.map((s) => {
-              const on = s.id === active.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  aria-current={on ? "true" : undefined}
-                  onClick={() => setActiveId(s.id)}
-                  className={`focus-inset flex h-11 items-center border-b border-l-[3px] border-b-hairline px-4 text-left type-small transition-colors duration-150 ${
-                    RAIL[isSectionComplete(s, values) ? "live" : "idle"]
-                  } ${on ? "bg-surface-2 font-medium text-fg" : "text-fg-secondary hover:bg-surface-2"}`}
-                >
-                  {groupLabel(dict, s.id)}
-                </button>
-              );
-            })}
-          </nav>
+          <OutlineNav
+            label={dict.workspace.sections}
+            sections={navSections}
+            activeId={active.id}
+            onSelect={setActiveId}
+          />
         )}
 
         <PreviewPanel templateId={template.id} format={format} fields={values} />
 
-        <aside className="flex min-w-0 flex-col border-hairline lg:min-h-0 lg:w-[340px] lg:shrink-0 lg:border-l">
+        <div className="flex min-w-0 flex-col border-hairline lg:min-h-0 lg:w-[340px] lg:shrink-0 lg:border-l">
           {outline && active && (
             <>
               {/* Below `lg` the outline is a row of chips; from `lg` it is the column at the left. */}
-              <nav
-                aria-label={dict.workspace.sections}
-                className="flex gap-2 overflow-x-auto border-b border-hairline px-4 py-3 lg:hidden"
-              >
-                {sections.map((s) => {
-                  const on = s.id === active.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      aria-current={on ? "true" : undefined}
-                      onClick={() => setActiveId(s.id)}
-                      className={`chip-instr inline-flex shrink-0 items-center gap-2 rounded-ctl border border-line px-3 py-2 transition-colors duration-150 ${
-                        on ? "bg-surface-2 text-fg" : "text-fg-secondary hover:bg-surface-2"
-                      }`}
-                    >
-                      <span
-                        aria-hidden
-                        className={`size-1.5 rounded-full ${
-                          isSectionComplete(s, values) ? "bg-live" : "bg-idle"
-                        }`}
-                      />
-                      {groupLabel(dict, s.id)}
-                    </button>
-                  );
-                })}
-              </nav>
+              <SectionChips
+                label={dict.workspace.sections}
+                sections={navSections}
+                activeId={active.id}
+                onSelect={setActiveId}
+              />
+              {/* The section's name is a heading at every width, and it is drawn
+                  only from `lg`: below it the chip is the name. */}
+              <h2 className="sr-only lg:hidden">{groupLabel(dict, active.id)}</h2>
               <div className="hidden h-12 shrink-0 items-center border-b border-hairline px-5 lg:flex">
                 <h2 className="type-body font-medium">{groupLabel(dict, active.id)}</h2>
               </div>
             </>
           )}
 
-          {/* `relative`: a file input is `sr-only` (absolutely positioned) and, with no
-              positioned ancestor, belongs to the page rather than to this scroller —
-              so the scroller cannot clip it and it stretches the document. */}
-          <div className="relative flex flex-col gap-4 p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-            {message && <Notice tone="dead">{message}</Notice>}
-            {blocked && missing && (
-              <Notice tone="dead" live>
-                {dict.configurator.errFieldRequired}: {missingText}
-              </Notice>
-            )}
+          <form
+            id={formId}
+            ref={formRef}
+            action={action}
+            onSubmit={guard}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <input type="hidden" name="template_id" value={template.id} />
+            {creativeId && <input type="hidden" name="creative_id" value={creativeId} />}
+            {!multiFormat && <input type="hidden" name="selected_format" value={format} />}
+            {carried.map((f) => (
+              <input key={f.name} type="hidden" name={f.name} value={values[f.name] ?? ""} readOnly />
+            ))}
 
-            {fields.length === 0 && (
-              <p className="type-small text-fg-muted">{dict.configurator.noFields}</p>
-            )}
+            {/* `relative`: a file input is `sr-only` (absolutely positioned) and, with no
+                positioned ancestor, belongs to the page rather than to this scroller —
+                so the scroller cannot clip it and it stretches the document. */}
+            <div className="relative flex flex-col gap-4 p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+              {message && <Notice tone="dead">{message}</Notice>}
+              {blocked && invalid && (
+                <Notice tone="dead" live>
+                  {invalid.fault === "required"
+                    ? dict.configurator.errFieldRequired
+                    : dict.configurator.errFieldInvalid}
+                  : {missingText}
+                </Notice>
+              )}
 
-            {outline && active ? (
-              <InspectorSection
-                section={active}
-                values={values}
-                onChange={setValue}
-                openPath={openPath}
-                onOpenPath={setOpenPath}
-              />
-            ) : (
-              sections.map((s) => (
+              {fields.length === 0 && (
+                <p className="type-small text-fg-muted">{dict.configurator.noFields}</p>
+              )}
+
+              {outline && active ? (
                 <InspectorSection
-                  key={s.id}
-                  section={s}
+                  section={active}
                   values={values}
                   onChange={setValue}
                   openPath={openPath}
                   onOpenPath={setOpenPath}
-                  headings
                 />
-              ))
-            )}
-          </div>
-        </aside>
-      </form>
+              ) : (
+                sections.map((s) => (
+                  <InspectorSection
+                    key={s.id}
+                    section={s}
+                    values={values}
+                    onChange={setValue}
+                    openPath={openPath}
+                    onOpenPath={setOpenPath}
+                    headings
+                  />
+                ))
+              )}
+            </div>
+          </form>
+        </div>
+      </main>
 
       {/* Below `lg` the save button leaves the bar for a strip of its own at the
           foot of the screen, where a thumb is. */}
-      <div className="sticky bottom-0 z-10 border-t border-hairline bg-ground p-4 lg:hidden">
+      <div className="workspace-strip sticky bottom-0 z-10 border-t border-hairline bg-ground p-4 lg:hidden">
         <button
           type="submit"
           form={formId}

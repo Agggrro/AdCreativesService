@@ -41,8 +41,14 @@ const PLAYERS: { key: PlayerKey; label: string }[] = [
  * surface" — the whole product is dark — so it is separated by elevation and a
  * hairline instead. From `lg` it fills the stage and the 16:9 screen is the
  * largest that fits it, from the well's own size (container query units); below
- * it the screen takes the width and the well its height, and the stage sticks to
- * the top of the screen while the parameters scroll under it.
+ * it the screen takes the column's width, capped by the screen's height, and the
+ * stage sticks to the top while the parameters scroll under it — when the screen is
+ * tall enough to leave them room (`.stage-stick`, `.stage-screen`: app/globals.css).
+ *
+ * It is rendered **outside** the configurator's `<form>`. The Sandbox player runs
+ * the creative in this very document, inside the stage, and a creative's own
+ * buttons are `type`-less, which is a submit button to any form around them: a
+ * click on the ad's call to action saved the creative.
  */
 export function PreviewPanel({
   templateId,
@@ -123,7 +129,7 @@ export function PreviewPanel({
 
   return (
     <section
-      className={`flex min-w-0 flex-col gap-4 bg-surface p-4 max-lg:sticky max-lg:top-0 max-lg:z-10 max-lg:border-b max-lg:border-hairline lg:min-h-0 lg:flex-1 lg:px-8 lg:py-6 ${className}`}
+      className={`stage-stick flex min-w-0 flex-col gap-4 bg-surface p-4 max-lg:border-b max-lg:border-hairline lg:min-h-0 lg:flex-1 lg:px-8 lg:py-6 ${className}`}
     >
       <div className="flex items-center justify-end gap-3">
         <NavDropdown
@@ -164,7 +170,7 @@ export function PreviewPanel({
             control with no visible focus state at all. §2 names this as the single
             most repeated way focus disappears here.
           */}
-          <div className="relative aspect-video w-full lg:w-[min(calc(100cqw_-_24px),calc((100cqh_-_24px)_*_16/9))]">
+          <div className="stage-screen relative aspect-video w-full lg:w-[min(calc(100cqw_-_24px),calc((100cqh_-_24px)_*_16/9))]">
             <div
               /* Isolated for the same reason as `VpaidPreview`'s screen: a
                  creative's chrome would otherwise paint over the page's own. */

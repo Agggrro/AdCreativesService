@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFormStatus } from "react-dom";
+import { NavDropdownContext } from "@/components/NavDropdown";
 import { buttonClass, type ButtonSize } from "@/components/ui/Button";
 import { useDict } from "@/components/i18n/LocaleProvider";
 
@@ -109,13 +110,19 @@ export function ConfirmAction({
   const titleId = useId();
   const bodyId = useId();
 
+  const menu = useContext(NavDropdownContext);
+
   // Focus goes back to where the dialog was opened from, or a keyboard user is
   // dropped at the top of the page. When the action removed the trigger — a
-  // deleted row — there is nothing to return to and the ref is simply empty.
+  // deleted row — there is nothing to return to and the ref is simply empty. When
+  // the trigger is a row of a menu panel that has closed behind the dialog it is
+  // hidden and cannot take focus; the menu's own button can.
   const close = useCallback(() => {
     setOpen(false);
-    triggerRef.current?.focus();
-  }, []);
+    const trigger = triggerRef.current;
+    trigger?.focus();
+    if (menu && document.activeElement !== trigger) menu.focusTrigger();
+  }, [menu]);
 
   useEffect(() => {
     if (!open) return;

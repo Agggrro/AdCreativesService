@@ -1,20 +1,15 @@
 import { redirect } from "next/navigation";
-import { createServerSupabase } from "@/lib/supabase/server";
 
 /**
- * `/dashboard` is no longer a page — the sections are Каталог / Мои креативы /
- * Доступ (ADR-0008, ADR-0034). It stays as a redirect because old links still
- * point here.
+ * `/dashboard` is no longer a page — an account lives on Creatives (ADR-0037).
+ * It stays as a redirect because old links, and the default destination after
+ * sign-in and sign-up, still point here.
  *
- * A user with no creatives gets the catalog instead of an empty table: an empty
- * list is a bad first screen, and the catalog is where the first creative
- * actually starts.
+ * An account with no creatives lands on the same list. Its empty state is the
+ * title and one button that opens the template sheet, and it is where the access
+ * notice is shown; the catalog is no longer part of the signed-in navigation, so
+ * sending a newcomer there would leave both out (ADR-0038).
  */
-export default async function DashboardIndex() {
-  const supabase = await createServerSupabase();
-  const { count } = await supabase
-    .from("creatives")
-    .select("id", { count: "exact", head: true });
-
-  redirect(count && count > 0 ? "/dashboard/creatives" : "/catalog");
+export default function DashboardIndex(): never {
+  redirect("/dashboard/creatives");
 }

@@ -15,10 +15,12 @@ const ROW =
  * *More* on a creative's bar (docs/design-system.md §6, "Workspace"): the actions
  * that are not the screen's one action — check the tag in the validator, make a
  * copy, delete. The Duplicate row is a form and the Delete row opens a dialog, so
- * the menu does not close on a click (a form closed under its own click would
- * unmount before it submitted) and keeps its children mounted while closed (the
- * dialog's mousedown counts as outside the panel and would otherwise take the
- * dialog down with it) — `NavDropdown`'s two switches for exactly this.
+ * the menu keeps its children mounted while closed (a form closed under its own
+ * click would unmount before it submitted, and the dialog's mousedown counts as
+ * outside the panel and would otherwise take the dialog down with it) and closes on
+ * a click, handing focus back to its button — `NavDropdown`'s two switches for
+ * exactly this. Closing on the click is also what keeps a portalled panel from
+ * hanging over a list that has just grown by the copy.
  *
  * Delete goes through the destructive confirmation like every other irreversible
  * action; the row is plain text, never coloured (§3).
@@ -42,6 +44,7 @@ export function MoreMenu({
       label={dict.workspace.more}
       align="right"
       keepMounted
+      closeOnClick
       portal={portal}
       triggerClassName={buttonClass("secondary", "sm")}
       panelClassName="w-64 divide-y divide-hairline"

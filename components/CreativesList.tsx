@@ -50,7 +50,8 @@ type Filter = "all" | "serving" | "stopped";
  * the name takes what is left and wraps. `TableFrame` is `overflow-x-auto`, which
  * clips like `overflow-hidden` does: the focus rings on edge-adjacent buttons
  * survive only because every cell's padding (12px+) exceeds the ring's 4px — do
- * not trim it (§2). Below the width the content needs, the table scrolls inside
+ * not trim it (§2); the actions cell, whose buttons are 32px, keeps 6px, which still
+ * clears it. Below the width the content needs, the table scrolls inside
  * that frame (§5). *More* is portalled for the same reason: its panel would be
  * clipped by the frame.
  */
@@ -124,14 +125,17 @@ export function CreativesList({
           {/* Below `sm` the one primary is a full-width strip at the foot of the
               screen, where a thumb is, rather than a button lost in a wrapped
               toolbar; the list below keeps room for it. */}
-          <div className="max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:border-t max-sm:border-hairline max-sm:bg-ground max-sm:p-4 max-sm:[&>button]:w-full">
+          <div className="workspace-strip max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:border-t max-sm:border-hairline max-sm:bg-ground max-sm:p-4 max-sm:[&>button]:w-full">
             {newCreative}
           </div>
         </div>
       </div>
 
       {shown.length === 0 ? (
-        <p className="rounded-panel border border-hairline bg-surface p-6 type-small text-fg-muted">
+        <p
+          role="status"
+          className="rounded-panel border border-hairline bg-surface p-6 type-small text-fg-muted"
+        >
           {dict.dashboard.noMatches}
         </p>
       ) : (
@@ -160,12 +164,27 @@ export function CreativesList({
                         label={r.serving ? dict.dashboard.serving : dict.dashboard.notServing}
                       />
                     )}
-                    <span className="data-instr type-caption text-fg-muted">
-                      {statsAvailable
-                        ? `${number.format(r.impressions)} · ${number.format(r.clicks)} · ${
-                            r.impressions > 0 ? percent.format(r.clicks / r.impressions) : "—"
-                          }`
-                        : "—"}
+                    {/* Each reading with its name, and the ratio with its denominator
+                        (§6, "Metrics"): three bare numbers in a row say nothing. */}
+                    <span className="data-instr flex flex-wrap gap-x-3 type-caption text-fg-muted">
+                      {statsAvailable ? (
+                        <>
+                          <span>
+                            {dict.dashboard.impressions} {number.format(r.impressions)}
+                          </span>
+                          <span>
+                            {dict.dashboard.clicks} {number.format(r.clicks)}
+                          </span>
+                          <span>
+                            {dict.dashboard.ctr}{" "}
+                            {r.impressions > 0
+                              ? `${percent.format(r.clicks / r.impressions)} ${dict.dashboard.ctrOfImpressions}`
+                              : "—"}
+                          </span>
+                        </>
+                      ) : (
+                        "—"
+                      )}
                     </span>
                   </Link>
                   <CopyButton value={tag} size="md" className="shrink-0 border-0" variant="secondary" />
@@ -186,9 +205,17 @@ export function CreativesList({
                   lives on the creative's Stats, in its own tile. */}
               <th className={`${NUM_HEAD} w-px`}>{dict.dashboard.impressions}</th>
               <th className={`${NUM_HEAD} w-px`}>{dict.dashboard.clicks}</th>
-              <th className={`${NUM_HEAD} w-px`}>{dict.dashboard.ctr}</th>
+              {/* A ratio names its denominator, a table column included (§6). */}
+              <th className={`${NUM_HEAD} w-px`}>
+                {dict.dashboard.ctr}
+                <span className="block font-normal normal-case tracking-normal">
+                  {dict.dashboard.ctrOfImpressions}
+                </span>
+              </th>
               <th className={`${HEAD} w-px`}>{dict.dashboard.status}</th>
-              <th className={`${HEAD} w-px`} />
+              <th className={`${HEAD} w-px`}>
+                <span className="sr-only">{dict.dashboard.actions}</span>
+              </th>
             </TableHead>
             <tbody>
               {shown.map((r) => {
@@ -237,12 +264,16 @@ export function CreativesList({
                         <span className="chip-instr text-fg-muted">—</span>
                       )}
                     </td>
-                    <td className={`${CELL} ${FIT}`}>
+                    {/* `py-1.5`, not `CELL`'s: three 32px buttons in a cell of 12px
+                        padding made a 56px row of what is a 44px one (§6). 6px still
+                        clears the focus ring's 4px, which the table's scroll frame
+                        would otherwise clip (§2). */}
+                    <td className={`px-4 py-1.5 align-middle ${FIT}`}>
                       {/* Copy tag, Edit and More keep visible words: an icon-only
                           version read as indistinguishable specks (§11). The full
-                          tag is a hover away on the copy button and in full on the
-                          creative's own page — a truncated "https://…/v?creative_id="
-                          would show only the part every row shares. */}
+                          tag is a hover away on the copy button — a truncated
+                          "https://…/v?creative_id=" would show only the part every
+                          row shares. */}
                       <div className="flex items-center justify-end gap-2">
                         <div title={tag} className="inline-flex">
                           <CopyButton value={tag} size="sm" />

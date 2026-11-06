@@ -348,3 +348,50 @@ body {
 .focus-inset:focus-visible {
   outline-offset: -2px;
 }
+
+/*
+ * The stage of a creative's Settings below `lg` (docs/design-system.md §6,
+ * "Workspace"; ADR-0038): the creative sticks to the top while the parameters scroll
+ * under it, and its 16:9 screen is capped by the screen's height as well as by the
+ * column's width.
+ *
+ * Only where the screen is tall enough. A phone on its side is 360px high, and a
+ * stage that sticks there leaves nothing to scroll the fields into; below 600px
+ * the stage scrolls away with the page and its screen is held to 70% of the
+ * height. Above it the screen is held to 30% — a stage and a strip that between
+ * them took half the screen would leave a field no room to be seen in.
+ *
+ * Plain classes, not utilities: the two conditions are one rule each, and a width
+ * and a height in one utility name would be the longest class in the codebase.
+ *
+ * `scroll-padding` keeps what a keyboard focuses out from under the two things that
+ * stick to the viewport: the strip at the foot, and the stage at the top. The
+ * stage's 22rem is the most it takes — a launched creative with a notice under it —
+ * so a field is never left behind it (WCAG 2.4.11).
+ */
+@media (width < 64rem) {
+  .stage-screen {
+    width: min(100%, calc(70dvh * 16 / 9));
+    margin-inline: auto;
+  }
+
+  html:has(.workspace-strip) {
+    scroll-padding-bottom: 6rem;
+  }
+}
+
+@media (width < 64rem) and (min-height: 600px) {
+  .stage-stick {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .stage-screen {
+    width: min(100%, calc(30dvh * 16 / 9));
+  }
+
+  html:has(.stage-stick) {
+    scroll-padding-top: 22rem;
+  }
+}

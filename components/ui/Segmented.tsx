@@ -6,8 +6,8 @@ import { chipType } from "@/components/ui/Chip";
  * The segmented control (docs/design-system.md §6).
  *
  * The same shape had been hand-copied into the language switcher, the landing
- * hero's template switcher and the preview panel's player tabs; all three now
- * use this. "One implementation per repeated element" is the rule that keeps the
+ * hero's template switcher and what was the preview panel's player tabs (a menu
+ * now); all of them use this. "One implementation per repeated element" is the rule that keeps the
  * next copy from quietly shipping at weight 400 or 24px high — which is exactly
  * what had already happened, the three copies having drifted to three different
  * paddings for want of a shared line-height.

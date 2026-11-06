@@ -84,21 +84,58 @@ export function isSectionComplete(
   );
 }
 
+/** Why a field would be refused: nothing in a required one, or a value the browser's own check would reject. */
+export type FieldFault = "required" | "url" | "number";
+
+export interface InvalidField {
+  field: ConfigField;
+  fault: FieldFault;
+}
+
+function isAbsoluteUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * The first required, active field with no value, in schema order — what a save
- * would be refused for. Found here, before submit, because the field may live in a
- * section the inspector is not showing and a hidden input is exempt from the
- * browser's own validation: the server would be the first to notice, and its
- * redirect throws away everything else typed.
+ * The first active field a save would be refused for, in schema order: a required
+ * one with no value, a `url` that is not an absolute address, a number outside its
+ * bounds. Found here, before submit, because the field may live in a section the
+ * inspector is not showing and a hidden input is exempt from the browser's own
+ * validation — `required`, `type="url"`, `min` and `max` all — so the server would
+ * be the first to notice, and its redirect throws away everything else typed. For a
+ * field that is showing, the browser's check runs first and this one agrees with it.
+ *
+ * The server keeps its own check and is the only one that counts; this one decides
+ * whether a save is worth sending.
  */
-export function firstMissing(
+export function firstInvalid(
   fields: ConfigField[],
   visible: Set<string>,
   values: Record<string, string>,
-): ConfigField | null {
-  for (const f of fields) {
-    if (!visible.has(f.name) || !f.required) continue;
-    if ((values[f.name] ?? "").trim() === "") return f;
+): InvalidField | null {
+  for (const field of fields) {
+    if (!visible.has(field.name)) continue;
+    const value = (values[field.name] ?? "").trim();
+    if (value === "") {
+      if (field.required) return { field, fault: "required" };
+      continue;
+    }
+    if (field.type === "url" && !isAbsoluteUrl(value)) return { field, fault: "url" };
+    if (field.type === "number") {
+      const n = Number(value);
+      if (
+        !Number.isFinite(n) ||
+        (field.min !== undefined && n < field.min) ||
+        (field.max !== undefined && n > field.max)
+      ) {
+        return { field, fault: "number" };
+      }
+    }
   }
   return null;
 }
